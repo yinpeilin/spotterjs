@@ -1,0 +1,37 @@
+{
+  "name": "@spotter-rs/node",
+  "version": "0.1.0",
+  "description": "Spotter desktop automation for Node.js",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/ypl0lpy/spotter.git",
+    "directory": "crates/spotter-node"
+  },
+  "bugs": {
+    "url": "https://gitee.com/ypl0lpy/spotter/issues"
+  },
+  "homepage": "https://gitee.com/ypl0lpy/spotter#readme",
+  "files": ["index.js", "index.d.ts", "LICENSE", "README.md"],
+  "engines": {
+    "node": ">=18"
+  },
+  "napi": {
+    "binaryName": "spotter-node",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:linux": "napi build --platform --release --features linux-x11",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -p . --skip-gh-release && node ../../scripts/sync-license.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@spotter-rs/node-match-opencv",
+  "version": "0.1.0",
+  "description": "OpenCV template matching native addon for Spotter",
+  "main": "index.js",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/ypl0lpy/spotter.git",
+    "directory": "crates/spotter-node-match-opencv"
+  },
+  "bugs": {
+    "url": "https://gitee.com/ypl0lpy/spotter/issues"
+  },
+  "homepage": "https://gitee.com/ypl0lpy/spotter#readme",
+  "files": ["index.js", "LICENSE", "README.md"],
+  "engines": {
+    "node": ">=18"
+  },
+  "napi": {
+    "binaryName": "spotter-node-match-opencv",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -p . --skip-gh-release && node ../../scripts/sync-license.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  }
+}

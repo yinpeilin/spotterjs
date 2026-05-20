@@ -1,0 +1,42 @@
+{
+  "name": "spotter-workspace",
+  "private": true,
+  "scripts": {
+    "build": "npm run build -w @spotter/base && npm run build -w @spotter-rs/node && npm run build -w @spotter/core && npm run build -w @spotter/plugin-ocr && npm run build -w @spotter-rs/node-match-opencv && npm run build -w @spotter/plugin-match-opencv",
+    "build:ts": "npm run build -w @spotter/base && npm run build -w @spotter/core && npm run build -w @spotter/plugin-ocr && npm run build -w @spotter/plugin-match-opencv",
+    "build:native": "npm run build -w @spotter-rs/node && npm run build -w @spotter-rs/node-match-opencv",
+    "sync-license": "node scripts/sync-license.mjs",
+    "test": "npm run test:rust && npm run test --workspaces --if-present",
+    "test:rust": "cargo test --workspace",
+    "test:rust:ignored": "cargo test --workspace -- --ignored",
+    "smoke": "tsx scripts/smoke/run-all.ts",
+    "smoke:version": "tsx scripts/smoke/01-version-screen.ts",
+    "smoke:capture": "tsx scripts/smoke/02-capture.ts",
+    "smoke:clipboard": "tsx scripts/smoke/03-clipboard.ts",
+    "smoke:windows": "tsx scripts/smoke/04-windows.ts",
+    "smoke:match": "tsx scripts/smoke/05-match-self.ts",
+    "smoke:a11y": "tsx scripts/smoke/06-accessibility-notepad.ts",
+    "integration:wechat:dump": "tsx scripts/integration/06-uia-dump-wechat.ts",
+    "integration:wechat:send": "tsx scripts/integration/wechat-send.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "npm run sync-license && changeset publish",
+    "verify-pack": "node scripts/verify-pack.mjs"
+  },
+  "workspaces": [
+    "packages/base",
+    "packages/core",
+    "packages/plugin-match-opencv",
+    "packages/plugin-ocr",
+    "crates/spotter-node",
+    "crates/spotter-node-match-opencv"
+  ],
+  "devDependencies": {
+    "@changesets/cli": "^2.29.0",
+    "@spotter/core": "0.1.0",
+    "@spotter/plugin-ocr": "0.1.0",
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0",
+    "tsx": "^4.19.0"
+  }
+}

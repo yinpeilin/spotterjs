@@ -1,0 +1,27 @@
+{
+  "name": "@spotter/base",
+  "version": "0.1.0",
+  "description": "Shared TypeScript types for Spotter",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/ypl0lpy/spotter.git",
+    "directory": "packages/base"
+  },
+  "bugs": {
+    "url": "https://gitee.com/ypl0lpy/spotter/issues"
+  },
+  "homepage": "https://gitee.com/ypl0lpy/spotter#readme",
+  "files": ["dist", "LICENSE", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^3.0.0"
+  }
+}

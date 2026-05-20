@@ -1,0 +1,52 @@
+{
+  "app": {
+    "windowTitleContains": "微信",
+    "focusDelayMs": 500
+  },
+  "accessibility": {
+    "enabled": true,
+    "treeDepth": 12,
+    "attachDelayMs": 500,
+    "eventSubscription": true,
+    "minListItemCount": 3
+  },
+  "flow": {
+    "contact": "${WECHAT_CONTACT}",
+    "message": "${WECHAT_MESSAGE}",
+    "steps": {
+      "openContact": {
+        "query": {
+          "controlType": "ListItem",
+          "name": "${contact}",
+          "match": "exact"
+        },
+        "action": "invoke",
+        "timeoutMs": 10000,
+        "pollMs": 200
+      },
+      "fillMessage": {
+        "query": {
+          "controlType": "Edit"
+        },
+        "action": "setValue",
+        "value": "${message}",
+        "timeoutMs": 10000,
+        "pollMs": 200
+      },
+      "send": {
+        "query": {
+          "controlType": "Button",
+          "name": "发送",
+          "match": "exact"
+        },
+        "action": "invoke",
+        "timeoutMs": 5000,
+        "pollMs": 200
+      }
+    }
+  },
+  "diagnostics": {
+    "dumpOnFailure": true,
+    "outputDir": "test-output"
+  }
+}
