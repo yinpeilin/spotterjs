@@ -15,37 +15,27 @@ npm run build --workspace=@spotter/core
 
 ```bash
 npm run smoke
+npm run smoke:ncc:synthetic   # 合成图 NCC 回归（不依赖微信）
+npm run smoke:match-tap       # 窗口匹配→鼠标对齐（含双屏，已纳入 smoke）
 ```
 
-含版本、截屏、剪贴板、窗口、模板自匹配、记事本 UIA 等。
+## 微信
 
-## 微信发消息（唯一入口）
+共享逻辑与坐标系：`scripts/integration/lib/wechat-contact.ts`（窗口外框 = 截图像素原点）
 
-**模板匹配**点击会话行 + **剪贴板**输入，不用 OCR。
+| npm 命令 | 脚本 | 说明 |
+|----------|------|------|
+| `integration:wechat:match` | `wechat-match.ts` | 匹配左侧会话并点击 |
+| `integration:wechat:send` | `wechat-send.ts` | 匹配 → 输入 → 发送 |
+| `integration:wechat:dump` | `06-uia-dump-wechat.ts` | UIA 树调试，不发消息 |
 
-1. 准备模板：`assets/wechat/templates/file-transfer-assistant.png`（见该目录 README）
-2. 运行：
-
-```bash
-npm run integration:wechat:send
-```
+模板与变量说明：`assets/wechat/templates/README.md`
 
 ```powershell
 $env:WECHAT_MESSAGE="你好"
-$env:WECHAT_CONTACT_TEMPLATE="C:\path\to\contact-row.png"  # 可选
 npm run integration:wechat:send
-```
-
-会发送真实消息，发送后请目视确认。
-
-## 无障碍（UIA）调试
-
-仅调试树结构，不参与发消息：
-
-```bash
-npm run integration:wechat:dump
 ```
 
 ## 安全
 
-- `integration:wechat:send` 会操作真实微信并发消息。
+- `integration:wechat:send` 会向真实微信发送消息，请先确认模板与联系人。
