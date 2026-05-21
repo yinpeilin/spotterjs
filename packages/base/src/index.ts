@@ -25,6 +25,26 @@ export interface MatchOptions {
   scaleStep?: number;
 }
 
+export interface WindowInfo {
+  id: string;
+  idHex: string;
+  title: string;
+  region: Region;
+  processId: number;
+  processName: string;
+  exePath?: string;
+  isMinimized: boolean;
+  isForeground: boolean;
+}
+
+export interface DesktopApp {
+  processId: number;
+  processName: string;
+  exePath?: string;
+  windows: WindowInfo[];
+  isForeground: boolean;
+}
+
 export interface MatchProvider {
   find(needle: string | Buffer, options?: MatchOptions): Promise<Region>;
   findAll(needle: string | Buffer, options?: MatchOptions): Promise<Region[]>;

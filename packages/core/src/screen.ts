@@ -1,16 +1,12 @@
-import type { CaptureImage, MatchOptions, MatchProvider, Region } from "@spotter/base";
-import { createNccMatchProvider, captureForMatch } from "./match";
+import { centerOf, type CaptureImage, type MatchOptions, type Region } from "@spotter/base";
+import {
+  captureForMatch,
+  findAllNeedle,
+  findNeedle,
+  toNativeOpts,
+  waitForNeedle,
+} from "./match";
 import { loadNative } from "./native";
-
-let matchProvider: MatchProvider = createNccMatchProvider();
-
-export function useMatchPlugin(provider: MatchProvider): void {
-  matchProvider = provider;
-}
-
-export function getMatchProvider(): MatchProvider {
-  return matchProvider;
-}
 
 export const screen = {
   width(): number {
@@ -25,11 +21,27 @@ export const screen = {
   capture(region?: Region): CaptureImage {
     return captureForMatch(region);
   },
+  captureWindow(windowId: string): CaptureImage {
+    return loadNative().captureWindow(windowId);
+  },
+  captureActive(): CaptureImage {
+    const active = loadNative().getActiveWindow();
+    return loadNative().captureWindow(active.id);
+  },
+  tapTemplate(needle: string | Buffer, options?: MatchOptions): Region {
+    const native = loadNative();
+    const path = typeof needle === "string" ? needle : "";
+    const buffer = typeof needle === "string" ? undefined : needle;
+    const region = native.findTemplate(path, buffer, toNativeOpts(options));
+    const { x, y } = centerOf(region);
+    native.tapAt(x, y);
+    return region;
+  },
   find(needle: string | Buffer, options?: MatchOptions): Promise<Region> {
-    return matchProvider.find(needle, options);
+    return findNeedle(needle, options);
   },
   findAll(needle: string | Buffer, options?: MatchOptions): Promise<Region[]> {
-    return matchProvider.findAll(needle, options);
+    return findAllNeedle(needle, options);
   },
   waitFor(
     needle: string | Buffer,
@@ -37,6 +49,6 @@ export const screen = {
     options?: MatchOptions,
     intervalMs?: number
   ): Promise<Region> {
-    return matchProvider.waitFor(needle, timeoutMs, options, intervalMs);
+    return waitForNeedle(needle, timeoutMs, options, intervalMs);
   },
 };

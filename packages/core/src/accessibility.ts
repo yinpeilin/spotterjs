@@ -1,4 +1,8 @@
-import { loadNative } from "./native";
+import {
+  loadNative,
+  type NativeAttachReport,
+  type NativeTreeHealth,
+} from "./native";
 import type { Region } from "@spotter/base";
 
 export type A11yQuery = {
@@ -18,24 +22,11 @@ export type A11yConfig = {
   minListItemCount?: number;
 };
 
-export type TreeHealth = {
-  maxDepth: number;
-  totalNodes: number;
-  listItemCount: number;
-  editCount: number;
-  buttonCount: number;
-  controlTypeCounts: Record<string, number>;
-};
+/** @see {@link NativeTreeHealth} — N-API shape from `@spotter-rs/node` */
+export type TreeHealth = NativeTreeHealth;
 
-export type AttachReport = {
-  elementId: string;
-  clientMode: boolean;
-  eventHandlerRegistered: boolean;
-  structureChangedEvents: number;
-  healthInitial: TreeHealth;
-  healthFinal: TreeHealth;
-  treeWaitMs: number;
-};
+/** @see {@link NativeAttachReport} — N-API shape from `@spotter-rs/node` */
+export type AttachReport = NativeAttachReport;
 
 function queryToNative(q: A11yQuery) {
   return {
@@ -58,59 +49,17 @@ function configToNative(config?: A11yConfig) {
   };
 }
 
-function healthFromNative(h: {
-  maxDepth: number;
-  totalNodes: number;
-  listItemCount: number;
-  editCount: number;
-  buttonCount: number;
-  controlTypeCounts: Record<string, number>;
-}): TreeHealth {
-  return {
-    maxDepth: h.maxDepth,
-    totalNodes: h.totalNodes,
-    listItemCount: h.listItemCount,
-    editCount: h.editCount,
-    buttonCount: h.buttonCount,
-    controlTypeCounts: h.controlTypeCounts,
-  };
+function healthFromNative(h: NativeTreeHealth): TreeHealth {
+  return h;
 }
 
-function attachReportFromNative(r: {
-  elementId: string;
-  clientMode: boolean;
-  eventHandlerRegistered: boolean;
-  structureChangedEvents: number;
-  healthInitial: {
-    maxDepth: number;
-    totalNodes: number;
-    listItemCount: number;
-    editCount: number;
-    buttonCount: number;
-    controlTypeCounts: Record<string, number>;
-  };
-  healthFinal: {
-    maxDepth: number;
-    totalNodes: number;
-    listItemCount: number;
-    editCount: number;
-    buttonCount: number;
-    controlTypeCounts: Record<string, number>;
-  };
-  treeWaitMs: number;
-}): AttachReport {
-  return {
-    elementId: r.elementId,
-    clientMode: r.clientMode,
-    eventHandlerRegistered: r.eventHandlerRegistered,
-    structureChangedEvents: r.structureChangedEvents,
-    healthInitial: healthFromNative(r.healthInitial),
-    healthFinal: healthFromNative(r.healthFinal),
-    treeWaitMs: r.treeWaitMs,
-  };
+function attachReportFromNative(r: NativeAttachReport): AttachReport {
+  return r;
 }
 
-export const accessibility = {
+import { extendAccessibility } from "./accessibility-helpers";
+
+const accessibilityBase = {
   enable(config?: A11yConfig): void {
     loadNative().accessibilityEnable(configToNative(config));
   },
@@ -190,3 +139,5 @@ export const accessibility = {
     return healthFromNative(h);
   },
 };
+
+export const accessibility = extendAccessibility(accessibilityBase);
