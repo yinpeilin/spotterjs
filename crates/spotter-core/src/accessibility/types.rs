@@ -5,6 +5,27 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct A11yElementId(pub u64);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TreeViewMode {
+    #[default]
+    Auto,
+    Raw,
+    Control,
+    Content,
+}
+
+impl TreeViewMode {
+    pub fn from_str(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "raw" => Self::Raw,
+            "control" => Self::Control,
+            "content" => Self::Content,
+            _ => Self::Auto,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A11yConfig {
     pub attach_delay_ms: u64,
@@ -18,6 +39,9 @@ pub struct A11yConfig {
     pub tree_wait_poll_ms: u64,
     #[serde(default = "default_min_list_items")]
     pub min_list_item_count: u32,
+    /// UIA tree walker: auto uses control when client_mode else raw.
+    #[serde(default)]
+    pub tree_view: TreeViewMode,
 }
 
 fn default_true() -> bool {
@@ -41,8 +65,19 @@ impl Default for A11yConfig {
             tree_wait_timeout_ms: 15_000,
             tree_wait_poll_ms: 300,
             min_list_item_count: 1,
+            tree_view: TreeViewMode::Auto,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachCandidate {
+    pub hwnd: u64,
+    pub class_name: String,
+    pub total_nodes: u32,
+    pub list_item_count: u32,
+    pub edit_count: u32,
+    pub chosen: bool,
 }
 
 /// Result of attach + optional client-mode tree expansion.
@@ -55,6 +90,11 @@ pub struct AttachReport {
     pub health_initial: TreeHealth,
     pub health_final: TreeHealth,
     pub tree_wait_ms: u64,
+    pub attach_strategy: String,
+    pub attached_hwnd: u64,
+    pub tree_view: String,
+    pub candidates: Vec<AttachCandidate>,
+    pub diagnosis: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,9 +129,27 @@ pub struct TreeNodeDump {
     pub name: String,
     pub control_type: String,
     pub automation_id: String,
+    pub class_name: String,
+    pub framework_id: String,
+    pub runtime_id: String,
+    pub is_offscreen: bool,
+    pub patterns: Vec<String>,
     pub bounds: Option<A11yBounds>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<TreeNodeDump>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElementInfo {
+    pub name: String,
+    pub control_type: String,
+    pub automation_id: String,
+    pub class_name: String,
+    pub framework_id: String,
+    pub runtime_id: String,
+    pub is_offscreen: bool,
+    pub patterns: Vec<String>,
+    pub bounds: Option<A11yBounds>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

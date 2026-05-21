@@ -78,11 +78,12 @@ With `SPOTTER_A11Y=1`:
 
 | Tool | Description |
 |------|-------------|
-| `desktop_a11y_attach_window` | Attach UIA / AT-SPI tree |
+| `desktop_a11y_attach_window` | Attach UIA / AT-SPI tree (returns HWND candidates + diagnosis) |
 | `desktop_a11y_find` | Find element |
 | `desktop_a11y_invoke` | Invoke pattern |
 | `desktop_a11y_tap_element` | Click element center |
-| `desktop_a11y_dump_tree` | Dump accessibility tree |
+| `desktop_a11y_dump_tree` | Dump accessibility tree (`treeView`: auto/raw/control/content) |
+| `desktop_a11y_element_info` | Single element metadata (patterns, runtimeId, etc.) |
 
 ### Host (`host_*`)
 

@@ -1,35 +1,48 @@
-use super::state::{self, store_element};
+use super::state::{self, store_element, update_element};
 use super::types::{
-    A11yBounds, A11yConfig, A11yElementId, A11yQuery, AttachReport, TreeHealth, TreeNodeDump,
+    A11yBounds, A11yConfig, A11yElementId, A11yQuery, AttachCandidate, AttachReport, ElementInfo,
+    TreeHealth, TreeNodeDump, TreeViewMode,
 };
 use super::uia_handler::create_structure_handler;
 use crate::error::{Result, SpotterError};
 use crate::types::{Region, WindowId};
 use crate::window::get_active_window;
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 use windows::core::BSTR;
-use windows::Win32::Foundation::HWND;
+use windows::core::BOOL;
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
+use windows::Win32::Graphics::Gdi::ClientToScreen;
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
+use windows::Win32::System::Ole::{
+    SafeArrayGetDim, SafeArrayGetElement,
+};
 use windows::Win32::UI::Accessibility::{
-    CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationStructureChangedEventHandler,
-    IUIAutomationTreeWalker, IUIAutomationInvokePattern, IUIAutomationValuePattern,
+    CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationInvokePattern,
+    IUIAutomationStructureChangedEventHandler, IUIAutomationTreeWalker, IUIAutomationValuePattern,
     TreeScope_Subtree, UIA_ButtonControlTypeId, UIA_DocumentControlTypeId, UIA_EditControlTypeId,
-    UIA_ListItemControlTypeId, UIA_PaneControlTypeId, UIA_TextControlTypeId, UIA_InvokePatternId,
-    UIA_ValuePatternId,
+    UIA_ExpandCollapsePatternId, UIA_InvokePatternId, UIA_ListItemControlTypeId, UIA_PaneControlTypeId,
+    UIA_PATTERN_ID, UIA_ScrollPatternId, UIA_SelectionPatternId, UIA_TextControlTypeId,
+    UIA_TextPatternId, UIA_ValuePatternId,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumChildWindows, GetClassNameW, GetClientRect, IsWindowVisible,
 };
 
 pub struct StoredElement {
     pub element: IUIAutomationElement,
+    pub attached_hwnd: HWND,
 }
 
 struct UiaSessionInner {
     automation: IUIAutomation,
     walker: IUIAutomationTreeWalker,
     control_walker: IUIAutomationTreeWalker,
+    content_walker: IUIAutomationTreeWalker,
+    active_tree_view: TreeViewMode,
     structure_handler: Option<IUIAutomationStructureChangedEventHandler>,
     handler_events: Option<std::sync::Arc<std::sync::atomic::AtomicU32>>,
     subscribed_hwnd: Option<HWND>,
@@ -41,12 +54,50 @@ thread_local! {
 
 static CONFIG: OnceLock<A11yConfig> = OnceLock::new();
 
+const MIN_CLIENT_AREA: i32 = 50;
+const THIN_TREE_NODES: u32 = 5;
+
 pub fn set_config(config: A11yConfig) {
     let _ = CONFIG.set(config);
 }
 
 fn config() -> A11yConfig {
     CONFIG.get().cloned().unwrap_or_default()
+}
+
+fn resolve_tree_view(cfg: &A11yConfig, client_mode: bool) -> TreeViewMode {
+    match cfg.tree_view {
+        TreeViewMode::Auto => {
+            if client_mode {
+                TreeViewMode::Control
+            } else {
+                TreeViewMode::Raw
+            }
+        }
+        other => other,
+    }
+}
+
+fn tree_view_label(mode: TreeViewMode) -> String {
+    match mode {
+        TreeViewMode::Auto => "auto".into(),
+        TreeViewMode::Raw => "raw".into(),
+        TreeViewMode::Control => "control".into(),
+        TreeViewMode::Content => "content".into(),
+    }
+}
+
+fn walker_for<'a>(
+    session: &'a UiaSessionInner,
+    override_mode: Option<TreeViewMode>,
+) -> &'a IUIAutomationTreeWalker {
+    let mode = override_mode.unwrap_or(session.active_tree_view);
+    match mode {
+        TreeViewMode::Raw => &session.walker,
+        TreeViewMode::Control => &session.control_walker,
+        TreeViewMode::Content => &session.content_walker,
+        TreeViewMode::Auto => &session.walker,
+    }
 }
 
 pub fn init_session() -> Result<()> {
@@ -66,10 +117,15 @@ pub fn init_session() -> Result<()> {
             let control_walker = automation
                 .ControlViewWalker()
                 .map_err(|e| SpotterError::Platform(format!("ControlViewWalker: {e}")))?;
+            let content_walker = automation
+                .ContentViewWalker()
+                .map_err(|e| SpotterError::Platform(format!("ContentViewWalker: {e}")))?;
             *cell.borrow_mut() = Some(UiaSessionInner {
                 automation,
                 walker,
                 control_walker,
+                content_walker,
+                active_tree_view: TreeViewMode::Raw,
                 structure_handler: None,
                 handler_events: None,
                 subscribed_hwnd: None,
@@ -109,10 +165,77 @@ fn hwnd_from_id(id: WindowId) -> HWND {
     HWND(id.0 as *mut std::ffi::c_void)
 }
 
+fn hwnd_to_u64(hwnd: HWND) -> u64 {
+    hwnd.0 as usize as u64
+}
+
 unsafe fn element_from_hwnd(automation: &IUIAutomation, hwnd: HWND) -> Result<IUIAutomationElement> {
     automation
         .ElementFromHandle(hwnd)
         .map_err(|e| SpotterError::Platform(format!("ElementFromHandle: {e}")))
+}
+
+unsafe fn win32_class_name(hwnd: HWND) -> String {
+    let mut buf = [0u16; 256];
+    let len = GetClassNameW(hwnd, &mut buf);
+    if len > 0 {
+        String::from_utf16_lossy(&buf[..len as usize])
+    } else {
+        String::new()
+    }
+}
+
+unsafe fn client_area_ok(hwnd: HWND) -> bool {
+    if !IsWindowVisible(hwnd).as_bool() {
+        return false;
+    }
+    let mut rect = RECT::default();
+    if GetClientRect(hwnd, &mut rect).is_err() {
+        return false;
+    }
+    let w = rect.right - rect.left;
+    let h = rect.bottom - rect.top;
+    w >= MIN_CLIENT_AREA && h >= MIN_CLIENT_AREA
+}
+
+unsafe fn enum_child_hwnds(parent: HWND, out: &mut Vec<HWND>) {
+    unsafe extern "system" fn proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let out = &mut *(lparam.0 as *mut Vec<HWND>);
+        if client_area_ok(hwnd) {
+            out.push(hwnd);
+            enum_child_hwnds(hwnd, out);
+        }
+        BOOL(1)
+    }
+    let _ = EnumChildWindows(Some(parent), Some(proc), LPARAM(out as *mut _ as _));
+}
+
+unsafe fn collect_hwnd_candidates(top: HWND) -> Vec<HWND> {
+    let mut hwnds = Vec::new();
+    if client_area_ok(top) {
+        hwnds.push(top);
+    }
+    enum_child_hwnds(top, &mut hwnds);
+    hwnds.sort_by_key(|h| hwnd_to_u64(*h));
+    hwnds.dedup();
+    hwnds
+}
+
+unsafe fn client_center_screen(hwnd: HWND) -> Option<POINT> {
+    let mut rect = RECT::default();
+    GetClientRect(hwnd, &mut rect).ok()?;
+    let mut pt = POINT {
+        x: rect.left + (rect.right - rect.left) / 2,
+        y: rect.top + (rect.bottom - rect.top) / 2,
+    };
+    if !ClientToScreen(hwnd, &mut pt).as_bool() {
+        return None;
+    }
+    Some(pt)
+}
+
+fn score_health(h: &TreeHealth) -> u32 {
+    h.total_nodes + h.list_item_count * 10 + h.edit_count * 5 + h.button_count * 2
 }
 
 unsafe fn tree_health_on_element(
@@ -187,7 +310,12 @@ unsafe fn register_structure_handler(
     Ok(true)
 }
 
-fn wait_for_tree_expand(hwnd: HWND, max_depth: u32, initial: &TreeHealth) -> u64 {
+fn wait_for_tree_expand(
+    hwnd: HWND,
+    max_depth: u32,
+    tree_view: TreeViewMode,
+    initial: &TreeHealth,
+) -> u64 {
     let cfg = config();
     if cfg.tree_wait_timeout_ms == 0 {
         return 0;
@@ -204,7 +332,8 @@ fn wait_for_tree_expand(hwnd: HWND, max_depth: u32, initial: &TreeHealth) -> u64
             let sess = guard.as_ref()?;
             unsafe {
                 let el = element_from_hwnd(&sess.automation, hwnd).ok()?;
-                let h = tree_health_on_element(&sess.control_walker, &el, max_depth);
+                let walker = walker_for(sess, Some(tree_view));
+                let h = tree_health_on_element(walker, &el, max_depth);
                 Some(h)
             }
         });
@@ -218,9 +347,151 @@ fn wait_for_tree_expand(hwnd: HWND, max_depth: u32, initial: &TreeHealth) -> u64
     elapsed
 }
 
+struct AttachSelection {
+    hwnd: HWND,
+    element: IUIAutomationElement,
+    strategy: String,
+    candidates: Vec<AttachCandidate>,
+}
+
+unsafe fn probe_hwnd_candidates(
+    session: &UiaSessionInner,
+    top_hwnd: HWND,
+    max_depth: u32,
+    walker: &IUIAutomationTreeWalker,
+) -> Vec<(HWND, IUIAutomationElement, TreeHealth)> {
+    let mut results = Vec::new();
+    for hwnd in collect_hwnd_candidates(top_hwnd) {
+        if let Ok(el) = element_from_hwnd(&session.automation, hwnd) {
+            let health = tree_health_on_element(walker, &el, max_depth);
+            results.push((hwnd, el, health));
+        }
+    }
+    results
+}
+
+unsafe fn select_attach_target(
+    session: &UiaSessionInner,
+    top_hwnd: HWND,
+    max_depth: u32,
+    walker: &IUIAutomationTreeWalker,
+) -> AttachSelection {
+    let probes = probe_hwnd_candidates(session, top_hwnd, max_depth, walker);
+    let mut best_idx = 0usize;
+    let mut best_score = 0u32;
+    for (i, (_, _, health)) in probes.iter().enumerate() {
+        let score = score_health(health);
+        if score > best_score {
+            best_score = score;
+            best_idx = i;
+        }
+    }
+
+    let mut strategy = "top_level".to_string();
+    let mut chosen_hwnd = top_hwnd;
+    let mut chosen_el = probes
+        .first()
+        .map(|(_, el, _)| el.clone())
+        .unwrap_or_else(|| {
+            element_from_hwnd(&session.automation, top_hwnd).unwrap_or_else(|_| {
+                panic!("top hwnd must resolve")
+            })
+        });
+
+    if let Some((hwnd, el, _)) = probes.get(best_idx) {
+        chosen_hwnd = *hwnd;
+        chosen_el = el.clone();
+        if *hwnd != top_hwnd {
+            strategy = "child_hwnd".into();
+        }
+    }
+
+    let mut candidates: Vec<AttachCandidate> = probes
+        .iter()
+        .enumerate()
+        .map(|(i, (hwnd, _, health))| AttachCandidate {
+            hwnd: hwnd_to_u64(*hwnd),
+            class_name: win32_class_name(*hwnd),
+            total_nodes: health.total_nodes,
+            list_item_count: health.list_item_count,
+            edit_count: health.edit_count,
+            chosen: i == best_idx,
+        })
+        .collect();
+
+    let best_health = probes
+        .get(best_idx)
+        .map(|(_, _, h)| h)
+        .cloned()
+        .unwrap_or(TreeHealth {
+            max_depth: 0,
+            total_nodes: 0,
+            control_type_counts: HashMap::new(),
+            list_item_count: 0,
+            edit_count: 0,
+            button_count: 0,
+        });
+
+    if best_health.total_nodes < THIN_TREE_NODES {
+        if let Some(pt) = client_center_screen(top_hwnd) {
+            if let Ok(el) = session.automation.ElementFromPoint(pt) {
+                let health = tree_health_on_element(walker, &el, max_depth);
+                if score_health(&health) > best_score {
+                    if let Ok(native) = el.CurrentNativeWindowHandle() {
+                        chosen_hwnd = native;
+                    }
+                    chosen_el = el;
+                    strategy = "element_from_point".into();
+                    for c in &mut candidates {
+                        c.chosen = false;
+                    }
+                    candidates.push(AttachCandidate {
+                        hwnd: hwnd_to_u64(chosen_hwnd),
+                        class_name: win32_class_name(chosen_hwnd),
+                        total_nodes: health.total_nodes,
+                        list_item_count: health.list_item_count,
+                        edit_count: health.edit_count,
+                        chosen: true,
+                    });
+                }
+            }
+        }
+    }
+
+    AttachSelection {
+        hwnd: chosen_hwnd,
+        element: chosen_el,
+        strategy,
+        candidates,
+    }
+}
+
+fn build_diagnosis(
+    health: &TreeHealth,
+    client_mode: bool,
+    strategy: &str,
+    candidates: &[AttachCandidate],
+) -> Vec<String> {
+    let mut d = Vec::new();
+    if health.total_nodes >= THIN_TREE_NODES {
+        return d;
+    }
+    if !client_mode {
+        d.push("enable_event_subscription".into());
+    }
+    if strategy == "top_level" && candidates.len() > 1 {
+        d.push("try_child_hwnd".into());
+    }
+    if health.total_nodes < THIN_TREE_NODES {
+        d.push("increase_tree_wait".into());
+    }
+    d.push("fallback_template_matching".into());
+    d
+}
+
 pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport> {
-    let hwnd = hwnd_from_id(id);
-    if hwnd.0.is_null() {
+    let top_hwnd = hwnd_from_id(id);
+    if top_hwnd.0.is_null() {
         return Err(SpotterError::InvalidWindowId(id.to_hex()));
     }
     let cfg = config();
@@ -230,33 +501,47 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
     }
 
     let client_mode = cfg.event_subscription;
-    let (health_initial, event_handler_registered, should_wait) =
+    let active_tree_view = resolve_tree_view(&cfg, client_mode);
+
+    let (selection, health_initial, event_handler_registered, should_wait) =
         with_session_mut(|session| unsafe {
-            let element = element_from_hwnd(&session.automation, hwnd)?;
-            let health_initial = tree_health_on_element(&session.walker, &element, max_depth);
+            session.active_tree_view = active_tree_view;
+            let walker = walker_for(session, Some(active_tree_view));
+            let selection = select_attach_target(session, top_hwnd, max_depth, walker);
+            let health_initial =
+                tree_health_on_element(walker, &selection.element, max_depth);
             let event_handler_registered = if client_mode {
-                register_structure_handler(session, hwnd, &element).unwrap_or(false)
+                register_structure_handler(session, selection.hwnd, &selection.element)
+                    .unwrap_or(false)
             } else {
                 false
             };
             let should_wait =
                 client_mode && event_handler_registered && cfg.tree_wait_timeout_ms > 0;
-            Ok((health_initial, event_handler_registered, should_wait))
+            Ok((
+                selection,
+                health_initial,
+                event_handler_registered,
+                should_wait,
+            ))
         })?;
 
     let tree_wait_ms = if should_wait {
-        wait_for_tree_expand(hwnd, max_depth, &health_initial)
+        wait_for_tree_expand(
+            selection.hwnd,
+            max_depth,
+            active_tree_view,
+            &health_initial,
+        )
     } else {
         0
     };
 
     with_session_mut(|session| unsafe {
-        let element_final = element_from_hwnd(&session.automation, hwnd)?;
-        let health_final = if client_mode {
-            tree_health_on_element(&session.control_walker, &element_final, max_depth)
-        } else {
-            tree_health_on_element(&session.walker, &element_final, max_depth)
-        };
+        let walker = walker_for(session, Some(active_tree_view));
+        let element_final = element_from_hwnd(&session.automation, selection.hwnd)
+            .unwrap_or(selection.element.clone());
+        let health_final = tree_health_on_element(walker, &element_final, max_depth);
 
         let structure_events = session
             .handler_events
@@ -264,8 +549,16 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
             .map(|c| c.load(std::sync::atomic::Ordering::Relaxed))
             .unwrap_or(0);
 
+        let diagnosis = build_diagnosis(
+            &health_final,
+            client_mode,
+            &selection.strategy,
+            &selection.candidates,
+        );
+
         let id_el = store_element(StoredElement {
             element: element_final,
+            attached_hwnd: selection.hwnd,
         });
 
         Ok(AttachReport {
@@ -276,6 +569,11 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
             health_initial,
             health_final,
             tree_wait_ms,
+            attach_strategy: selection.strategy,
+            attached_hwnd: hwnd_to_u64(selection.hwnd),
+            tree_view: tree_view_label(active_tree_view),
+            candidates: selection.candidates,
+            diagnosis,
         })
     })
 }
@@ -289,6 +587,19 @@ pub fn attach_window(id: WindowId) -> Result<A11yElementId> {
 pub fn attach_active() -> Result<A11yElementId> {
     let active = get_active_window()?;
     attach_window(active.id)
+}
+
+pub fn refresh_root(id: A11yElementId) -> Result<()> {
+    with_session(|session| {
+        state::with_element(id, |stored| unsafe {
+            let fresh = element_from_hwnd(&session.automation, stored.attached_hwnd)?;
+            update_element(id, StoredElement {
+                element: fresh,
+                attached_hwnd: stored.attached_hwnd,
+            });
+            Ok(())
+        })
+    })
 }
 
 fn control_type_from_str(s: &str) -> Option<i32> {
@@ -321,6 +632,44 @@ fn control_type_name(id: i32) -> String {
     }
 }
 
+unsafe fn runtime_id_string(el: &IUIAutomationElement) -> String {
+    let Ok(sa) = el.GetRuntimeId() else {
+        return String::new();
+    };
+    if sa.is_null() || SafeArrayGetDim(sa) == 0 {
+        return String::new();
+    }
+    let mut parts = Vec::new();
+    let mut i = 0i32;
+    loop {
+        let mut val = 0i32;
+        if SafeArrayGetElement(sa, &i, &mut val as *mut _ as *mut _).is_err() {
+            break;
+        }
+        parts.push(val.to_string());
+        i += 1;
+    }
+    parts.join(".")
+}
+
+unsafe fn element_patterns(el: &IUIAutomationElement) -> Vec<String> {
+    let checks: &[(i32, &str)] = &[
+        (UIA_InvokePatternId.0, "Invoke"),
+        (UIA_ValuePatternId.0, "Value"),
+        (UIA_TextPatternId.0, "Text"),
+        (UIA_ScrollPatternId.0, "Scroll"),
+        (UIA_SelectionPatternId.0, "Selection"),
+        (UIA_ExpandCollapsePatternId.0, "ExpandCollapse"),
+    ];
+    let mut out = Vec::new();
+    for (pid, name) in checks {
+        if el.GetCurrentPattern(UIA_PATTERN_ID(*pid)).is_ok() {
+            out.push((*name).to_string());
+        }
+    }
+    out
+}
+
 unsafe fn element_name(el: &IUIAutomationElement) -> String {
     el.CurrentName()
         .map(|b| b.to_string())
@@ -337,6 +686,24 @@ unsafe fn element_automation_id(el: &IUIAutomationElement) -> String {
         .unwrap_or_default()
 }
 
+unsafe fn element_class_name(el: &IUIAutomationElement) -> String {
+    el.CurrentClassName()
+        .map(|b| b.to_string())
+        .unwrap_or_default()
+}
+
+unsafe fn element_framework_id(el: &IUIAutomationElement) -> String {
+    el.CurrentFrameworkId()
+        .map(|b| b.to_string())
+        .unwrap_or_default()
+}
+
+unsafe fn element_is_offscreen(el: &IUIAutomationElement) -> bool {
+    el.CurrentIsOffscreen()
+        .map(|b| b.as_bool())
+        .unwrap_or(false)
+}
+
 unsafe fn element_bounds(el: &IUIAutomationElement) -> Option<A11yBounds> {
     let r = el.CurrentBoundingRectangle().ok()?;
     Some(A11yBounds {
@@ -345,6 +712,24 @@ unsafe fn element_bounds(el: &IUIAutomationElement) -> Option<A11yBounds> {
         width: r.right - r.left,
         height: r.bottom - r.top,
     })
+}
+
+unsafe fn element_info_from(el: &IUIAutomationElement) -> ElementInfo {
+    ElementInfo {
+        name: element_name(el),
+        control_type: control_type_name(element_control_type(el)),
+        automation_id: element_automation_id(el),
+        class_name: element_class_name(el),
+        framework_id: element_framework_id(el),
+        runtime_id: runtime_id_string(el),
+        is_offscreen: element_is_offscreen(el),
+        patterns: element_patterns(el),
+        bounds: element_bounds(el),
+    }
+}
+
+pub fn get_element_info(id: A11yElementId) -> Result<ElementInfo> {
+    state::with_element(id, |stored| unsafe { Ok(element_info_from(&stored.element)) })
 }
 
 unsafe fn matches_query(el: &IUIAutomationElement, query: &A11yQuery) -> bool {
@@ -409,8 +794,12 @@ pub fn find_descendant(
 ) -> Result<A11yElementId> {
     with_session(|s| {
         state::with_element(root, |stored| unsafe {
-            let found = find_rec(&s.walker, &stored.element, query, 0, max_depth)?;
-            Ok(store_element(StoredElement { element: found }))
+            let walker = walker_for(s, None);
+            let found = find_rec(walker, &stored.element, query, 0, max_depth)?;
+            Ok(store_element(StoredElement {
+                element: found,
+                attached_hwnd: stored.attached_hwnd,
+            }))
         })
     })
 }
@@ -494,12 +883,18 @@ unsafe fn build_dump(
             child = walker.GetNextSiblingElement(c).ok();
         }
     }
+    let info = element_info_from(el);
     TreeNodeDump {
         depth,
-        name: element_name(el),
-        control_type: control_type_name(element_control_type(el)),
-        automation_id: element_automation_id(el),
-        bounds: element_bounds(el),
+        name: info.name,
+        control_type: info.control_type,
+        automation_id: info.automation_id,
+        class_name: info.class_name,
+        framework_id: info.framework_id,
+        runtime_id: info.runtime_id,
+        is_offscreen: info.is_offscreen,
+        patterns: info.patterns,
+        bounds: info.bounds,
         children: if children.is_empty() {
             None
         } else {
@@ -508,14 +903,27 @@ unsafe fn build_dump(
     }
 }
 
-pub fn dump_tree(root: A11yElementId, max_depth: u32) -> Result<String> {
+pub fn dump_tree_node(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<TreeNodeDump> {
     with_session(|s| {
         state::with_element(root, |stored| unsafe {
-            let tree = build_dump(&s.walker, &stored.element, 0, max_depth);
-            serde_json::to_string_pretty(&tree)
-                .map_err(|e| SpotterError::Platform(format!("json: {e}")))
+            let walker = walker_for(s, tree_view);
+            Ok(build_dump(walker, &stored.element, 0, max_depth))
         })
     })
+}
+
+pub fn dump_tree(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<String> {
+    let tree = dump_tree_node(root, max_depth, tree_view)?;
+    serde_json::to_string_pretty(&tree)
+        .map_err(|e| SpotterError::Platform(format!("json: {e}")))
 }
 
 unsafe fn health_rec(
@@ -554,27 +962,32 @@ unsafe fn health_rec(
     }
 }
 
-pub fn tree_health(root: A11yElementId, max_depth: u32) -> Result<TreeHealth> {
+pub fn tree_health(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<TreeHealth> {
     with_session(|s| {
         state::with_element(root, |stored| unsafe {
-        let mut counts = HashMap::new();
-        let mut list_items = 0;
-        let mut edits = 0;
-        let mut buttons = 0;
-        let mut total = 0;
-        let mut max_d = 0;
-        health_rec(
-            &s.walker,
-            &stored.element,
-            0,
-            max_depth,
-            &mut counts,
-            &mut list_items,
-            &mut edits,
-            &mut buttons,
-            &mut total,
-            &mut max_d,
-        );
+            let walker = walker_for(s, tree_view);
+            let mut counts = HashMap::new();
+            let mut list_items = 0;
+            let mut edits = 0;
+            let mut buttons = 0;
+            let mut total = 0;
+            let mut max_d = 0;
+            health_rec(
+                walker,
+                &stored.element,
+                0,
+                max_depth,
+                &mut counts,
+                &mut list_items,
+                &mut edits,
+                &mut buttons,
+                &mut total,
+                &mut max_d,
+            );
             Ok(TreeHealth {
                 max_depth: max_d,
                 total_nodes: total,
@@ -587,9 +1000,13 @@ pub fn tree_health(root: A11yElementId, max_depth: u32) -> Result<TreeHealth> {
     })
 }
 
-pub fn check_tree_health(root: A11yElementId, max_depth: u32, min_list_items: u32) -> Result<TreeHealth> {
-    let h = tree_health(root, max_depth)?;
-    if h.list_item_count < min_list_items && h.total_nodes < 5 {
+pub fn check_tree_health(
+    root: A11yElementId,
+    max_depth: u32,
+    min_list_items: u32,
+) -> Result<TreeHealth> {
+    let h = tree_health(root, max_depth, None)?;
+    if h.list_item_count < min_list_items && h.total_nodes < THIN_TREE_NODES {
         return Err(SpotterError::TreeUnavailable(format!(
             "thinned tree: list_items={}, total_nodes={}",
             h.list_item_count, h.total_nodes

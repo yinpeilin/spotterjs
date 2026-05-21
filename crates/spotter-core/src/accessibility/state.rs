@@ -63,6 +63,13 @@ pub fn with_element<T, F: FnOnce(&crate::accessibility::windows::StoredElement) 
     })
 }
 
+#[cfg(windows)]
+pub fn update_element(id: A11yElementId, el: crate::accessibility::windows::StoredElement) {
+    REGISTRY.with(|r| {
+        r.borrow_mut().insert(id.0, el);
+    });
+}
+
 #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
 pub fn with_element_linux<T, F: FnOnce(&crate::accessibility::linux::StoredElement) -> crate::error::Result<T>>(
     id: A11yElementId,

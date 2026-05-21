@@ -23,8 +23,12 @@ export async function run(): Promise<void> {
   windowApi.focus(target.id);
   await sleep(400);
 
-  const root = accessibility.attachWindow(target.id);
+  const report = accessibility.attachWindowReport(target.id, 8);
+  const root = report.elementId;
   const health = accessibility.treeHealth(root, 8);
+  info(
+    `attach: strategy=${report.attachStrategy} treeView=${report.treeView} nodes=${health.totalNodes}`
+  );
   info(
     `tree: nodes=${health.totalNodes} buttons=${health.buttonCount} edits=${health.editCount}`
   );

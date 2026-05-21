@@ -4,7 +4,11 @@ import type {
   A11yConfig,
   A11yQuery,
   AttachReport,
+  ElementInfo,
+  TreeDumpOptions,
   TreeHealth,
+  TreeNodeDump,
+  TreeViewMode,
 } from "./accessibility";
 
 export type A11yApi = {
@@ -22,10 +26,20 @@ export type A11yApi = {
     opts?: { maxDepth?: number; pollMs?: number }
   ): string;
   getBounds(elementId: string): Region;
+  getElementInfo(elementId: string): ElementInfo;
+  refreshRoot(elementId: string): void;
   invoke(elementId: string): void;
   setValue(elementId: string, text: string): void;
-  dumpTree(rootId: string, maxDepth?: number): string;
-  treeHealth(rootId: string, maxDepth?: number): TreeHealth;
+  dumpTree(rootId: string, maxDepthOrOpts?: number | TreeDumpOptions): string;
+  dumpTreeObject(
+    rootId: string,
+    maxDepthOrOpts?: number | TreeDumpOptions
+  ): TreeNodeDump;
+  treeHealth(
+    rootId: string,
+    maxDepth?: number,
+    treeView?: TreeViewMode
+  ): TreeHealth;
   checkTreeHealth(
     rootId: string,
     minListItems: number,

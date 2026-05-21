@@ -287,6 +287,11 @@ async fn build_dump(
         name,
         control_type: role_name(role),
         automation_id: String::new(),
+        class_name: String::new(),
+        framework_id: String::new(),
+        runtime_id: path.to_string(),
+        is_offscreen: false,
+        patterns: Vec::new(),
         bounds,
         children: if children.is_empty() {
             None

@@ -21,12 +21,15 @@ pub mod window;
 pub use accessibility::{
     attach_active as a11y_attach_active, attach_window as a11y_attach_window,
     attach_window_report as a11y_attach_window_report, check_tree_health,
-    disable as a11y_disable, dump_tree as a11y_dump_tree, enable as a11y_enable,
-    find_descendant as a11y_find_descendant, format_element_id, get_bounds as a11y_get_bounds,
+    disable as a11y_disable, dump_tree as a11y_dump_tree,
+    dump_tree_node as a11y_dump_tree_node, enable as a11y_enable,
+    find_descendant as a11y_find_descendant, format_element_id,
+    get_bounds as a11y_get_bounds, get_element_info as a11y_get_element_info,
     invoke as a11y_invoke, is_accessibility_enabled, parse_element_id,
-    set_value as a11y_set_value, tree_health as a11y_tree_health,
-    wait_for_descendant as a11y_wait_for_descendant, A11yConfig, A11yElementId, A11yQuery,
-    AttachReport, TreeHealth,
+    refresh_root as a11y_refresh_root, set_value as a11y_set_value,
+    tree_health as a11y_tree_health, wait_for_descendant as a11y_wait_for_descendant,
+    A11yConfig, A11yElementId, A11yQuery, AttachCandidate, AttachReport, ElementInfo,
+    TreeHealth, TreeNodeDump, TreeViewMode, A11yBounds,
 };
 pub use capture::{capture_screen, capture_window};
 pub use image::{

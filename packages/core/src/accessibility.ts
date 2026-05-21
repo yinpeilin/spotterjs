@@ -1,9 +1,14 @@
 import {
   loadNative,
   type NativeAttachReport,
+  type NativeElementInfo,
   type NativeTreeHealth,
+  type NativeTreeNodeDump,
 } from "./native";
 import type { Region } from "@spotter/base";
+
+/** UIA 树遍历视图（Windows） */
+export type TreeViewMode = "auto" | "raw" | "control" | "content";
 
 /**
  * 无障碍树元素查询条件。
@@ -38,6 +43,13 @@ export type A11yConfig = {
   treeWaitPollMs?: number;
   /** 树健康检查：最少 ListItem 数量 */
   minListItemCount?: number;
+  /** UIA walker：`auto` 在 client 模式用 control，否则 raw */
+  treeView?: TreeViewMode;
+};
+
+export type TreeDumpOptions = {
+  maxDepth?: number;
+  treeView?: TreeViewMode;
 };
 
 /** 无障碍树健康检查结果，形状来自 `@spotter-rs/node` */
@@ -45,6 +57,12 @@ export type TreeHealth = NativeTreeHealth;
 
 /** attach 报告（attach 前后树状态对比），形状来自 `@spotter-rs/node` */
 export type AttachReport = NativeAttachReport;
+
+/** 单节点 UIA 元数据 */
+export type ElementInfo = NativeElementInfo;
+
+/** UIA 树节点（结构化） */
+export type TreeNodeDump = NativeTreeNodeDump;
 
 function queryToNative(q: A11yQuery) {
   return {
@@ -64,6 +82,7 @@ function configToNative(config?: A11yConfig) {
     treeWaitTimeoutMs: config.treeWaitTimeoutMs,
     treeWaitPollMs: config.treeWaitPollMs,
     minListItemCount: config.minListItemCount,
+    treeView: config.treeView,
   };
 }
 
@@ -105,7 +124,7 @@ const accessibilityBase = {
 
   /**
    * 带 UIA client 模式与树展开等待的 attach。
-   * @returns attach 前后树健康对比
+   * @returns attach 前后树健康对比、HWND 候选与诊断建议
    */
   attachWindowReport(windowId: string, maxDepth = 12): AttachReport {
     const r = loadNative().accessibilityAttachWindowReport(windowId, maxDepth);
@@ -151,6 +170,16 @@ const accessibilityBase = {
     return loadNative().accessibilityGetBounds(elementId);
   },
 
+  /** 单节点 UIA 元数据（无需 dump 整树） */
+  getElementInfo(elementId: string): ElementInfo {
+    return loadNative().accessibilityGetElementInfo(elementId);
+  },
+
+  /** UI 变化后从原 HWND 刷新根元素 COM 引用 */
+  refreshRoot(elementId: string): void {
+    loadNative().accessibilityRefreshRoot(elementId);
+  },
+
   /** 触发 Invoke 模式（按钮等） */
   invoke(elementId: string): void {
     loadNative().accessibilityInvoke(elementId);
@@ -161,14 +190,42 @@ const accessibilityBase = {
     loadNative().accessibilitySetValue(elementId, text);
   },
 
-  /** 导出子树为可读文本（调试） */
-  dumpTree(rootId: string, maxDepth = 12): string {
-    return loadNative().accessibilityDumpTree(rootId, maxDepth);
+  /** 导出子树为 JSON 字符串（调试） */
+  dumpTree(rootId: string, maxDepthOrOpts: number | TreeDumpOptions = 12): string {
+    const opts =
+      typeof maxDepthOrOpts === "number"
+        ? { maxDepth: maxDepthOrOpts }
+        : maxDepthOrOpts;
+    return loadNative().accessibilityDumpTree(
+      rootId,
+      opts.maxDepth ?? 12,
+      opts.treeView
+    );
+  },
+
+  /** 导出子树为结构化对象 */
+  dumpTreeObject(
+    rootId: string,
+    maxDepthOrOpts: number | TreeDumpOptions = 12
+  ): TreeNodeDump {
+    const opts =
+      typeof maxDepthOrOpts === "number"
+        ? { maxDepth: maxDepthOrOpts }
+        : maxDepthOrOpts;
+    return loadNative().accessibilityDumpTreeObject(
+      rootId,
+      opts.maxDepth ?? 12,
+      opts.treeView
+    );
   },
 
   /** 统计子树节点数等指标 */
-  treeHealth(rootId: string, maxDepth = 12): TreeHealth {
-    const h = loadNative().accessibilityTreeHealth(rootId, maxDepth);
+  treeHealth(
+    rootId: string,
+    maxDepth = 12,
+    treeView?: TreeViewMode
+  ): TreeHealth {
+    const h = loadNative().accessibilityTreeHealth(rootId, maxDepth, treeView);
     return healthFromNative(h);
   },
 
@@ -193,7 +250,7 @@ const accessibilityBase = {
 /**
  * 无障碍自动化 API（UIA / AT-SPI）。
  *
- * 典型流程：`enable` → `attachWindow` → `find` / `waitFor` → `invoke` / `tapElement`。
+ * 典型流程：`enable` → `attachWindowReport` → `dumpTree` / `find` → `invoke` / `tapElement`。
  * 扩展方法见 {@link extendAccessibility}。
  */
 export const accessibility = extendAccessibility(accessibilityBase);

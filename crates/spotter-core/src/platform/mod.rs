@@ -133,6 +133,6 @@ pub mod windows;
 #[cfg(all(target_os = "linux", feature = "linux-x11"))]
 pub mod linux_x11;
 
-pub fn platform() -> Result<Platform> {
+pub(crate) fn platform() -> Result<Platform> {
     Platform::new()
 }

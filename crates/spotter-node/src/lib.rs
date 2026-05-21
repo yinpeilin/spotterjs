@@ -8,15 +8,17 @@ use spotter_base::napi::{
 };
 use spotter_core::{
     a11y_attach_active, a11y_attach_window, a11y_attach_window_report, a11y_disable, a11y_dump_tree,
-    a11y_enable, a11y_find_descendant, a11y_get_bounds, a11y_invoke, a11y_set_value, a11y_tree_health,
-    a11y_wait_for_descendant, check_tree_health, clipboard_get, clipboard_set, find_apps, find_windows,
+    a11y_dump_tree_node, a11y_enable, a11y_find_descendant, a11y_get_bounds, a11y_get_element_info,
+    a11y_invoke, a11y_refresh_root, a11y_set_value, a11y_tree_health, a11y_wait_for_descendant,
+    check_tree_health, clipboard_get, clipboard_set, find_apps, find_windows,
     format_element_id, get_foreground_app, is_accessibility_enabled, list_desktop_apps, wait_for_window,
     A11yElementId, DesktopApp,
     keyboard_press, keyboard_release, keyboard_type, keyboard_type_keys, minimize_window, mouse_click,
     mouse_drag_to, mouse_get_position, mouse_move, move_window, parse_element_id, parse_key, parse_keys,
     parse_window_id, resize_window, restore_window, screen_height, screen_size, screen_width,
     set_keyboard_config, set_mouse_config, straight_line_points, A11yConfig, A11yQuery, AttachReport,
-    KeyboardConfig, MouseButton, MouseConfig, Point, TreeHealth, WindowInfo, VERSION,
+    ElementInfo, KeyboardConfig, MouseButton, MouseConfig, Point, TreeHealth, TreeNodeDump, TreeViewMode,
+    A11yBounds, WindowInfo, VERSION,
 };
 use std::path::Path;
 
@@ -572,6 +574,17 @@ pub struct JsA11yConfig {
     pub tree_wait_timeout_ms: Option<u32>,
     pub tree_wait_poll_ms: Option<u32>,
     pub min_list_item_count: Option<u32>,
+    pub tree_view: Option<String>,
+}
+
+#[napi(object)]
+pub struct JsAttachCandidate {
+    pub hwnd: String,
+    pub class_name: String,
+    pub total_nodes: u32,
+    pub list_item_count: u32,
+    pub edit_count: u32,
+    pub chosen: bool,
 }
 
 #[napi(object)]
@@ -583,6 +596,47 @@ pub struct JsAttachReport {
     pub health_initial: JsTreeHealth,
     pub health_final: JsTreeHealth,
     pub tree_wait_ms: u32,
+    pub attach_strategy: String,
+    pub attached_hwnd: String,
+    pub tree_view: String,
+    pub candidates: Vec<JsAttachCandidate>,
+    pub diagnosis: Vec<String>,
+}
+
+#[napi(object)]
+pub struct JsA11yBounds {
+    pub left: i32,
+    pub top: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[napi(object)]
+pub struct JsElementInfo {
+    pub name: String,
+    pub control_type: String,
+    pub automation_id: String,
+    pub class_name: String,
+    pub framework_id: String,
+    pub runtime_id: String,
+    pub is_offscreen: bool,
+    pub patterns: Vec<String>,
+    pub bounds: Option<JsA11yBounds>,
+}
+
+#[napi(object)]
+pub struct JsTreeNodeDump {
+    pub depth: u32,
+    pub name: String,
+    pub control_type: String,
+    pub automation_id: String,
+    pub class_name: String,
+    pub framework_id: String,
+    pub runtime_id: String,
+    pub is_offscreen: bool,
+    pub patterns: Vec<String>,
+    pub bounds: Option<JsA11yBounds>,
+    pub children: Option<Vec<JsTreeNodeDump>>,
 }
 
 #[napi(object)]
@@ -612,8 +666,58 @@ fn a11y_config_from_js(c: Option<JsA11yConfig>) -> A11yConfig {
             tree_wait_timeout_ms: cfg.tree_wait_timeout_ms.unwrap_or(15_000) as u64,
             tree_wait_poll_ms: cfg.tree_wait_poll_ms.unwrap_or(300) as u64,
             min_list_item_count: cfg.min_list_item_count.unwrap_or(1),
+            tree_view: cfg
+                .tree_view
+                .as_deref()
+                .map(TreeViewMode::from_str)
+                .unwrap_or_default(),
         },
         None => A11yConfig::default(),
+    }
+}
+
+fn tree_view_from_js(v: Option<String>) -> Option<TreeViewMode> {
+    v.map(|s| TreeViewMode::from_str(&s))
+}
+
+fn bounds_to_js(b: A11yBounds) -> JsA11yBounds {
+    JsA11yBounds {
+        left: b.left,
+        top: b.top,
+        width: b.width,
+        height: b.height,
+    }
+}
+
+fn element_info_to_js(i: ElementInfo) -> JsElementInfo {
+    JsElementInfo {
+        name: i.name,
+        control_type: i.control_type,
+        automation_id: i.automation_id,
+        class_name: i.class_name,
+        framework_id: i.framework_id,
+        runtime_id: i.runtime_id,
+        is_offscreen: i.is_offscreen,
+        patterns: i.patterns,
+        bounds: i.bounds.map(bounds_to_js),
+    }
+}
+
+fn tree_node_to_js(n: TreeNodeDump) -> JsTreeNodeDump {
+    JsTreeNodeDump {
+        depth: n.depth,
+        name: n.name,
+        control_type: n.control_type,
+        automation_id: n.automation_id,
+        class_name: n.class_name,
+        framework_id: n.framework_id,
+        runtime_id: n.runtime_id,
+        is_offscreen: n.is_offscreen,
+        patterns: n.patterns,
+        bounds: n.bounds.map(bounds_to_js),
+        children: n
+            .children
+            .map(|kids| kids.into_iter().map(tree_node_to_js).collect()),
     }
 }
 
@@ -626,6 +730,22 @@ fn attach_report_to_js(r: AttachReport) -> JsAttachReport {
         health_initial: tree_health_to_js(r.health_initial),
         health_final: tree_health_to_js(r.health_final),
         tree_wait_ms: r.tree_wait_ms.min(u32::MAX as u64) as u32,
+        attach_strategy: r.attach_strategy,
+        attached_hwnd: r.attached_hwnd.to_string(),
+        tree_view: r.tree_view,
+        candidates: r
+            .candidates
+            .into_iter()
+            .map(|c| JsAttachCandidate {
+                hwnd: c.hwnd.to_string(),
+                class_name: c.class_name,
+                total_nodes: c.total_nodes,
+                list_item_count: c.list_item_count,
+                edit_count: c.edit_count,
+                chosen: c.chosen,
+            })
+            .collect(),
+        diagnosis: r.diagnosis,
     }
 }
 
@@ -740,17 +860,64 @@ pub fn accessibility_set_value(element_id: String, text: String) -> Result<()> {
 }
 
 #[napi]
-pub fn accessibility_dump_tree(root_id: String, max_depth: Option<u32>) -> Result<String> {
+pub fn accessibility_dump_tree(
+    root_id: String,
+    max_depth: Option<u32>,
+    tree_view: Option<String>,
+) -> Result<String> {
     let root = parse_element_id(&root_id).map_err(map_err)?;
-    a11y_dump_tree(root, max_depth.unwrap_or(12)).map_err(map_err)
+    a11y_dump_tree(
+        root,
+        max_depth.unwrap_or(12),
+        tree_view_from_js(tree_view),
+    )
+    .map_err(map_err)
 }
 
 #[napi]
-pub fn accessibility_tree_health(root_id: String, max_depth: Option<u32>) -> Result<JsTreeHealth> {
+pub fn accessibility_dump_tree_object(
+    root_id: String,
+    max_depth: Option<u32>,
+    tree_view: Option<String>,
+) -> Result<JsTreeNodeDump> {
     let root = parse_element_id(&root_id).map_err(map_err)?;
-    a11y_tree_health(root, max_depth.unwrap_or(12))
-        .map(tree_health_to_js)
+    a11y_dump_tree_node(
+        root,
+        max_depth.unwrap_or(12),
+        tree_view_from_js(tree_view),
+    )
+    .map(tree_node_to_js)
+    .map_err(map_err)
+}
+
+#[napi]
+pub fn accessibility_get_element_info(element_id: String) -> Result<JsElementInfo> {
+    let id = parse_element_id(&element_id).map_err(map_err)?;
+    a11y_get_element_info(id)
+        .map(element_info_to_js)
         .map_err(map_err)
+}
+
+#[napi]
+pub fn accessibility_refresh_root(element_id: String) -> Result<()> {
+    let id = parse_element_id(&element_id).map_err(map_err)?;
+    a11y_refresh_root(id).map_err(map_err)
+}
+
+#[napi]
+pub fn accessibility_tree_health(
+    root_id: String,
+    max_depth: Option<u32>,
+    tree_view: Option<String>,
+) -> Result<JsTreeHealth> {
+    let root = parse_element_id(&root_id).map_err(map_err)?;
+    a11y_tree_health(
+        root,
+        max_depth.unwrap_or(12),
+        tree_view_from_js(tree_view),
+    )
+    .map(tree_health_to_js)
+    .map_err(map_err)
 }
 
 #[napi]

@@ -15,7 +15,8 @@ mod windows;
 mod linux;
 
 pub use types::{
-    A11yBounds, A11yConfig, A11yElementId, A11yQuery, AttachReport, TreeHealth, TreeNodeDump,
+    A11yBounds, A11yConfig, A11yElementId, A11yQuery, AttachCandidate, AttachReport, ElementInfo,
+    TreeHealth, TreeNodeDump, TreeViewMode,
 };
 
 use crate::error::{Result, SpotterError};
@@ -91,14 +92,41 @@ pub fn set_value(id: A11yElementId, text: &str) -> Result<()> {
     platform_set_value(id, text)
 }
 
-pub fn dump_tree(root: A11yElementId, max_depth: u32) -> Result<String> {
+pub fn dump_tree(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<String> {
     require_enabled()?;
-    platform_dump_tree(root, max_depth)
+    platform_dump_tree(root, max_depth, tree_view)
 }
 
-pub fn tree_health(root: A11yElementId, max_depth: u32) -> Result<TreeHealth> {
+pub fn dump_tree_node(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<TreeNodeDump> {
     require_enabled()?;
-    platform_tree_health(root, max_depth)
+    platform_dump_tree_node(root, max_depth, tree_view)
+}
+
+pub fn get_element_info(id: A11yElementId) -> Result<ElementInfo> {
+    require_enabled()?;
+    platform_get_element_info(id)
+}
+
+pub fn refresh_root(id: A11yElementId) -> Result<()> {
+    require_enabled()?;
+    platform_refresh_root(id)
+}
+
+pub fn tree_health(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<TreeHealth> {
+    require_enabled()?;
+    platform_tree_health(root, max_depth, tree_view)
 }
 
 pub fn check_tree_health(
@@ -151,6 +179,11 @@ fn platform_attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachR
             health_initial: h.clone(),
             health_final: h,
             tree_wait_ms: 0,
+            attach_strategy: "top_level".into(),
+            attached_hwnd: 0,
+            tree_view: "raw".into(),
+            candidates: Vec::new(),
+            diagnosis: Vec::new(),
         })
     }
     #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
@@ -253,26 +286,91 @@ fn platform_set_value(id: A11yElementId, text: &str) -> Result<()> {
     }
 }
 
-fn platform_dump_tree(root: A11yElementId, max_depth: u32) -> Result<String> {
+fn platform_dump_tree(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<String> {
     #[cfg(windows)]
-    return windows::dump_tree(root, max_depth);
+    return windows::dump_tree(root, max_depth, tree_view);
     #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
-    return linux::dump_tree(root, max_depth);
+    {
+        let _ = tree_view;
+        return linux::dump_tree(root, max_depth);
+    }
     #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
     {
-        let _ = (root, max_depth);
+        let _ = (root, max_depth, tree_view);
         Err(SpotterError::AccessibilityNotSupported)
     }
 }
 
-fn platform_tree_health(root: A11yElementId, max_depth: u32) -> Result<TreeHealth> {
+fn platform_dump_tree_node(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<TreeNodeDump> {
     #[cfg(windows)]
-    return windows::tree_health(root, max_depth);
+    return windows::dump_tree_node(root, max_depth, tree_view);
     #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
-    return linux::tree_health(root, max_depth);
+    {
+        let _ = tree_view;
+        let json = linux::dump_tree(root, max_depth)?;
+        serde_json::from_str(&json)
+            .map_err(|e| SpotterError::Platform(format!("parse tree dump: {e}")))
+    }
     #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
     {
-        let _ = (root, max_depth);
+        let _ = (root, max_depth, tree_view);
+        Err(SpotterError::AccessibilityNotSupported)
+    }
+}
+
+fn platform_get_element_info(id: A11yElementId) -> Result<ElementInfo> {
+    #[cfg(windows)]
+    return windows::get_element_info(id);
+    #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
+    {
+        let _ = id;
+        Err(SpotterError::AccessibilityNotSupported)
+    }
+    #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
+    {
+        let _ = id;
+        Err(SpotterError::AccessibilityNotSupported)
+    }
+}
+
+fn platform_refresh_root(id: A11yElementId) -> Result<()> {
+    #[cfg(windows)]
+    return windows::refresh_root(id);
+    #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
+    {
+        let _ = id;
+        Ok(())
+    }
+    #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
+    {
+        let _ = id;
+        Err(SpotterError::AccessibilityNotSupported)
+    }
+}
+
+fn platform_tree_health(
+    root: A11yElementId,
+    max_depth: u32,
+    tree_view: Option<TreeViewMode>,
+) -> Result<TreeHealth> {
+    #[cfg(windows)]
+    return windows::tree_health(root, max_depth, tree_view);
+    #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
+    {
+        let _ = tree_view;
+        return linux::tree_health(root, max_depth);
+    }
+    #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
+    {
+        let _ = (root, max_depth, tree_view);
         Err(SpotterError::AccessibilityNotSupported)
     }
 }

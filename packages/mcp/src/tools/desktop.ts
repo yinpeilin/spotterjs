@@ -258,11 +258,24 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       inputSchema: z.object({
         rootId: z.string(),
         maxDepth: z.number().optional(),
+        treeView: z.enum(["auto", "raw", "control", "content"]).optional(),
       }),
     },
-    async ({ rootId, maxDepth }) => {
-      const tree = accessibility.dumpTree(rootId, maxDepth ?? 12);
+    async ({ rootId, maxDepth, treeView }) => {
+      const tree = accessibility.dumpTree(rootId, {
+        maxDepth: maxDepth ?? 12,
+        treeView,
+      });
       return { content: [{ type: "text", text: tree }] };
+    }
+  );
+
+  server.registerTool(
+    "desktop_a11y_element_info",
+    { inputSchema: z.object({ elementId: z.string() }) },
+    async ({ elementId }) => {
+      const info = accessibility.getElementInfo(elementId);
+      return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
     }
   );
 }

@@ -241,7 +241,16 @@ export type {
   NativeMatchOptions,
 } from "./native";
 export { accessibility } from "./accessibility";
-export type { A11yQuery, A11yConfig, TreeHealth, AttachReport } from "./accessibility";
+export type {
+  A11yQuery,
+  A11yConfig,
+  TreeHealth,
+  AttachReport,
+  TreeViewMode,
+  TreeDumpOptions,
+  ElementInfo,
+  TreeNodeDump,
+} from "./accessibility";
 export { desktop } from "./desktop";
 export { host, configureHost, HostPathError } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";

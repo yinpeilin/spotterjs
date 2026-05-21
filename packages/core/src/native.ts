@@ -26,6 +26,7 @@ export type NativeA11yConfig = Node.JsA11YConfig;
 export type NativeA11yQuery = Node.JsA11YQuery;
 export type NativeTreeHealth = Node.JsTreeHealth;
 export type NativeAttachReport = Node.JsAttachReport;
+export type { JsElementInfo as NativeElementInfo, JsTreeNodeDump as NativeTreeNodeDump } from "@spotter-rs/node";
 
 let _native: SpotterNative | null = null;
 
