@@ -1,6 +1,6 @@
 # Spotter
 
-Cross-platform desktop automation with a **TypeScript-first** API, Rust native addons, and pluggable vision backends.
+Cross-platform desktop automation with a **TypeScript-first** API, Rust native addons, and **built-in NCC template matching** (multi-scale, path/Buffer needles).
 
 - **Source:** [Gitee — spotter/spotter](https://gitee.com/ypl0lpy/spotter)
 - **npm:** `@spotter/core` and related packages (see [Packages](#packages))
@@ -11,21 +11,14 @@ Cross-platform desktop automation with a **TypeScript-first** API, Rust native a
 |-------------|----------|------|
 | `@spotter/core` | Yes (entry) | Screen, mouse, keyboard, windows, accessibility |
 | `@spotter/base` | Transitive | Shared TS types |
-| `@spotter-rs/node` | Transitive | Native: capture, input, window, NCC match |
-| `@spotter/plugin-match-opencv` | Optional | OpenCV template matching plugin |
-| `@spotter-rs/node-match-opencv` | Optional | Native OpenCV matcher |
+| `@spotter-rs/node` | Transitive | Native: capture, input, window, NCC template match |
 | `@spotter/plugin-ocr` | Optional | **Preview** — OCR placeholder only |
+| `@spotter/mcp` | Optional | MCP server — desktop + workspace file + shell tools |
 
 ## Install (users)
 
 ```bash
 npm install @spotter/core
-```
-
-Optional OpenCV plugin:
-
-```bash
-npm install @spotter/plugin-match-opencv @spotter-rs/node-match-opencv
 ```
 
 Supported native platforms (prebuilt on publish): **Windows x64 (MSVC)**, **Linux x64 (gnu)**.
@@ -50,49 +43,51 @@ npm run build:ts
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/PUBLISHING.md](docs/PUBLISHING.md) for maintainers.
 
-### OpenCV addon (optional)
-
-See [crates/spotter-node-match-opencv/README.md](crates/spotter-node-match-opencv/README.md) for vcpkg / apt setup.
-
-```bash
-cd crates/spotter-node-match-opencv && npm install && npm run build
-npm run build -w @spotter/plugin-match-opencv
-```
-
 ## Architecture
 
 ```
 @spotter/core (TS)          ← primary entry
     ├── @spotter/base (TS types)
-    ├── @spotter-rs/node (native: input, capture, window, NCC match)
-    └── @spotter/plugin-match-opencv (optional)
-            └── @spotter-rs/node-match-opencv (native: OpenCV match only)
+    └── @spotter-rs/node (native: input, capture, window, NCC match)
 
 spotter-base (Rust)         ← shared Region, MatchOptions, N-API types
 spotter-core (Rust)         ← platform + capture + input
-spotter-plugin-match-ncc    ← default matcher
-spotter-plugin-match-opencv ← OpenCV matcher (optional build)
+spotter-plugin-match-ncc    ← NCC matcher (multi-scale, parallel)
 ```
 
-**Two independent native npm packages** share `spotter-base` — OpenCV is **not** a feature on `@spotter-rs/node`.
+All template matching goes through `@spotter-rs/node` — there is no separate vision plugin package.
 
 ## Usage
 
 ```typescript
-import { screen, mouse, useMatchPlugin } from "@spotter/core";
-import { useOpencvMatcher } from "@spotter/plugin-match-opencv";
+import { screen, mouse } from "@spotter/core";
 import { centerOf } from "@spotter/base";
 
-// Default: NCC via @spotter-rs/node
-const region = await screen.find("./button.png", { confidence: 0.9 });
+// NCC template match (path or PNG/JPEG Buffer needle)
+const region = await screen.find("./button.png", {
+  confidence: 0.9,
+  multiScale: true,
+});
 const { x, y } = centerOf(region);
 mouse.move(x, y);
 mouse.click("left");
 
-// Optional: switch to OpenCV (requires @spotter-rs/node-match-opencv built)
-useOpencvMatcher({ multiScale: true });
-await screen.find("./button.png", { confidence: 0.9, multiScale: true });
+// In-memory needle (image file bytes)
+import fs from "fs";
+await screen.find(fs.readFileSync("./icon.png"), { confidence: 0.85 });
+
+// findAll with search region (screen coordinates)
+await screen.findAll("./icon.png", {
+  confidence: 0.9,
+  searchRegion: { left: 100, top: 50, width: 800, height: 600 },
+});
 ```
+
+See [docs/MATCHING.md](docs/MATCHING.md) for match options and buffer APIs.
+
+### MCP server
+
+See [docs/MCP.md](docs/MCP.md) for `@spotter/mcp` setup (desktop tools, workspace files, PowerShell/bash).
 
 ### Accessibility (UIA / AT-SPI)
 
@@ -113,16 +108,15 @@ Windows uses UI Automation; Linux uses AT-SPI2 (`accessibility-linux` feature). 
 | nut.js | Spotter |
 |--------|---------|
 | `@nut-tree/nut-js` | `@spotter/core` |
-| `@nut-tree/nl-matcher` | `@spotter/plugin-match-opencv` + `@spotter-rs/node-match-opencv` |
-| `useNlMatcher()` | `useOpencvMatcher()` |
+| `@nut-tree/nl-matcher` | Built-in NCC (`multiScale`, Buffer needles) |
 | `screen.find` / `findAll` / `waitFor` | `screen.find` / `findAll` / `waitFor` |
 
-## Benchmark (NCC vs OpenCV)
+## Benchmark (NCC multi-scale)
 
-Add `packages/plugin-match-opencv/fixtures/screen.png` and `needle.png`, then:
+After smoke capture writes fixtures under `test-output/`:
 
 ```bash
-npm run benchmark --workspace=@spotter/plugin-match-opencv
+npm run benchmark:ncc
 ```
 
 ## Testing

@@ -7,10 +7,8 @@
     [
       "@spotter/base",
       "@spotter/core",
-      "@spotter/plugin-match-opencv",
       "@spotter/plugin-ocr",
-      "@spotter-rs/node",
-      "@spotter-rs/node-match-opencv"
+      "@spotter-rs/node"
     ]
   ],
   "access": "public",

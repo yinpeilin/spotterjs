@@ -1,5 +1,5 @@
 # Gitee Go / 流水线 — adjust image names to match your Gitee runner labels.
-# Secrets: NPM_TOKEN (npmjs publish), optional OPENCV for native-opencv job.
+# Secrets: NPM_TOKEN (npmjs publish)
 
 stages:
   - test
@@ -48,16 +48,6 @@ native-linux:
   artifacts:
     paths:
       - crates/spotter-node/
-
-native-opencv:
-  stage: native
-  when: manual
-  tags:
-    - windows
-  script:
-    - npm ci
-    - npm run build -w @spotter-rs/node-match-opencv
-    - npx napi prepublish -p crates/spotter-node-match-opencv --skip-gh-release
 
 npm-release:
   stage: release

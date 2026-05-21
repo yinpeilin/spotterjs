@@ -3,10 +3,8 @@
 node_modules/
 packages/*/dist/
 crates/spotter-node/*.node
-crates/spotter-node-match-opencv/*.node
 crates/spotter-node/index.js
 crates/spotter-node/index.d.ts
-crates/spotter-node-match-opencv/index.js
 *.png
 !assets/sample-template.png
 test-output/
