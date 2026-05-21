@@ -22,14 +22,9 @@ pub fn get_window_region_clamped(id: WindowId) -> Result<crate::types::Region> {
     platform()?.window_region_clamped(id)
 }
 
-/// Screen position of the window client-area origin (matches capture / in-window match coords).
+/// Screen position of the window client-area origin (below the title bar).
 pub fn get_window_client_origin(id: WindowId) -> Result<(i32, i32)> {
-    #[cfg(windows)]
-    {
-        return crate::platform::windows::WindowsPlatform::client_screen_origin(id);
-    }
-    let r = get_window_region(id)?;
-    Ok((r.left, r.top))
+    platform()?.client_origin(id)
 }
 
 pub fn move_window(id: WindowId, x: i32, y: i32) -> Result<()> {

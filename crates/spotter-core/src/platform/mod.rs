@@ -19,6 +19,11 @@ pub(crate) trait PlatformWindow: PlatformScreen + Send + Sync {
     fn resize_window(&self, id: WindowId, width: i32, height: i32) -> Result<()>;
     fn minimize_window(&self, id: WindowId) -> Result<()>;
     fn restore_window(&self, id: WindowId) -> Result<()>;
+    /// Screen coordinates of the window client-area origin (matches capture / in-window match).
+    fn client_origin(&self, id: WindowId) -> Result<(i32, i32)> {
+        let r = self.window_region(id)?;
+        Ok((r.left, r.top))
+    }
 }
 
 pub(crate) trait PlatformCapture: Send + Sync {
@@ -100,6 +105,10 @@ impl PlatformWindow for Platform {
     fn restore_window(&self, id: WindowId) -> Result<()> {
         delegate!(self, restore_window, id)
     }
+
+    fn client_origin(&self, id: WindowId) -> Result<(i32, i32)> {
+        delegate!(self, client_origin, id)
+    }
 }
 
 impl PlatformCapture for Platform {
@@ -112,8 +121,12 @@ impl PlatformCapture for Platform {
     }
 }
 
+#[cfg(all(target_os = "linux", feature = "linux-x11"))]
 pub(crate) mod x11_image;
 
+mod bgra;
+#[cfg(windows)]
+pub mod windows_input;
 #[cfg(windows)]
 pub mod windows;
 

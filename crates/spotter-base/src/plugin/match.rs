@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::types::{MatchOptions, Region, RgbaImage};
 
-/// Template-matching backend (NCC, OpenCV, etc.).
+/// Template-matching backend (NCC; extensible via `MatchPlugin` trait).
 pub trait MatchPlugin: Send + Sync {
     fn name(&self) -> &'static str;
 

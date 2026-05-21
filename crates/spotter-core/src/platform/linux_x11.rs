@@ -1,6 +1,7 @@
 use crate::error::{Result, SpotterError};
 use crate::platform::{PlatformCapture, PlatformScreen, PlatformWindow};
 use crate::types::{Region, RgbaImage, WindowId, WindowInfo};
+use std::fs;
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::*;
 use x11rb::rust_connection::RustConnection;
@@ -137,11 +138,105 @@ impl LinuxX11Platform {
         })
     }
 
+    fn wm_pid(&self, window: Window) -> u32 {
+        let atom = self.intern_atom("_NET_WM_PID");
+        if atom == Atom::from(0) {
+            return 0;
+        }
+        if let Ok(reply) = self.conn.get_property(false, window, atom, AtomEnum::CARDINAL, 0, 1)
+        {
+            if let Ok(r) = reply.reply() {
+                if let Some(value) = r.value {
+                    if value.len() >= 4 {
+                        return u32::from_ne_bytes([value[0], value[1], value[2], value[3]]);
+                    }
+                }
+            }
+        }
+        0
+    }
+
+    fn process_info(pid: u32) -> (String, Option<String>) {
+        if pid == 0 {
+            return ("unknown".into(), None);
+        }
+        let comm_path = format!("/proc/{pid}/comm");
+        let exe_path = format!("/proc/{pid}/exe");
+        let name = fs::read_to_string(&comm_path)
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|_| "unknown".into());
+        let exe = fs::read_link(&exe_path)
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned());
+        (name, exe)
+    }
+
+    fn is_minimized(&self, window: Window) -> bool {
+        let state_atom = self.intern_atom("_NET_WM_STATE");
+        let hidden = self.intern_atom("_NET_WM_STATE_HIDDEN");
+        if state_atom == Atom::from(0) {
+            return false;
+        }
+        if let Ok(reply) = self.conn.get_property(
+            false,
+            window,
+            state_atom,
+            AtomEnum::ATOM,
+            0,
+            64,
+        ) {
+            if let Ok(r) = reply.reply() {
+                if let Some(value) = r.value {
+                    for chunk in value.chunks_exact(4) {
+                        let atom = u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                        if Atom::from(atom) == hidden {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn active_window_id(&self) -> Option<Window> {
+        let prop = self
+            .conn
+            .get_property(
+                false,
+                self.root,
+                self.intern_atom("_NET_ACTIVE_WINDOW"),
+                AtomEnum::WINDOW,
+                0,
+                1,
+            )
+            .ok()?;
+        let reply = prop.reply().ok()?;
+        let value = reply.value?;
+        if value.len() < 4 {
+            return None;
+        }
+        let id = u32::from_ne_bytes([value[0], value[1], value[2], value[3]]);
+        if id == 0 {
+            None
+        } else {
+            Some(id)
+        }
+    }
+
     fn build_info(&self, window: Window) -> Result<WindowInfo> {
+        let pid = self.wm_pid(window);
+        let (process_name, exe_path) = Self::process_info(pid);
+        let active = self.active_window_id();
         Ok(WindowInfo {
             id: Self::window_id(window),
             title: self.get_wm_name(window),
             region: self.geometry(window)?,
+            process_id: pid,
+            process_name,
+            exe_path,
+            is_minimized: self.is_minimized(window),
+            is_foreground: active == Some(window),
         })
     }
 }

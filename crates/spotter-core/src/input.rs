@@ -1,9 +1,12 @@
 use crate::error::{Result, SpotterError};
 use crate::types::{MouseButton, Point};
-use enigo::{Axis, Button, Coordinate, Direction, Enigo, Mouse, Settings};
-use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+
+#[cfg(not(windows))]
+use enigo::{Axis, Button, Coordinate, Direction, Enigo, Mouse, Settings};
+#[cfg(not(windows))]
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct MouseConfig {
@@ -20,7 +23,14 @@ impl Default for MouseConfig {
     }
 }
 
+#[cfg(not(windows))]
 static MOUSE_CONFIG: Mutex<MouseConfig> = Mutex::new(MouseConfig {
+    auto_delay_ms: 10,
+    mouse_speed: 1000,
+});
+
+#[cfg(windows)]
+static MOUSE_CONFIG: std::sync::Mutex<MouseConfig> = std::sync::Mutex::new(MouseConfig {
     auto_delay_ms: 10,
     mouse_speed: 1000,
 });
@@ -33,11 +43,13 @@ pub fn set_mouse_config(config: MouseConfig) {
     *MOUSE_CONFIG.lock().unwrap() = config;
 }
 
+#[cfg(not(windows))]
 fn enigo() -> Result<Enigo> {
     Enigo::new(&Settings::default())
         .map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
 }
 
+#[cfg(not(windows))]
 fn to_enigo_button(button: MouseButton) -> Button {
     match button {
         MouseButton::Left => Button::Left,
@@ -54,17 +66,33 @@ fn auto_delay() {
 }
 
 pub fn mouse_get_position() -> Result<(i32, i32)> {
-    let e = enigo()?;
-    e.location()
-        .map_err(|err| SpotterError::Platform(format!("mouse_get_position: {err}")))
+    #[cfg(windows)]
+    {
+        return crate::platform::windows_input::mouse_get_position();
+    }
+    #[cfg(not(windows))]
+    {
+        let e = enigo()?;
+        e.location()
+            .map_err(|err| SpotterError::Platform(format!("mouse_get_position: {err}")))
+    }
 }
 
 pub fn mouse_move(x: i32, y: i32) -> Result<()> {
-    let mut e = enigo()?;
-    e.move_mouse(x, y, Coordinate::Abs)
-        .map_err(|err| SpotterError::Platform(format!("mouse_move: {err}")))?;
-    auto_delay();
-    Ok(())
+    #[cfg(windows)]
+    {
+        crate::platform::windows_input::mouse_move(x, y)?;
+        auto_delay();
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        let mut e = enigo()?;
+        e.move_mouse(x, y, Coordinate::Abs)
+            .map_err(|err| SpotterError::Platform(format!("mouse_move: {err}")))?;
+        auto_delay();
+        Ok(())
+    }
 }
 
 pub fn mouse_move_path(points: &[(i32, i32)]) -> Result<()> {
@@ -98,27 +126,42 @@ pub fn mouse_move_path(points: &[(i32, i32)]) -> Result<()> {
 }
 
 pub fn mouse_press(button: MouseButton) -> Result<()> {
-    let mut e = enigo()?;
-    e.button(to_enigo_button(button), Direction::Press)
-        .map_err(|err| SpotterError::Platform(format!("mouse_press: {err}")))?;
-    auto_delay();
-    Ok(())
+    #[cfg(windows)]
+    {
+        crate::platform::windows_input::mouse_press(button)?;
+        auto_delay();
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        let mut e = enigo()?;
+        e.button(to_enigo_button(button), Direction::Press)
+            .map_err(|err| SpotterError::Platform(format!("mouse_press: {err}")))?;
+        auto_delay();
+        Ok(())
+    }
 }
 
 pub fn mouse_release(button: MouseButton) -> Result<()> {
-    let mut e = enigo()?;
-    e.button(to_enigo_button(button), Direction::Release)
-        .map_err(|err| SpotterError::Platform(format!("mouse_release: {err}")))?;
-    auto_delay();
-    Ok(())
+    #[cfg(windows)]
+    {
+        crate::platform::windows_input::mouse_release(button)?;
+        auto_delay();
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        let mut e = enigo()?;
+        e.button(to_enigo_button(button), Direction::Release)
+            .map_err(|err| SpotterError::Platform(format!("mouse_release: {err}")))?;
+        auto_delay();
+        Ok(())
+    }
 }
 
 pub fn mouse_click(button: MouseButton) -> Result<()> {
-    let mut e = enigo()?;
-    e.button(to_enigo_button(button), Direction::Click)
-        .map_err(|err| SpotterError::Platform(format!("mouse_click: {err}")))?;
-    auto_delay();
-    Ok(())
+    mouse_press(button)?;
+    mouse_release(button)
 }
 
 pub fn mouse_double_click(button: MouseButton) -> Result<()> {
@@ -127,27 +170,41 @@ pub fn mouse_double_click(button: MouseButton) -> Result<()> {
 }
 
 pub fn mouse_scroll_up(amount: i32) -> Result<()> {
-    mouse_scroll(-amount, Axis::Vertical)
+    mouse_scroll(-amount, true)
 }
 
 pub fn mouse_scroll_down(amount: i32) -> Result<()> {
-    mouse_scroll(amount, Axis::Vertical)
+    mouse_scroll(amount, true)
 }
 
 pub fn mouse_scroll_left(amount: i32) -> Result<()> {
-    mouse_scroll(-amount, Axis::Horizontal)
+    mouse_scroll(-amount, false)
 }
 
 pub fn mouse_scroll_right(amount: i32) -> Result<()> {
-    mouse_scroll(amount, Axis::Horizontal)
+    mouse_scroll(amount, false)
 }
 
-fn mouse_scroll(length: i32, axis: Axis) -> Result<()> {
-    let mut e = enigo()?;
-    e.scroll(length, axis)
-        .map_err(|err| SpotterError::Platform(format!("mouse_scroll: {err}")))?;
-    auto_delay();
-    Ok(())
+fn mouse_scroll(length: i32, vertical: bool) -> Result<()> {
+    #[cfg(windows)]
+    {
+        crate::platform::windows_input::mouse_scroll(length, vertical)?;
+        auto_delay();
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        let mut e = enigo()?;
+        let axis = if vertical {
+            Axis::Vertical
+        } else {
+            Axis::Horizontal
+        };
+        e.scroll(length, axis)
+            .map_err(|err| SpotterError::Platform(format!("mouse_scroll: {err}")))?;
+        auto_delay();
+        Ok(())
+    }
 }
 
 pub fn mouse_drag_to(x: i32, y: i32, button: MouseButton) -> Result<()> {

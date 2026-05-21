@@ -4,9 +4,13 @@ members = [
     "crates/spotter-base",
     "crates/spotter-core",
     "crates/spotter-plugin-match-ncc",
-    "crates/spotter-plugin-match-opencv",
     "crates/spotter-node",
-    "crates/spotter-node-match-opencv",
+]
+default-members = [
+    "crates/spotter-base",
+    "crates/spotter-core",
+    "crates/spotter-plugin-match-ncc",
+    "crates/spotter-node",
 ]
 
 [workspace.package]
@@ -20,7 +24,7 @@ repository = "https://gitee.com/ypl0lpy/spotter"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-image = "0.25"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 enigo = "0.6"
 arboard = "3.4"
 windows = { version = "0.61", features = [
@@ -31,12 +35,13 @@ windows = { version = "0.61", features = [
     "Win32_System_Com",
     "Win32_UI_Accessibility",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_HiDpi",
     "Win32_Storage_Xps",
 ] }
 atspi = { version = "0.22", default-features = false, features = ["tokio"] }
 atspi-common = "0.6"
 zbus = { version = "4", default-features = false, features = ["tokio"] }
-opencv = { version = "0.93", default-features = false, features = ["imgproc"] }
+base64 = "0.22"
 napi = "2"
 napi-derive = "2"
 napi-build = "2"
