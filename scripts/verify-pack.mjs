@@ -11,9 +11,7 @@ const workspaces = [
   "@spotter/base",
   "@spotter/core",
   "@spotter/plugin-ocr",
-  "@spotter/plugin-match-opencv",
   "@spotter-rs/node",
-  "@spotter-rs/node-match-opencv",
 ];
 
 for (const ws of workspaces) {

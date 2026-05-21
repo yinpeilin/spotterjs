@@ -11,10 +11,9 @@ const license = join(root, "LICENSE");
 const targets = [
   "packages/base",
   "packages/core",
-  "packages/plugin-match-opencv",
   "packages/plugin-ocr",
+  "packages/mcp",
   "crates/spotter-node",
-  "crates/spotter-node-match-opencv",
 ];
 
 for (const dir of targets) {
