@@ -33,10 +33,15 @@ export type A11yApi = {
   ): TreeHealth;
 };
 
+/** 在基础 {@link A11yApi} 上挂载常用组合操作 */
 export function extendAccessibility(base: A11yApi): A11yApi & {
+  /** 获取元素边界并点击其中心（屏幕坐标） */
   tapElement(elementId: string): Region;
+  /** 向元素写入文本（`setValue` 别名） */
   typeInto(elementId: string, text: string): void;
+  /** 查找并 invoke，返回元素 ID */
   findAndInvoke(rootId: string, query: A11yQuery, maxDepth?: number): string;
+  /** attach 窗口并查找元素，返回 `{ rootId, elementId }` */
   attachAndFind(
     windowId: string,
     query: A11yQuery,

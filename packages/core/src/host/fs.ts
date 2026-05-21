@@ -9,10 +9,16 @@ import {
 } from "./paths";
 
 export type ReadFileOptions = {
+  /** 文本编码；`null` 表示返回原始 Buffer */
   encoding?: BufferEncoding | null;
+  /** 覆盖全局 maxBytes 限制 */
   maxBytes?: number;
 };
 
+/**
+ * 读取工作区内文件（路径相对于 {@link HostConfig.workspaceRoot}）。
+ * @throws 路径逃逸、非文件、超大文件
+ */
 export function readFile(filePath: string, opts?: ReadFileOptions): string | Buffer {
   const resolved = resolveWorkspacePath(filePath);
   const st = statSafe(resolved);
@@ -26,6 +32,10 @@ export function readFile(filePath: string, opts?: ReadFileOptions): string | Buf
   return fs.readFileSync(resolved, opts?.encoding ?? "utf8");
 }
 
+/**
+ * 写入工作区文件（自动创建父目录）。
+ * @throws 路径逃逸、denylist、超大内容
+ */
 export function writeFile(
   filePath: string,
   content: string | Buffer,
@@ -42,6 +52,7 @@ export function writeFile(
   fs.writeFileSync(resolved, data);
 }
 
+/** 目录项摘要（`path` 为相对工作区的 POSIX 风格路径） */
 export type DirEntry = {
   name: string;
   path: string;
@@ -50,6 +61,7 @@ export type DirEntry = {
   size: number;
 };
 
+/** 列出目录内容 */
 export function listDir(dirPath = "."): DirEntry[] {
   const resolved = resolveWorkspacePath(dirPath);
   const st = statSafe(resolved);
@@ -70,6 +82,7 @@ export function listDir(dirPath = "."): DirEntry[] {
   });
 }
 
+/** 文件/目录 stat（不含完整 resolved 路径，返回原始相对路径） */
 export function stat(filePath: string) {
   const resolved = resolveWorkspacePath(filePath);
   const st = statSafe(resolved);

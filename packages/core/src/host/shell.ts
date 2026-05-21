@@ -4,6 +4,7 @@ import { HostPathError } from "./paths";
 
 export type ShellKind = "powershell" | "bash" | "custom";
 
+/** 当前平台 shell 信息（供 Agent 生成正确语法的命令） */
 export type ShellInfo = {
   platform: NodeJS.Platform;
   shell: ShellKind;
@@ -11,6 +12,7 @@ export type ShellInfo = {
   hint: string;
 };
 
+/** 返回默认 shell：Windows 为 PowerShell，Linux 为 bash；可通过 `SPOTTER_SHELL` 覆盖 */
 export function getShellInfo(): ShellInfo {
   if (process.env.SPOTTER_SHELL?.trim()) {
     return {
@@ -50,6 +52,7 @@ function buildSpawnArgs(command: string): { executable: string; args: string[] }
   return { executable: "/bin/bash", args: ["-lc", command] };
 }
 
+/** shell 命令执行结果 */
 export type ExecResult = {
   exitCode: number | null;
   stdout: string;
@@ -57,6 +60,15 @@ export type ExecResult = {
   shell: ShellKind;
 };
 
+/**
+ * 在工作区内执行 shell 命令。
+ *
+ * 需 `SPOTTER_ALLOW_SHELL=1` 或 `configureHost({ allowShell: true })`。
+ * Windows 使用 PowerShell `-Command`；Linux 使用 `bash -lc`。
+ *
+ * @param opts.cwd 工作目录，默认 workspaceRoot
+ * @param opts.timeoutMs 超时，默认 HostConfig.execTimeoutMs
+ */
 export function execCommand(
   command: string,
   opts?: { cwd?: string; timeoutMs?: number }

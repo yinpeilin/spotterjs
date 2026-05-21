@@ -16,12 +16,23 @@ import { execCommand, getShellInfo } from "./shell";
 import { listDir, readFile, stat, writeFile } from "./fs";
 import { openPath } from "./open";
 
+/**
+ * 沙箱化工作区 I/O（面向 Agent / MCP）。
+ *
+ * - 所有路径限制在 `workspaceRoot` 内
+ * - 写操作拦截 `.env` 等敏感文件
+ * - shell 默认关闭，需显式开启
+ *
+ * 环境变量：`SPOTTER_WORKSPACE_ROOT`、`SPOTTER_ALLOW_SHELL`、
+ * `SPOTTER_FS_MAX_BYTES`、`SPOTTER_EXEC_TIMEOUT_MS`、`SPOTTER_SHELL`
+ */
 export const host = {
   configure: configureHost,
   readFile,
   writeFile,
   listDir,
   stat,
+  /** 用系统默认应用打开路径（文件或目录） */
   openPath,
   exec: execCommand,
   getShellInfo,
