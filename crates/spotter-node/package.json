@@ -26,9 +26,9 @@
     ]
   },
   "scripts": {
-    "build": "napi build --platform --release",
-    "build:linux": "napi build --platform --release --features linux-x11",
-    "build:debug": "napi build --platform",
+    "build": "napi build --platform --release --dts index.d.ts",
+    "build:linux": "napi build --platform --release --features linux-x11 --dts index.d.ts",
+    "build:debug": "napi build --platform --dts index.d.ts",
     "prepublishOnly": "napi prepublish -p . --skip-gh-release && node ../../scripts/sync-license.mjs"
   },
   "devDependencies": {

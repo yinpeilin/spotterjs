@@ -3,24 +3,23 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use spotter_base::napi::{
-    capture_to_js, map_err, match_opts_from_js, region_from_js, region_to_js, JsCaptureImage,
-    JsMatchOptions, JsRegion,
+    capture_from_js, capture_to_js, map_err, match_opts_from_js, region_from_js, region_to_js,
+    JsCaptureImage, JsMatchOptions, JsRegion,
 };
 use spotter_core::{
     a11y_attach_active, a11y_attach_window, a11y_attach_window_report, a11y_disable, a11y_dump_tree,
     a11y_enable, a11y_find_descendant, a11y_get_bounds, a11y_invoke, a11y_set_value, a11y_tree_health,
-    a11y_wait_for_descendant, check_tree_health, clipboard_get, clipboard_set, format_element_id,
-    is_accessibility_enabled, A11yElementId,
+    a11y_wait_for_descendant, check_tree_health, clipboard_get, clipboard_set, find_apps, find_windows,
+    format_element_id, get_foreground_app, is_accessibility_enabled, list_desktop_apps, wait_for_window,
+    A11yElementId, DesktopApp,
     keyboard_press, keyboard_release, keyboard_type, keyboard_type_keys, minimize_window, mouse_click,
     mouse_drag_to, mouse_get_position, mouse_move, move_window, parse_element_id, parse_key, parse_keys,
-    parse_window_id, region_center, resize_window, restore_window, screen_height, screen_size, screen_width,
+    parse_window_id, resize_window, restore_window, screen_height, screen_size, screen_width,
     set_keyboard_config, set_mouse_config, straight_line_points, A11yConfig, A11yQuery, AttachReport,
     KeyboardConfig, MouseButton, MouseConfig, Point, TreeHealth, WindowInfo, VERSION,
 };
 use std::path::Path;
 
-/// Alias for shared capture type (same layout as `JsCaptureImage`).
-pub type JsCaptureResult = JsCaptureImage;
 
 #[napi(object)]
 pub struct JsPoint {
@@ -34,6 +33,20 @@ pub struct JsWindowInfo {
     pub id_hex: String,
     pub title: String,
     pub region: JsRegion,
+    pub process_id: u32,
+    pub process_name: String,
+    pub exe_path: Option<String>,
+    pub is_minimized: bool,
+    pub is_foreground: bool,
+}
+
+#[napi(object)]
+pub struct JsDesktopApp {
+    pub process_id: u32,
+    pub process_name: String,
+    pub exe_path: Option<String>,
+    pub windows: Vec<JsWindowInfo>,
+    pub is_foreground: bool,
 }
 
 #[napi(object)]
@@ -59,6 +72,21 @@ fn window_to_js(w: WindowInfo) -> JsWindowInfo {
         id_hex: w.id.to_hex(),
         title: w.title,
         region: region_to_js(w.region),
+        process_id: w.process_id,
+        process_name: w.process_name,
+        exe_path: w.exe_path,
+        is_minimized: w.is_minimized,
+        is_foreground: w.is_foreground,
+    }
+}
+
+fn desktop_app_to_js(a: DesktopApp) -> JsDesktopApp {
+    JsDesktopApp {
+        process_id: a.process_id,
+        process_name: a.process_name,
+        exe_path: a.exe_path,
+        windows: a.windows.into_iter().map(window_to_js).collect(),
+        is_foreground: a.is_foreground,
     }
 }
 
@@ -97,13 +125,7 @@ pub fn get_screen_height() -> Result<i32> {
 }
 
 #[napi]
-pub fn region_center_js(region: JsRegion) -> JsPoint {
-    let (x, y) = region_center(region_from_js(&region));
-    JsPoint { x, y }
-}
-
-#[napi]
-pub fn capture_screen(region: Option<JsRegion>) -> Result<JsCaptureResult> {
+pub fn capture_screen(region: Option<JsRegion>) -> Result<JsCaptureImage> {
     let reg = region.as_ref().map(region_from_js);
     spotter_core::capture_screen(reg)
         .map(capture_to_js)
@@ -111,11 +133,51 @@ pub fn capture_screen(region: Option<JsRegion>) -> Result<JsCaptureResult> {
 }
 
 #[napi]
-pub fn capture_window(id: String) -> Result<JsCaptureResult> {
+pub fn capture_window(id: String) -> Result<JsCaptureImage> {
     let wid = parse_window_id(&id).map_err(map_err)?;
     spotter_core::capture_window(wid)
         .map(capture_to_js)
         .map_err(map_err)
+}
+
+#[napi(object)]
+pub struct JsImageSize {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[napi(js_name = "loadImageFromPath")]
+pub fn load_image_from_path(path: String) -> Result<JsCaptureImage> {
+    let img = spotter_core::load_rgba_from_path(Path::new(&path)).map_err(map_err)?;
+    Ok(capture_to_js(img))
+}
+
+#[napi(js_name = "getImageSize")]
+pub fn get_image_size(path: String) -> Result<JsImageSize> {
+    let (w, h) = spotter_core::image_size_from_path(Path::new(&path)).map_err(map_err)?;
+    Ok(JsImageSize {
+        width: w,
+        height: h,
+    })
+}
+
+#[napi(js_name = "encodeCapturePng")]
+pub fn encode_capture_png(capture: JsCaptureImage) -> Result<Buffer> {
+    let img = capture_from_js(&capture)?;
+    let png = spotter_core::encode_rgba_to_png(&img).map_err(map_err)?;
+    Ok(Buffer::from(png))
+}
+
+#[napi(js_name = "encodeCapturePngBase64")]
+pub fn encode_capture_png_base64(capture: JsCaptureImage) -> Result<String> {
+    let img = capture_from_js(&capture)?;
+    let png = spotter_core::encode_rgba_to_png(&img).map_err(map_err)?;
+    Ok(base64_encode(&png))
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
 // --- Window ---
@@ -185,18 +247,71 @@ pub fn restore_window_js(id: String) -> Result<()> {
     restore_window(wid).map_err(map_err)
 }
 
+// --- Desktop apps ---
+
+#[napi(js_name = "listDesktopApps")]
+pub fn list_desktop_apps_js() -> Result<Vec<JsDesktopApp>> {
+    list_desktop_apps()
+        .map(|v| v.into_iter().map(desktop_app_to_js).collect())
+        .map_err(map_err)
+}
+
+#[napi(js_name = "findDesktopApps")]
+pub fn find_desktop_apps(substring: String) -> Result<Vec<JsDesktopApp>> {
+    find_apps(&substring)
+        .map(|v| v.into_iter().map(desktop_app_to_js).collect())
+        .map_err(map_err)
+}
+
+#[napi(js_name = "findWindowsByTitle")]
+pub fn find_windows_by_title(substring: String) -> Result<Vec<JsWindowInfo>> {
+    find_windows(&substring)
+        .map(|v| v.into_iter().map(window_to_js).collect())
+        .map_err(map_err)
+}
+
+#[napi(js_name = "waitForWindowByTitle")]
+pub fn wait_for_window_by_title(
+    substring: String,
+    timeout_ms: u32,
+    poll_ms: Option<u32>,
+) -> Result<JsWindowInfo> {
+    wait_for_window(
+        &substring,
+        timeout_ms as u64,
+        poll_ms.unwrap_or(200) as u64,
+    )
+    .map(window_to_js)
+    .map_err(map_err)
+}
+
+#[napi(js_name = "getForegroundApp")]
+pub fn get_foreground_app_js() -> Result<JsDesktopApp> {
+    get_foreground_app().map(desktop_app_to_js).map_err(map_err)
+}
+
 // --- Matcher ---
 
 #[napi]
-pub fn find_template(path: String, opts: Option<JsMatchOptions>) -> Result<JsRegion> {
-    spotter_core::find_template(Path::new(&path), match_opts_from_js(opts))
+pub fn find_template(
+    path: String,
+    needle_buffer: Option<Buffer>,
+    opts: Option<JsMatchOptions>,
+) -> Result<JsRegion> {
+    let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
+    spotter_core::find_template_with_needle(Path::new(&path), bytes, match_opts_from_js(opts))
         .map(region_to_js)
         .map_err(map_err)
 }
 
 #[napi]
-pub fn find_all_templates(path: String, opts: Option<JsMatchOptions>) -> Result<Vec<JsRegion>> {
-    spotter_core::find_all_templates(Path::new(&path), match_opts_from_js(opts))
+pub fn find_all_templates(
+    path: String,
+    needle_buffer: Option<Buffer>,
+    opts: Option<JsMatchOptions>,
+) -> Result<Vec<JsRegion>> {
+    let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
+    spotter_core::find_all_templates_with_needle(Path::new(&path), bytes, match_opts_from_js(opts))
         .map(|v| v.into_iter().map(region_to_js).collect())
         .map_err(map_err)
 }
@@ -205,35 +320,52 @@ pub fn find_all_templates(path: String, opts: Option<JsMatchOptions>) -> Result<
 pub fn find_template_in_window(
     id: String,
     path: String,
+    needle_buffer: Option<Buffer>,
     opts: Option<JsMatchOptions>,
 ) -> Result<JsRegion> {
     let wid = parse_window_id(&id).map_err(map_err)?;
-    spotter_core::find_template_in_window(wid, Path::new(&path), match_opts_from_js(opts))
-        .map(region_to_js)
-        .map_err(map_err)
+    let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
+    spotter_core::find_template_in_window_with_needle(
+        wid,
+        Path::new(&path),
+        bytes,
+        match_opts_from_js(opts),
+    )
+    .map(region_to_js)
+    .map_err(map_err)
 }
 
 #[napi]
 pub fn find_all_templates_in_window(
     id: String,
     path: String,
+    needle_buffer: Option<Buffer>,
     opts: Option<JsMatchOptions>,
 ) -> Result<Vec<JsRegion>> {
     let wid = parse_window_id(&id).map_err(map_err)?;
-    spotter_core::find_all_templates_in_window(wid, Path::new(&path), match_opts_from_js(opts))
-        .map(|v| v.into_iter().map(region_to_js).collect())
-        .map_err(map_err)
+    let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
+    spotter_core::find_all_templates_in_window_with_needle(
+        wid,
+        Path::new(&path),
+        bytes,
+        match_opts_from_js(opts),
+    )
+    .map(|v| v.into_iter().map(region_to_js).collect())
+    .map_err(map_err)
 }
 
 #[napi]
 pub fn wait_for_template(
     path: String,
+    needle_buffer: Option<Buffer>,
     timeout_ms: u32,
     opts: Option<JsMatchOptions>,
     interval_ms: Option<u32>,
 ) -> Result<JsRegion> {
-    spotter_core::wait_for_template(
+    let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
+    spotter_core::wait_for_template_with_needle(
         Path::new(&path),
+        bytes,
         timeout_ms as u64,
         match_opts_from_js(opts),
         interval_ms.map(|v| v as u64),
@@ -242,14 +374,56 @@ pub fn wait_for_template(
     .map_err(map_err)
 }
 
-#[napi]
-pub fn tap_template(path: String, opts: Option<JsMatchOptions>) -> Result<()> {
-    spotter_core::tap_template(Path::new(&path), match_opts_from_js(opts)).map_err(map_err)
+#[napi(js_name = "findTemplateBuffers")]
+pub fn find_template_buffers(
+    haystack: JsCaptureImage,
+    needle: JsCaptureImage,
+    opts: Option<JsMatchOptions>,
+) -> Result<JsRegion> {
+    let hay = capture_from_js(&haystack)?;
+    let needle = capture_from_js(&needle)?;
+    spotter_core::find_template_buffers(&hay, &needle, &match_opts_from_js(opts))
+        .map(region_to_js)
+        .map_err(map_err)
+}
+
+#[napi(js_name = "findAllTemplateBuffers")]
+pub fn find_all_template_buffers(
+    haystack: JsCaptureImage,
+    needle: JsCaptureImage,
+    opts: Option<JsMatchOptions>,
+) -> Result<Vec<JsRegion>> {
+    let hay = capture_from_js(&haystack)?;
+    let needle = capture_from_js(&needle)?;
+    spotter_core::find_all_template_buffers(&hay, &needle, &match_opts_from_js(opts))
+        .map(|v| v.into_iter().map(region_to_js).collect())
+        .map_err(map_err)
+}
+
+#[napi(js_name = "waitForTemplateBuffers")]
+pub fn wait_for_template_buffers(
+    haystack: JsCaptureImage,
+    needle: JsCaptureImage,
+    timeout_ms: u32,
+    opts: Option<JsMatchOptions>,
+    interval_ms: Option<u32>,
+) -> Result<JsRegion> {
+    let hay = capture_from_js(&haystack)?;
+    let needle = capture_from_js(&needle)?;
+    spotter_core::wait_for_template_buffers(
+        &hay,
+        &needle,
+        timeout_ms as u64,
+        match_opts_from_js(opts),
+        interval_ms.map(|v| v as u64),
+    )
+    .map(region_to_js)
+    .map_err(map_err)
 }
 
 // --- Mouse ---
 
-#[napi]
+#[napi(js_name = "setMouseConfig")]
 pub fn set_mouse_config_js(config: JsMouseConfig) -> Result<()> {
     let mut cfg = MouseConfig::default();
     if let Some(ms) = config.auto_delay_ms {
@@ -338,7 +512,7 @@ pub fn tap_at(x: i32, y: i32, button: Option<String>) -> Result<()> {
 
 // --- Keyboard ---
 
-#[napi]
+#[napi(js_name = "setKeyboardConfig")]
 pub fn set_keyboard_config_js(config: JsKeyboardConfig) -> Result<()> {
     let mut cfg = KeyboardConfig::default();
     if let Some(ms) = config.auto_delay_ms {

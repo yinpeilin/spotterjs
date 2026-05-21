@@ -13,6 +13,7 @@ spotter-base = { path = "../spotter-base", features = ["napi"] }
 spotter-core = { path = "../spotter-core" }
 napi = { workspace = true, features = ["napi4"] }
 napi-derive = { workspace = true }
+base64 = { workspace = true }
 
 [features]
 default = []
