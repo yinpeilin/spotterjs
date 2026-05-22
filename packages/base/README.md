@@ -1,8 +1,8 @@
-# @spotter/base
+# @spotterjs/base
 
-Spotter 各包的**共享 TypeScript 类型**与工具函数。
+spotterjs 各包的**共享 TypeScript 类型**与工具函数。
 
-通常作为 `@spotter/core` 的依赖安装，也可单独引用类型。
+通常作为 `@spotterjs/core` 的依赖安装，也可单独引用类型。
 
 ## 导出
 
@@ -20,7 +20,7 @@ Spotter 各包的**共享 TypeScript 类型**与工具函数。
 ## 坐标约定
 
 - 所有 `Region` / `Point` 默认使用**屏幕坐标**（主显示器左上角为原点）。
-- 窗口内匹配 API（`findInWindow` 等，见 `@spotter/core`）返回结果同样为屏幕坐标。
+- 窗口内匹配 API（`findInWindow` 等，见 `@spotterjs/core`）返回结果同样为屏幕坐标。
 
 IDE 悬停可查看各字段的 JSDoc 说明。
 

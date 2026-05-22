@@ -1,14 +1,14 @@
-# Spotter Smoke 与 Integration 脚本
+# spotterjs Smoke 与 Integration 脚本
 
 ## 构建
 
 ```bash
-cargo build -p spotter-node
-cd crates/spotter-node && npm install && npm run build
+cargo build -p spotterjs-node
+cd crates/spotterjs-node && npm install && npm run build
 cd ../..
 npm install
-npm run build --workspace=@spotter/base
-npm run build --workspace=@spotter/core
+npm run build --workspace=@spotterjs/base
+npm run build --workspace=@spotterjs/core
 ```
 
 ## Smoke

@@ -1,4 +1,4 @@
-# Spotter 架构清理与修改总纲
+# spotterjs 架构清理与修改总纲
 
 > 版本：OpenCV 删除后 v1  
 > 范围：Rust crate、TypeScript 包、文档、lockfile  
@@ -9,17 +9,17 @@
 OpenCV 插件与 native 包已删除，NCC v2 承担全部模板匹配（multiScale、并行、Buffer/path）。匹配链路统一为：
 
 ```
-screen.find → @spotter-rs/node → spotter-core::matcher → spotter-plugin-match-ncc
+screen.find → @spotterjs/node → spotterjs-core::matcher → spotterjs-plugin-match-ncc
 ```
 
 ## 2. 目标架构
 
 ```
-@spotter/core
-  └── @spotter-rs/node (spotter-node)
-        └── spotter-core
-              ├── spotter-base (types, errors, napi convert)
-              └── spotter-plugin-match-ncc (唯一 matcher)
+@spotterjs/core
+  └── @spotterjs/node (spotterjs-node)
+        └── spotterjs-core
+              ├── spotterjs-base (types, errors, napi convert)
+              └── spotterjs-plugin-match-ncc (唯一 matcher)
 ```
 
 ## 3. 修改总览

@@ -1,18 +1,18 @@
 # Template matching (NCC)
 
-Spotter uses **normalized cross-correlation** (NCC, `TM_CCOEFF_NORMED` semantics) in `spotter-plugin-match-ncc`, exposed through `@spotter-rs/node` and `@spotter/core`.
+spotterjs uses **normalized cross-correlation** (NCC, `TM_CCOEFF_NORMED` semantics) in `spotterjs-plugin-match-ncc`, exposed through `@spotterjs/node` and `@spotterjs/core`.
 
 ## Architecture
 
 ```
 screen.find / findAll / waitFor
-  → @spotter-rs/node
-  → spotter-core::matcher
-  → spotter-plugin-match-ncc
+  → @spotterjs/node
+  → spotterjs-core::matcher
+  → spotterjs-plugin-match-ncc
 
-Image decode (path / bytes)     → spotter-core::image   [Rust, PNG/JPEG/WebP]
-Image encode (MCP base64 PNG)   → spotter-core::image   [Rust]
-Screen / window capture       → spotter-core::capture [platform GDI / X11]
+Image decode (path / bytes)     → spotterjs-core::image   [Rust, PNG/JPEG/WebP]
+Image encode (MCP base64 PNG)   → spotterjs-core::image   [Rust]
+Screen / window capture       → spotterjs-core::capture [platform GDI / X11]
 ```
 
 See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate boundaries.
@@ -40,7 +40,7 @@ When `searchRegion` is set, the core captures that screen rectangle first, then 
 ## TypeScript
 
 ```typescript
-import { screen, findInWindow } from "@spotter/core";
+import { screen, findInWindow } from "@spotterjs/core";
 import fs from "fs";
 
 // File path
@@ -74,7 +74,7 @@ findInWindow(windowId, fs.readFileSync("./icon.png"), { confidence: 0.9 });
 Image utilities (decode / size / PNG encode):
 
 ```typescript
-import { loadNative } from "@spotter/core";
+import { loadNative } from "@spotterjs/core";
 
 const native = loadNative();
 const { width, height } = native.getImageSize("./button.png");
@@ -126,5 +126,5 @@ npm run benchmark:ncc        # full screen.find path
 
 ## Breaking changes (v0.2)
 
-- Removed `@spotter/plugin-match-opencv` and `@spotter-rs/node-match-opencv`
+- Removed `@spotterjs/plugin-match-opencv` and `@spotterjs/node-match-opencv`
 - Removed `useMatchPlugin`, `getMatchProvider`, and `createNccMatchProvider` — use `screen.find` directly

@@ -13,10 +13,10 @@ Each subdirectory has `haystack.png` and `needle.png`. Green-box overlays: `test
 ## Rust regression
 
 ```bash
-cargo test -p spotter-plugin-match-ncc --test ncc_synthetic_scenarios
+cargo test -p spotterjs-plugin-match-ncc --test ncc_synthetic_scenarios
 ```
 
-Scenario builders live in `crates/spotter-plugin-match-ncc/tests/common/fixtures.rs`.
+Scenario builders live in `crates/spotterjs-plugin-match-ncc/tests/common/fixtures.rs`.
 
 ## Scenarios (16)
 

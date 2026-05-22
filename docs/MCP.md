@@ -1,19 +1,19 @@
-# Spotter MCP Server (`@spotter/mcp`)
+# spotterjs MCP Server (`@spotterjs/mcp`)
 
-The Spotter MCP server exposes desktop automation, workspace file access, and shell execution to MCP clients (Cursor, Claude Desktop, etc.).
+The spotterjs MCP server exposes desktop automation, workspace file access, and shell execution to MCP clients (Cursor, Claude Desktop, etc.).
 
 ## Install
 
 ```bash
-npm install @spotter/mcp @spotter/core
+npm install @spotterjs/mcp @spotterjs/core
 ```
 
 Build from source (development):
 
 ```bash
-npm run build -w @spotter-rs/node
-npm run build -w @spotter/core
-npm run build -w @spotter/mcp
+npm run build -w @spotterjs/node
+npm run build -w @spotterjs/core
+npm run build -w @spotterjs/mcp
 ```
 
 ## Cursor / Claude configuration
@@ -21,13 +21,13 @@ npm run build -w @spotter/mcp
 ```json
 {
   "mcpServers": {
-    "spotter": {
+    "spotterjs": {
       "command": "npx",
-      "args": ["-y", "@spotter/mcp"],
+      "args": ["-y", "@spotterjs/mcp"],
       "env": {
-        "SPOTTER_WORKSPACE_ROOT": "C:/path/to/your/project",
-        "SPOTTER_ALLOW_SHELL": "1",
-        "SPOTTER_A11Y": "1"
+        "SPOTTERJS_WORKSPACE_ROOT": "C:/path/to/your/project",
+        "SPOTTERJS_ALLOW_SHELL": "1",
+        "SPOTTERJS_A11Y": "1"
       }
     }
   }
@@ -38,12 +38,12 @@ npm run build -w @spotter/mcp
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SPOTTER_WORKSPACE_ROOT` | `process.cwd()` | Sandbox root for `host_*` file tools |
-| `SPOTTER_ALLOW_SHELL` | `0` | Set to `1` to enable `host_exec` |
-| `SPOTTER_FS_MAX_BYTES` | `1048576` | Max read/write size per file |
-| `SPOTTER_EXEC_TIMEOUT_MS` | `60000` | Shell command timeout |
-| `SPOTTER_SHELL` | *(auto)* | Override shell executable |
-| `SPOTTER_A11Y` | off | Set to `1` to register accessibility tools |
+| `SPOTTERJS_WORKSPACE_ROOT` | `process.cwd()` | Sandbox root for `host_*` file tools |
+| `SPOTTERJS_ALLOW_SHELL` | `0` | Set to `1` to enable `host_exec` |
+| `SPOTTERJS_FS_MAX_BYTES` | `1048576` | Max read/write size per file |
+| `SPOTTERJS_EXEC_TIMEOUT_MS` | `60000` | Shell command timeout |
+| `SPOTTERJS_SHELL` | *(auto)* | Override shell executable |
+| `SPOTTERJS_A11Y` | off | Set to `1` to register accessibility tools |
 
 ### Shell platform policy
 
@@ -74,7 +74,7 @@ Use `host_shell_info` to query the active shell and syntax hint.
 | `desktop_clipboard_get` / `desktop_clipboard_set` | Clipboard |
 | `desktop_find_template` | Template match on screen |
 
-With `SPOTTER_A11Y=1`:
+With `SPOTTERJS_A11Y=1`:
 
 | Tool | Description |
 |------|-------------|
@@ -95,13 +95,13 @@ With `SPOTTER_A11Y=1`:
 | `host_stat` | File metadata |
 | `host_open_file` | Open with OS default app |
 | `host_shell_info` | Current shell + syntax hint |
-| `host_exec` | Run command (requires `SPOTTER_ALLOW_SHELL=1`) |
+| `host_exec` | Run command (requires `SPOTTERJS_ALLOW_SHELL=1`) |
 
 ## Security
 
-- File paths must resolve **inside** `SPOTTER_WORKSPACE_ROOT`.
+- File paths must resolve **inside** `SPOTTERJS_WORKSPACE_ROOT`.
 - Writing to `.env`, `credentials.json`, etc. is blocked by default.
-- Shell execution is **disabled** unless `SPOTTER_ALLOW_SHELL=1`.
+- Shell execution is **disabled** unless `SPOTTERJS_ALLOW_SHELL=1`.
 - Desktop tools can control your mouse, keyboard, and windows — enable only on trusted machines.
 
 ## Smoke test
@@ -113,7 +113,7 @@ npm run smoke:desktop
 ## MCP Inspector (manual)
 
 ```bash
-npx @modelcontextprotocol/inspector npx @spotter/mcp
+npx @modelcontextprotocol/inspector npx @spotterjs/mcp
 ```
 
 Verify: `host_shell_info`, `desktop_list_apps`, `host_read_file` (with workspace root set).
