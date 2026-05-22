@@ -325,16 +325,16 @@ export const keyboard = {
   hotkey(keys: KeyName[]) {
     if (keys.length === 0) return;
     if (keys.length === 1) {
-      this.tap(keys[0]);
+      keyboard.tap(keys[0]);
       return;
     }
     const modifiers = keys.slice(0, -1);
     const key = keys[keys.length - 1];
-    this.down(modifiers);
+    keyboard.down(modifiers);
     try {
-      this.tap(key);
+      keyboard.tap(key);
     } finally {
-      this.up(modifiers);
+      keyboard.up(modifiers);
     }
   },
 
