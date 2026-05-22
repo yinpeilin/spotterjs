@@ -20,10 +20,10 @@ ts-test:
   image: node:20-bookworm
   script:
     - npm ci
-    - npm run build -w @spotter/base
-    - npm run build -w @spotter/core
-    - npm run build -w @spotter/plugin-ocr
-    - npm test --workspace=@spotter/base --workspace=@spotter/core
+    - npm run build -w @spotterjs/base
+    - npm run build -w @spotterjs/core
+    - npm run build -w @spotterjs/plugin-ocr
+    - npm test --workspace=@spotterjs/base --workspace=@spotterjs/core
 
 native-win:
   stage: native
@@ -31,11 +31,11 @@ native-win:
     - windows
   script:
     - npm ci
-    - npm run build -w @spotter-rs/node
-    - npx napi prepublish -p crates/spotter-node --skip-gh-release
+    - npm run build -w @spotterjs/node
+    - node scripts/prepare-native-package.mjs win32-x64-msvc
   artifacts:
     paths:
-      - crates/spotter-node/
+      - crates/spotterjs-node/win32-x64-msvc/
 
 native-linux:
   stage: native
@@ -43,11 +43,11 @@ native-linux:
   script:
     - apt-get update && apt-get install -y build-essential
     - npm ci
-    - npm run build -w @spotter-rs/node
-    - npx napi prepublish -p crates/spotter-node --skip-gh-release
+    - npm run build:linux -w @spotterjs/node
+    - node scripts/prepare-native-package.mjs linux-x64-gnu
   artifacts:
     paths:
-      - crates/spotter-node/
+      - crates/spotterjs-node/linux-x64-gnu/
 
 npm-release:
   stage: release

@@ -1,0 +1,33 @@
+{
+  "name": "@spotterjs/node-win32-x64-msvc",
+  "version": "0.1.0",
+  "description": "Windows x64 native binary for @spotterjs/node",
+  "main": "index.win32-x64-msvc.node",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/ypl0lpy/spotterjs.git",
+    "directory": "crates/spotterjs-node/win32-x64-msvc"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "files": [
+    "index.win32-x64-msvc.node",
+    "LICENSE",
+    "README.md"
+  ],
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepublishOnly": "node ../../../scripts/prepare-native-package.mjs win32-x64-msvc"
+  }
+}

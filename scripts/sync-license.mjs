@@ -13,7 +13,9 @@ const targets = [
   "packages/core",
   "packages/plugin-ocr",
   "packages/mcp",
-  "crates/spotter-node",
+  "crates/spotterjs-node",
+  "crates/spotterjs-node/win32-x64-msvc",
+  "crates/spotterjs-node/linux-x64-gnu",
 ];
 
 for (const dir of targets) {
