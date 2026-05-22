@@ -4,12 +4,12 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import { accessibility, windowApi } from "@spotter/core";
+import { accessibility, windowApi } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
   const depth = 12;
-  accessibility.enable({
+  accessibility.quick.enable({
     attachDelayMs: 800,
     eventSubscription: true,
     treeWaitTimeoutMs: 15_000,
@@ -22,7 +22,7 @@ export async function run(): Promise<void> {
   windowApi.focus(win.id);
   await sleep(800);
 
-  const report = accessibility.attachWindowReport(win.id, depth);
+  const report = accessibility.debug.attachWindowReport(win.id, depth);
   const root = report.elementId;
 
   info(`clientMode=${report.clientMode} handler=${report.eventHandlerRegistered}`);
@@ -48,8 +48,8 @@ export async function run(): Promise<void> {
     `health final:   nodes=${report.healthFinal.totalNodes} listItems=${report.healthFinal.listItemCount} edits=${report.healthFinal.editCount} buttons=${report.healthFinal.buttonCount}`
   );
 
-  const health = accessibility.treeHealth(root, depth);
-  const dumpHealth = countDumpNodes(JSON.parse(accessibility.dumpTree(root, depth)));
+  const health = accessibility.debug.treeHealth(root, depth);
+  const dumpHealth = countDumpNodes(JSON.parse(accessibility.debug.dumpTree(root, depth)));
   info(
     `health nodes=${health.totalNodes} dump nodes=${dumpHealth} (should match when treeView aligned)`
   );
@@ -59,7 +59,7 @@ export async function run(): Promise<void> {
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), "utf8");
 
   const dumpPath = path.join(outDir, "wechat-uia-tree.json");
-  fs.writeFileSync(dumpPath, accessibility.dumpTree(root, depth), "utf8");
+  fs.writeFileSync(dumpPath, accessibility.debug.dumpTree(root, depth), "utf8");
 
   info(`dump nodes=${health.totalNodes} listItems=${health.listItemCount}`);
   info(`wrote ${reportPath}`);

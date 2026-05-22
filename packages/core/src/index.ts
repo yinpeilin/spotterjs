@@ -1,7 +1,170 @@
 import { loadNative } from "./native";
 import type { NativeWindow } from "./native";
-import { centerOf, type CaptureImage, type Region } from "@spotter/base";
+import { centerOf, type CaptureImage, type Region } from "@spotterjs/base";
 import { encodePngBase64 } from "./capture";
+
+type LetterKey =
+  | "A"
+  | "B"
+  | "C"
+  | "D"
+  | "E"
+  | "F"
+  | "G"
+  | "H"
+  | "I"
+  | "J"
+  | "K"
+  | "L"
+  | "M"
+  | "N"
+  | "O"
+  | "P"
+  | "Q"
+  | "R"
+  | "S"
+  | "T"
+  | "U"
+  | "V"
+  | "W"
+  | "X"
+  | "Y"
+  | "Z"
+  | "a"
+  | "b"
+  | "c"
+  | "d"
+  | "e"
+  | "f"
+  | "g"
+  | "h"
+  | "i"
+  | "j"
+  | "k"
+  | "l"
+  | "m"
+  | "n"
+  | "o"
+  | "p"
+  | "q"
+  | "r"
+  | "s"
+  | "t"
+  | "u"
+  | "v"
+  | "w"
+  | "x"
+  | "y"
+  | "z";
+
+type FunctionKey =
+  | "F1"
+  | "F2"
+  | "F3"
+  | "F4"
+  | "F5"
+  | "F6"
+  | "F7"
+  | "F8"
+  | "F9"
+  | "F10"
+  | "F11"
+  | "F12";
+
+type NamedKey =
+  | "Enter"
+  | "Return"
+  | "Tab"
+  | "Escape"
+  | "Esc"
+  | "Space"
+  | "Backspace"
+  | "Delete"
+  | "Up"
+  | "Down"
+  | "Left"
+  | "Right"
+  | "Home"
+  | "End"
+  | "PageUp"
+  | "PageDown"
+  | "Ctrl"
+  | "Control"
+  | "LeftControl"
+  | "RightControl"
+  | "Shift"
+  | "LeftShift"
+  | "RightShift"
+  | "Alt"
+  | "LeftAlt"
+  | "RightAlt"
+  | "Meta"
+  | "Win"
+  | "Cmd"
+  | "LeftSuper"
+  | "RightSuper";
+
+/**
+ * 键盘按键名称。
+ *
+ * 推荐使用 `Enter`、`Ctrl`、`V` 这类首字母大写/大写字母写法。
+ * 常见小写别名（如 `enter`、`ctrl`、`esc`）由 native 层兼容解析。
+ */
+export type KeyName =
+  | LetterKey
+  | FunctionKey
+  | Lowercase<FunctionKey>
+  | NamedKey
+  | Lowercase<NamedKey>;
+
+type KeyInput = KeyName | KeyName[];
+
+const pressedKeys = new Set<string>();
+
+function keyList(keys: KeyInput): string[] {
+  return (Array.isArray(keys) ? keys : [keys]).map((key) => String(key));
+}
+
+function normalizeKeyName(key: string): string {
+  const trimmed = key.trim();
+  const lower = trimmed.toLowerCase();
+  if (/^[a-z]$/.test(lower)) return lower.toUpperCase();
+  const aliases: Record<string, string> = {
+    enter: "Enter",
+    return: "Enter",
+    tab: "Tab",
+    escape: "Escape",
+    esc: "Escape",
+    space: "Space",
+    backspace: "Backspace",
+    delete: "Delete",
+    up: "Up",
+    down: "Down",
+    left: "Left",
+    right: "Right",
+    home: "Home",
+    end: "End",
+    pageup: "PageUp",
+    pagedown: "PageDown",
+    ctrl: "Ctrl",
+    control: "Ctrl",
+    leftcontrol: "LeftControl",
+    rightcontrol: "RightControl",
+    shift: "Shift",
+    leftshift: "LeftShift",
+    rightshift: "RightShift",
+    alt: "Alt",
+    leftalt: "LeftAlt",
+    rightalt: "RightAlt",
+    meta: "Meta",
+    win: "Win",
+    cmd: "Cmd",
+    leftsuper: "LeftSuper",
+    rightsuper: "RightSuper",
+  };
+  if (/^f([1-9]|1[0-2])$/.test(lower)) return lower.toUpperCase();
+  return aliases[lower] ?? trimmed;
+}
 
 function mapWindow(w: NativeWindow) {
   return {
@@ -112,32 +275,67 @@ export const mouse = {
 /**
  * 键盘输入模拟。
  *
- * 键名格式与 native 层一致（如 `"enter"`、`"ctrl"`、`"a"`）。
+ * 推荐键名写法：`"Enter"`、`"Ctrl"`、`"V"`。小写常见别名由 native 层兼容。
+ * `up()` 只释放由 `down()` 记录的按键；需要强制发送 key-up 时使用 `rawUp()`。
  */
 export const keyboard = {
-  /** 输入 Unicode 文本（逐字符） */
-  type(text: string) {
+  /** 输入 Unicode 文本。 */
+  write(text: string) {
     loadNative().keyboardTypeText(text);
   },
 
-  /** 按下多个键（组合键第一步） */
-  press(keys: string[]) {
-    loadNative().keyboardPressKeys(keys);
+  /** 按下并释放单个按键。 */
+  tap(key: KeyName) {
+    loadNative().keyboardTypeKey(String(key));
   },
 
-  /** 释放多个键 */
-  release(keys: string[]) {
-    loadNative().keyboardReleaseKeys(keys);
+  /** 按住一个或多个按键，并记录按下状态。 */
+  down(keys: KeyInput) {
+    const names = keyList(keys);
+    loadNative().keyboardPressKeys(names);
+    for (const name of names) {
+      pressedKeys.add(normalizeKeyName(name));
+    }
   },
 
-  /** 按下并释放单个键 */
-  typeKey(key: string) {
-    loadNative().keyboardTypeKey(key);
+  /** 释放由 {@link keyboard.down} 记录为按下的按键；未记录的按键会静默跳过。 */
+  up(keys: KeyInput) {
+    const names = keyList(keys);
+    const releasable = names
+      .filter((name) => pressedKeys.has(normalizeKeyName(name)))
+      .reverse();
+    if (releasable.length === 0) return;
+    loadNative().keyboardReleaseKeys(releasable);
+    for (const name of releasable) {
+      pressedKeys.delete(normalizeKeyName(name));
+    }
   },
 
-  /** 快捷键：依次 press → release */
-  shortcut(keys: string[]) {
-    loadNative().keyboardShortcut(keys);
+  /** 直接发送底层 key-down，不记录状态。 */
+  rawDown(keys: KeyInput) {
+    loadNative().keyboardPressKeys(keyList(keys));
+  },
+
+  /** 直接发送底层 key-up，不检查状态。 */
+  rawUp(keys: KeyInput) {
+    loadNative().keyboardReleaseKeys(keyList(keys));
+  },
+
+  /** 快捷键：按住修饰键，敲击最后一个键，再释放修饰键。 */
+  hotkey(keys: KeyName[]) {
+    if (keys.length === 0) return;
+    if (keys.length === 1) {
+      this.tap(keys[0]);
+      return;
+    }
+    const modifiers = keys.slice(0, -1);
+    const key = keys[keys.length - 1];
+    this.down(modifiers);
+    try {
+      this.tap(key);
+    } finally {
+      this.up(modifiers);
+    }
   },
 
   /** @param config.autoDelayMs 按键间隔 */
@@ -228,7 +426,7 @@ export function captureToBase64(capture: CaptureImage): string {
   return encodePngBase64(capture);
 }
 
-export * from "@spotter/base";
+export * from "@spotterjs/base";
 export { screen } from "./screen";
 export { findInWindow, findAllInWindow, tapInWindow } from "./template";
 export { loadNative } from "./native";
@@ -244,6 +442,8 @@ export { accessibility } from "./accessibility";
 export type {
   A11yQuery,
   A11yConfig,
+  A11yDebugApi,
+  A11yQuickApi,
   TreeHealth,
   AttachReport,
   TreeViewMode,

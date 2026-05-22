@@ -1,4 +1,4 @@
-import { accessibility, windowApi } from "@spotter/core";
+import { accessibility, windowApi } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 /**
@@ -6,7 +6,7 @@ import { info, runSmokeScript } from "../lib/log";
  * Requires Notepad or Calculator to be open.
  */
 export async function run(): Promise<void> {
-  accessibility.enable({ attachDelayMs: 300 });
+  accessibility.quick.enable({ attachDelayMs: 300 });
 
   const windows = windowApi.list();
   const target =
@@ -23,9 +23,9 @@ export async function run(): Promise<void> {
   windowApi.focus(target.id);
   await sleep(400);
 
-  const report = accessibility.attachWindowReport(target.id, 8);
+  const report = accessibility.debug.attachWindowReport(target.id, 8);
   const root = report.elementId;
-  const health = accessibility.treeHealth(root, 8);
+  const health = accessibility.debug.treeHealth(root, 8);
   info(
     `attach: strategy=${report.attachStrategy} treeView=${report.treeView} nodes=${health.totalNodes}`
   );
@@ -37,7 +37,7 @@ export async function run(): Promise<void> {
     throw new Error("UIA tree too small — enable accessibility or check app version");
   }
 
-  const dump = accessibility.dumpTree(root, 4);
+  const dump = accessibility.debug.dumpTree(root, 4);
   info(`dump preview (first 500 chars): ${dump.slice(0, 500)}`);
 }
 

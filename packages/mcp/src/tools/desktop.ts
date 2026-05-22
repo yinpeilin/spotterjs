@@ -10,7 +10,7 @@ import {
   mouse,
   screen,
   windowApi,
-} from "@spotter/core";
+} from "@spotterjs/core";
 import {
   captureActiveBase64,
   captureScreenBase64,
@@ -163,7 +163,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_keyboard_type",
     { inputSchema: z.object({ text: z.string() }) },
     async ({ text }) => {
-      keyboard.type(text);
+      keyboard.write(text);
       return { content: [{ type: "text", text: "ok" }] };
     }
   );
@@ -210,7 +210,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       }),
     },
     async ({ windowId, maxDepth }) => {
-      const report = accessibility.attachWindowReport(windowId, maxDepth ?? 12);
+      const report = accessibility.debug.attachWindowReport(windowId, maxDepth ?? 12);
       return { content: [{ type: "text", text: JSON.stringify(report, null, 2) }] };
     }
   );
@@ -229,7 +229,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     },
     async (args) => {
       const { rootId, maxDepth, ...query } = args;
-      const id = accessibility.find(rootId, query, maxDepth ?? 12);
+      const id = accessibility.quick.find(rootId, query, maxDepth ?? 12);
       return { content: [{ type: "text", text: id }] };
     }
   );
@@ -238,7 +238,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_a11y_invoke",
     { inputSchema: z.object({ elementId: z.string() }) },
     async ({ elementId }) => {
-      accessibility.invoke(elementId);
+      accessibility.quick.invoke(elementId);
       return { content: [{ type: "text", text: "ok" }] };
     }
   );
@@ -247,7 +247,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_a11y_tap_element",
     { inputSchema: z.object({ elementId: z.string() }) },
     async ({ elementId }) => {
-      const region = accessibility.tapElement(elementId);
+      const region = accessibility.quick.click(elementId);
       return { content: [{ type: "text", text: JSON.stringify(region, null, 2) }] };
     }
   );
@@ -262,7 +262,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       }),
     },
     async ({ rootId, maxDepth, treeView }) => {
-      const tree = accessibility.dumpTree(rootId, {
+      const tree = accessibility.debug.dumpTree(rootId, {
         maxDepth: maxDepth ?? 12,
         treeView,
       });
@@ -274,7 +274,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_a11y_element_info",
     { inputSchema: z.object({ elementId: z.string() }) },
     async ({ elementId }) => {
-      const info = accessibility.getElementInfo(elementId);
+      const info = accessibility.debug.getElementInfo(elementId);
       return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
     }
   );

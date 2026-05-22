@@ -5,7 +5,7 @@ import {
   type NativeTreeHealth,
   type NativeTreeNodeDump,
 } from "./native";
-import type { Region } from "@spotter/base";
+import { centerOf, type Region } from "@spotterjs/base";
 
 /** UIA 树遍历视图（Windows） */
 export type TreeViewMode = "auto" | "raw" | "control" | "content";
@@ -31,7 +31,7 @@ export type A11yQuery = {
 /**
  * 无障碍子系统初始化选项。
  *
- * 调用 {@link accessibility.enable} 后生效，影响 attach 与树展开行为。
+ * 调用 {@link accessibility.quick.enable} 后生效，影响 attach 与树展开行为。
  */
 export type A11yConfig = {
   /** attach 后的固定等待（毫秒） */
@@ -52,10 +52,10 @@ export type TreeDumpOptions = {
   treeView?: TreeViewMode;
 };
 
-/** 无障碍树健康检查结果，形状来自 `@spotter-rs/node` */
+/** 无障碍树健康检查结果，形状来自 `@spotterjs/node` */
 export type TreeHealth = NativeTreeHealth;
 
-/** attach 报告（attach 前后树状态对比），形状来自 `@spotter-rs/node` */
+/** attach 报告（attach 前后树状态对比），形状来自 `@spotterjs/node` */
 export type AttachReport = NativeAttachReport;
 
 /** 单节点 UIA 元数据 */
@@ -93,8 +93,6 @@ function healthFromNative(h: NativeTreeHealth): TreeHealth {
 function attachReportFromNative(r: NativeAttachReport): AttachReport {
   return r;
 }
-
-import { extendAccessibility } from "./accessibility-helpers";
 
 const accessibilityBase = {
   /**
@@ -248,9 +246,113 @@ const accessibilityBase = {
 };
 
 /**
- * 无障碍自动化 API（UIA / AT-SPI）。
+ * 日常无障碍自动化 API。
  *
- * 典型流程：`enable` → `attachWindowReport` → `dumpTree` / `find` → `invoke` / `tapElement`。
- * 扩展方法见 {@link extendAccessibility}。
+ * 典型流程：`quick.enable()` → `quick.attach()` → `quick.find()` → `quick.click()` / `quick.invoke()`。
  */
-export const accessibility = extendAccessibility(accessibilityBase);
+export type A11yQuickApi = {
+  enable(config?: A11yConfig): void;
+  attach(windowId: string): string;
+  find(rootId: string, query: A11yQuery, maxDepth?: number): string;
+  waitFor(
+    rootId: string,
+    query: A11yQuery,
+    timeoutMs: number,
+    opts?: { maxDepth?: number; pollMs?: number }
+  ): string;
+  click(elementId: string): Region;
+  typeText(elementId: string, text: string): void;
+  invoke(elementId: string): void;
+  findAndClick(rootId: string, query: A11yQuery, maxDepth?: number): string;
+  attachAndFind(
+    windowId: string,
+    query: A11yQuery,
+    maxDepth?: number
+  ): { rootId: string; elementId: string };
+};
+
+/**
+ * 无障碍诊断 API。
+ *
+ * 当 `quick.find()` 找不到元素，或 UIA / AT-SPI 树不完整时，用这里的树导出、
+ * 健康检查和元素元数据方法排查。
+ */
+export type A11yDebugApi = {
+  attachWindowReport(windowId: string, maxDepth?: number): AttachReport;
+  dumpTree(rootId: string, maxDepthOrOpts?: number | TreeDumpOptions): string;
+  dumpTreeObject(
+    rootId: string,
+    maxDepthOrOpts?: number | TreeDumpOptions
+  ): TreeNodeDump;
+  treeHealth(
+    rootId: string,
+    maxDepth?: number,
+    treeView?: TreeViewMode
+  ): TreeHealth;
+  checkTreeHealth(
+    rootId: string,
+    minListItems: number,
+    maxDepth?: number
+  ): TreeHealth;
+  getElementInfo(elementId: string): ElementInfo;
+  refreshRoot(elementId: string): void;
+};
+
+function clickElement(elementId: string): Region {
+  const region = accessibilityBase.getBounds(elementId);
+  const { x, y } = centerOf(region);
+  loadNative().tapAt(x, y);
+  return region;
+}
+
+export const accessibility: {
+  quick: A11yQuickApi;
+  debug: A11yDebugApi;
+} = {
+  quick: {
+    enable: accessibilityBase.enable,
+
+    attach(windowId: string): string {
+      return accessibilityBase.attachWindow(windowId);
+    },
+
+    find: accessibilityBase.find,
+    waitFor: accessibilityBase.waitFor,
+
+    click(elementId: string): Region {
+      return clickElement(elementId);
+    },
+
+    typeText(elementId: string, text: string): void {
+      accessibilityBase.setValue(elementId, text);
+    },
+
+    invoke: accessibilityBase.invoke,
+
+    findAndClick(rootId: string, query: A11yQuery, maxDepth = 12): string {
+      const elementId = accessibilityBase.find(rootId, query, maxDepth);
+      clickElement(elementId);
+      return elementId;
+    },
+
+    attachAndFind(
+      windowId: string,
+      query: A11yQuery,
+      maxDepth = 12
+    ): { rootId: string; elementId: string } {
+      const report = accessibilityBase.attachWindowReport(windowId, maxDepth);
+      const elementId = accessibilityBase.find(report.elementId, query, maxDepth);
+      return { rootId: report.elementId, elementId };
+    },
+  },
+
+  debug: {
+    attachWindowReport: accessibilityBase.attachWindowReport,
+    dumpTree: accessibilityBase.dumpTree,
+    dumpTreeObject: accessibilityBase.dumpTreeObject,
+    treeHealth: accessibilityBase.treeHealth,
+    checkTreeHealth: accessibilityBase.checkTreeHealth,
+    getElementInfo: accessibilityBase.getElementInfo,
+    refreshRoot: accessibilityBase.refreshRoot,
+  },
+};

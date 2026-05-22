@@ -1,14 +1,14 @@
-# @spotter/core
+# @spotterjs/core
 
-Spotter 桌面自动化的 TypeScript API：截图、模板匹配、键鼠、窗口、无障碍与工作区宿主 I/O。
+spotterjs 桌面自动化的 TypeScript API：截图、模板匹配、键鼠、窗口、无障碍与工作区宿主 I/O。
 
 ## 安装
 
 ```bash
-npm install @spotter/core
+npm install @spotterjs/core
 ```
 
-需要对应平台的 `@spotter-rs/node` 预编译二进制（Windows x64、Linux x64-gnu）。
+需要对应平台的 `@spotterjs/node` 预编译二进制（Windows x64、Linux x64-gnu）。
 
 ## 快速开始
 
@@ -19,13 +19,13 @@ import {
   desktop,
   windowApi,
   centerOf,
-} from "@spotter/core";
+} from "@spotterjs/core";
 
 // 1. 等待目标窗口
 const win = desktop.waitForWindow("Notepad", 10_000);
 
 // 2. 窗口内模板匹配并点击
-import { tapInWindow } from "@spotter/core";
+import { tapInWindow } from "@spotterjs/core";
 tapInWindow(win.id, "./assets/save-btn.png", { confidence: 0.9 });
 
 // 3. 或全屏匹配
@@ -43,7 +43,7 @@ mouse.tap(x, y);
 | `mouse` / `keyboard` / `clipboard` | 输入模拟 |
 | `windowApi` | 枚举、聚焦、移动、调整大小、窗口截图 |
 | `desktop` | 按进程列出应用、按标题找窗口、`waitForWindow` |
-| `accessibility` | UIA / AT-SPI：`attachWindow`、`find`、`tapElement` 等 |
+| `accessibility` | UIA / AT-SPI：`quick.attach`、`quick.find`、`quick.click` 等 |
 | `host` | 沙箱文件读写与 shell（Agent 场景） |
 | `encodePng` / `captureToBase64` | 截图 PNG 编码 |
 | `toMatchBox` / `matchTapScreen` | 屏幕坐标与窗口局部坐标转换 |
@@ -69,16 +69,33 @@ await screen.find("./btn.png", {
 });
 ```
 
+## 键盘输入
+
+```typescript
+import { keyboard } from "@spotterjs/core";
+
+keyboard.write("hello");
+keyboard.hotkey(["Ctrl", "V"]);
+
+// `up` 只释放由 `down` 记录的按键；强制 key-up 请用 rawUp。
+keyboard.down(["Ctrl"]);
+keyboard.up(["Ctrl"]);
+```
+
+推荐键名写法是 `"Enter"`、`"Ctrl"`、`"V"`。常见小写别名（如 `"enter"`、`"ctrl"`、`"esc"`）也可解析。
+
 ## 无障碍典型流程
 
 ```typescript
-import { accessibility } from "@spotter/core";
+import { accessibility } from "@spotterjs/core";
 
-accessibility.enable({ eventSubscription: true });
-const rootId = accessibility.attachWindow(windowId);
-const btnId = accessibility.waitFor(rootId, { name: "发送" }, 5000);
-accessibility.tapElement(btnId);
+accessibility.quick.enable({ eventSubscription: true });
+const rootId = accessibility.quick.attach(windowId);
+const btnId = accessibility.quick.waitFor(rootId, { name: "发送" }, 5000);
+accessibility.quick.click(btnId);
 ```
+
+日常脚本先用 `accessibility.quick`。如果树里找不到目标元素，再用 `accessibility.debug.dumpTree(rootId)` 查看树结构和诊断数据。
 
 ## 何时使用 `loadNative()`
 
@@ -88,12 +105,12 @@ accessibility.tapElement(btnId);
 - 尚未封装的 native 能力
 - 与 Rust 层脚本直接集成
 
-类型为 `SpotterNative`（来自 `@spotter-rs/node` 自动生成绑定）。
+类型为 `SpotterNative`（来自 `@spotterjs/node` 自动生成绑定）。
 
 ## MCP
 
-MCP 服务端：[`@spotter/mcp`](../mcp) — 见 [docs/MCP.md](../../docs/MCP.md)。
+MCP 服务端：[`@spotterjs/mcp`](../mcp) — 见 [docs/MCP.md](../../docs/MCP.md)。
 
 ## License
 
-Learning and non-commercial use are free. Commercial use: `ypl123698745@qq.com` or [Gitee Issues](https://gitee.com/ypl0lpy/spotter/issues). See [LICENSE](../../LICENSE).
+Learning and non-commercial use are free. Commercial use: `ypl123698745@qq.com` or [Gitee Issues](https://gitee.com/ypl0lpy/spotterjs/issues). See [LICENSE](../../LICENSE).
