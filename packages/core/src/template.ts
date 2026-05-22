@@ -1,4 +1,4 @@
-import { centerOf, type MatchOptions, type Region } from "@spotter/base";
+import { centerOf, type MatchOptions, type Region } from "@spotterjs/base";
 
 import { toNativeOpts } from "./match";
 

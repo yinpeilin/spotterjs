@@ -1,0 +1,16 @@
+[package]
+name = "spotterjs-base"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared types, errors, and plugin traits for spotterjs"
+
+[features]
+default = []
+napi = ["dep:napi", "dep:napi-derive"]
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+napi = { version = "2", features = ["napi4"], optional = true }
+napi-derive = { version = "2", optional = true }

@@ -1,5 +1,5 @@
 import * as path from "path";
-import { screen } from "@spotter/core";
+import { screen } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { cropRgba, writeRgbaPng } from "../lib/png";
 

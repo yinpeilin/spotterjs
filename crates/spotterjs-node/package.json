@@ -1,0 +1,50 @@
+{
+  "name": "@spotterjs/node",
+  "version": "0.1.0",
+  "description": "spotterjs desktop automation for Node.js",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/ypl0lpy/spotterjs.git",
+    "directory": "crates/spotterjs-node"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bugs": {
+    "url": "https://gitee.com/ypl0lpy/spotterjs/issues"
+  },
+  "homepage": "https://gitee.com/ypl0lpy/spotterjs#readme",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "napi": {
+    "binaryName": "spotterjs-node",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release --dts index.d.ts",
+    "build:linux": "napi build --platform --release --features linux-x11 --dts index.d.ts",
+    "build:debug": "napi build --platform --dts index.d.ts",
+    "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  },
+  "optionalDependencies": {
+    "@spotterjs/node-win32-x64-msvc": "0.1.0",
+    "@spotterjs/node-linux-x64-gnu": "0.1.0"
+  }
+}

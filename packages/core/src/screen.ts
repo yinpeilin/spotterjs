@@ -1,4 +1,4 @@
-import { centerOf, type CaptureImage, type MatchOptions, type Region } from "@spotter/base";
+import { centerOf, type CaptureImage, type MatchOptions, type Region } from "@spotterjs/base";
 import {
   captureForMatch,
   findAllNeedle,

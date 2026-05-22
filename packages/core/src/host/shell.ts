@@ -12,14 +12,14 @@ export type ShellInfo = {
   hint: string;
 };
 
-/** 返回默认 shell：Windows 为 PowerShell，Linux 为 bash；可通过 `SPOTTER_SHELL` 覆盖 */
+/** 返回默认 shell：Windows 为 PowerShell，Linux 为 bash；可通过 `SPOTTERJS_SHELL` 覆盖 */
 export function getShellInfo(): ShellInfo {
-  if (process.env.SPOTTER_SHELL?.trim()) {
+  if (process.env.SPOTTERJS_SHELL?.trim()) {
     return {
       platform: process.platform,
       shell: "custom",
-      executable: process.env.SPOTTER_SHELL.trim(),
-      hint: `Commands run via SPOTTER_SHELL (${process.env.SPOTTER_SHELL}).`,
+      executable: process.env.SPOTTERJS_SHELL.trim(),
+      hint: `Commands run via SPOTTERJS_SHELL (${process.env.SPOTTERJS_SHELL}).`,
     };
   }
   if (process.platform === "win32") {
@@ -39,7 +39,7 @@ export function getShellInfo(): ShellInfo {
 }
 
 function buildSpawnArgs(command: string): { executable: string; args: string[] } {
-  const custom = process.env.SPOTTER_SHELL?.trim();
+  const custom = process.env.SPOTTERJS_SHELL?.trim();
   if (custom) {
     return { executable: custom, args: ["-c", command] };
   }
@@ -63,7 +63,7 @@ export type ExecResult = {
 /**
  * 在工作区内执行 shell 命令。
  *
- * 需 `SPOTTER_ALLOW_SHELL=1` 或 `configureHost({ allowShell: true })`。
+ * 需 `SPOTTERJS_ALLOW_SHELL=1` 或 `configureHost({ allowShell: true })`。
  * Windows 使用 PowerShell `-Command`；Linux 使用 `bash -lc`。
  *
  * @param opts.cwd 工作目录，默认 workspaceRoot
@@ -77,7 +77,7 @@ export function execCommand(
   if (!allowShell) {
     return Promise.reject(
       new HostPathError(
-        "shell execution disabled; set SPOTTER_ALLOW_SHELL=1 to enable host.exec"
+        "shell execution disabled; set SPOTTERJS_ALLOW_SHELL=1 to enable host.exec"
       )
     );
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { centerOf } from "@spotter/base";
+import { centerOf } from "@spotterjs/base";
 import {
   matchTapScreen,
   toLocal,

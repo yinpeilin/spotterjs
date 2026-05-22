@@ -7,10 +7,10 @@
  * 微信发消息请用模板匹配: npm run integration:wechat:send
  */
 
-export type { Region } from "@spotter/base";
+export type { Region } from "@spotterjs/base";
 
 export function useOcrPlugin(): never {
   throw new Error(
-    "@spotter/plugin-ocr: Tesseract 已停用。微信请用模板匹配 (integration:wechat:send)。后续 OCR 计划: PaddleOCR。"
+    "@spotterjs/plugin-ocr: Tesseract 已停用。微信请用模板匹配 (integration:wechat:send)。后续 OCR 计划: PaddleOCR。"
   );
 }

@@ -8,7 +8,7 @@ describe("host", () => {
   let tmp: string;
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "spotter-host-"));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "spotterjs-host-"));
     configureHost({ workspaceRoot: tmp, allowShell: false, maxBytes: 4096 });
   });
 

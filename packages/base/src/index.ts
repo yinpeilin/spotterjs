@@ -28,7 +28,7 @@ export interface Point {
  * - `data` 为行优先排列的 RGBA 字节（每像素 4 字节，无 stride padding）
  * - 尺寸与 `width * height * 4` 一致
  *
- * 可用 {@link encodePng}（`@spotter/core`）编码为 PNG。
+ * 可用 {@link encodePng}（`@spotterjs/core`）编码为 PNG。
  */
 export interface CaptureImage {
   /** RGBA 像素 buffer */
@@ -40,7 +40,7 @@ export interface CaptureImage {
 /**
  * 模板匹配（NCC）的可选参数。
  *
- * 详见 `@spotter/core` 文档与 `docs/MATCHING.md`。
+ * 详见 `@spotterjs/core` 文档与 `docs/MATCHING.md`。
  */
 export interface MatchOptions {
   /**

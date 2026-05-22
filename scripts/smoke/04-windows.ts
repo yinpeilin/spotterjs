@@ -1,4 +1,4 @@
-import { windowApi } from "@spotter/core";
+import { windowApi } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {

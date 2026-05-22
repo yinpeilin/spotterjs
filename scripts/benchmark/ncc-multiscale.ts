@@ -8,7 +8,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import { screen } from "@spotter/core";
+import { screen } from "@spotterjs/core";
 
 const outDir = path.resolve(process.cwd(), "test-output");
 const needlePath = path.join(outDir, "needle.png");

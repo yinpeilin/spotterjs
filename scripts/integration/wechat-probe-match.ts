@@ -3,7 +3,7 @@
  * npm run integration:wechat:probe
  */
 import * as path from "path";
-import { findAllInWindow, findInWindow, loadNative, windowApi } from "@spotter/core";
+import { findAllInWindow, findInWindow, loadNative, windowApi } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { writeRgbaPng } from "../lib/png";
 import {

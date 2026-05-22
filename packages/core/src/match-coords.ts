@@ -1,4 +1,4 @@
-import { centerOf, type Point, type Region } from "@spotter/base";
+import { centerOf, type Point, type Region } from "@spotterjs/base";
 
 /**
  * 窗口外框（与 `windowApi.getRegion` / `captureWindow` 一致）。

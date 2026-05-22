@@ -2,9 +2,9 @@
  * Linux Phase2 smoke (AT-SPI). Run on Linux with accessibility-linux feature built.
  * Requires gedit or GNOME Calculator open.
  *
- *   SPOTTER_ACCESSIBILITY=1 tsx scripts/smoke/06-accessibility-gtk.ts
+ *   SPOTTERJS_ACCESSIBILITY=1 tsx scripts/smoke/06-accessibility-gtk.ts
  */
-import { accessibility, windowApi } from "@spotter/core";
+import { accessibility, windowApi } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
@@ -13,7 +13,7 @@ export async function run(): Promise<void> {
     return;
   }
 
-  accessibility.enable({ attachDelayMs: 500 });
+  accessibility.quick.enable({ attachDelayMs: 500 });
 
   const windows = windowApi.list();
   const target =
@@ -28,8 +28,8 @@ export async function run(): Promise<void> {
   windowApi.focus(target.id);
   await sleep(500);
 
-  const root = accessibility.attachWindow(target.id);
-  const health = accessibility.treeHealth(root, 8);
+  const root = accessibility.quick.attach(target.id);
+  const health = accessibility.debug.treeHealth(root, 8);
   info(`nodes=${health.totalNodes}`);
 }
 

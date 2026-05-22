@@ -5,10 +5,10 @@
   "fixed": [],
   "linked": [
     [
-      "@spotter/base",
-      "@spotter/core",
-      "@spotter/plugin-ocr",
-      "@spotter-rs/node"
+      "@spotterjs/base",
+      "@spotterjs/core",
+      "@spotterjs/plugin-ocr",
+      "@spotterjs/node"
     ]
   ],
   "access": "public",

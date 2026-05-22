@@ -1,4 +1,4 @@
-import type { CaptureImage, MatchOptions, Region } from "@spotter/base";
+import type { CaptureImage, MatchOptions, Region } from "@spotterjs/base";
 
 import { loadNative } from "./native";
 

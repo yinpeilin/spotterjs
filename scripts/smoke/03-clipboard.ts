@@ -1,8 +1,8 @@
-import { clipboard } from "@spotter/core";
+import { clipboard } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
-  const token = `spotter-smoke-${process.pid}`;
+  const token = `spotterjs-smoke-${process.pid}`;
   clipboard.set(token);
   const read = clipboard.get();
   if (read !== token) {

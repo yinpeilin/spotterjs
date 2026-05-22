@@ -1,5 +1,5 @@
-import { captureToBase64, screen } from "@spotter/core";
-import type { Region } from "@spotter/base";
+import { captureToBase64, screen } from "@spotterjs/core";
+import type { Region } from "@spotterjs/base";
 
 export function captureScreenBase64(region?: Region) {
   const img = screen.capture(region);

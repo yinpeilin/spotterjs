@@ -1,4 +1,4 @@
-import { loadNative, screen } from "@spotter/core";
+import { loadNative, screen } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {

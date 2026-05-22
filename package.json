@@ -1,16 +1,19 @@
 {
-  "name": "spotter-workspace",
+  "name": "spotterjs-workspace",
   "private": true,
   "scripts": {
-    "build": "npm run build -w @spotter/base && npm run build -w @spotter-rs/node && npm run build -w @spotter/core && npm run build -w @spotter/mcp && npm run build -w @spotter/plugin-ocr",
-    "build:ts": "npm run build -w @spotter/base && npm run build -w @spotter/core && npm run build -w @spotter/mcp && npm run build -w @spotter/plugin-ocr",
-    "build:native": "npm run build -w @spotter-rs/node",
+    "build": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/node && npm run build -w @spotterjs/core && npm run build -w @spotterjs/mcp && npm run build -w @spotterjs/plugin-ocr",
+    "build:ts": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/core && npm run build -w @spotterjs/mcp && npm run build -w @spotterjs/plugin-ocr",
+    "build:native": "npm run build -w @spotterjs/node",
+    "prepare:native-packages": "node scripts/prepare-native-packages.mjs",
+    "publish:native:win": "npm run build -w @spotterjs/node && node scripts/prepare-native-package.mjs win32-x64-msvc && npm publish ./crates/spotterjs-node/win32-x64-msvc",
+    "publish:native:linux": "npm run build:linux -w @spotterjs/node && node scripts/prepare-native-package.mjs linux-x64-gnu && npm publish ./crates/spotterjs-node/linux-x64-gnu",
     "sync-license": "node scripts/sync-license.mjs",
     "test": "npm run test:rust && npm run test --workspaces --if-present",
     "test:rust": "cargo test",
     "test:rust:ignored": "cargo test -- --ignored",
     "benchmark:ncc": "tsx scripts/benchmark/ncc-multiscale.ts",
-    "benchmark:ncc:rust": "cargo run -p spotter-plugin-match-ncc --release --example bench_ncc -- test-output/capture.png test-output/needle.png",
+    "benchmark:ncc:rust": "cargo run -p spotterjs-plugin-match-ncc --release --example bench_ncc -- test-output/capture.png test-output/needle.png",
     "smoke": "tsx scripts/smoke/run-all.ts",
     "smoke:version": "tsx scripts/smoke/01-version-screen.ts",
     "smoke:capture": "tsx scripts/smoke/02-capture.ts",
@@ -34,12 +37,12 @@
     "packages/core",
     "packages/mcp",
     "packages/plugin-ocr",
-    "crates/spotter-node"
+    "crates/spotterjs-node"
   ],
   "devDependencies": {
     "@changesets/cli": "^2.29.0",
-    "@spotter/core": "0.1.0",
-    "@spotter/plugin-ocr": "0.1.0",
+    "@spotterjs/core": "0.1.0",
+    "@spotterjs/plugin-ocr": "0.1.0",
     "@types/pngjs": "^6.0.5",
     "pngjs": "^7.0.0",
     "tsx": "^4.19.0"

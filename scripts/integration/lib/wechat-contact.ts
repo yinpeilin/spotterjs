@@ -10,7 +10,7 @@ import * as fs from "fs";
 
 import * as path from "path";
 
-import type { MatchOptions, Point, Region } from "@spotter/base";
+import type { MatchOptions, Point, Region } from "@spotterjs/base";
 
 import {
 
@@ -32,7 +32,7 @@ import {
 
   type MatchBox,
 
-} from "@spotter/core";
+} from "@spotterjs/core";
 
 import { info } from "../../lib/log";
 
@@ -40,7 +40,7 @@ import { drawCrosshair, drawRectOutline, writeRgbaPng } from "../../lib/png";
 
 
 
-export type { MatchBox } from "@spotter/core";
+export type { MatchBox } from "@spotterjs/core";
 
 export { matchTapScreen, toLocal, toScreen };
 

@@ -45,7 +45,7 @@ function interpolate(template: string, vars: Record<string, string>): string {
 export function loadAutomationConfig(
   configPath?: string
 ): WechatAutomationConfig {
-  const envPath = process.env.SPOTTER_CONFIG;
+  const envPath = process.env.SPOTTERJS_CONFIG;
   const resolved =
     configPath ??
     envPath ??
@@ -82,10 +82,10 @@ export function loadAutomationConfig(
     }
   }
 
-  if (process.env.SPOTTER_ACCESSIBILITY === "1") {
+  if (process.env.SPOTTERJS_ACCESSIBILITY === "1") {
     raw.accessibility.enabled = true;
   }
-  if (process.env.SPOTTER_ACCESSIBILITY === "0") {
+  if (process.env.SPOTTERJS_ACCESSIBILITY === "0") {
     raw.accessibility.enabled = false;
   }
 

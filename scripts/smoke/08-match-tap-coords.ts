@@ -14,7 +14,7 @@ import {
   screen,
   toMatchBox,
   windowApi,
-} from "@spotter/core";
+} from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { cropRgba, writeRgbaPng } from "../lib/png";
 
@@ -26,7 +26,7 @@ const CONFIDENCE = 0.85;
 const DEFAULT_TOL = 3;
 
 function tol(): number {
-  const n = Number(process.env.SPOTTER_MOUSE_TOL ?? String(DEFAULT_TOL));
+  const n = Number(process.env.SPOTTERJS_MOUSE_TOL ?? String(DEFAULT_TOL));
   return Number.isFinite(n) ? n : DEFAULT_TOL;
 }
 

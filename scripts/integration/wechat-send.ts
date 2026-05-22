@@ -10,14 +10,14 @@
  */
 import { execSync } from "child_process";
 import * as fs from "fs";
-import type { Region } from "@spotter/base";
+import type { Region } from "@spotterjs/base";
 import {
   clipboard,
   keyboard,
   loadNative,
   tapInWindow,
   windowApi,
-} from "@spotter/core";
+} from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import {
   assertMainWindow,
@@ -35,7 +35,7 @@ import {
 
 const MESSAGE =
   process.env.WECHAT_MESSAGE?.trim() ||
-  `Spotter 测试 ${new Date().toLocaleString()}`;
+  `spotterjs 测试 ${new Date().toLocaleString()}`;
 
 const WECHAT_PATHS = [
   process.env.WECHAT_EXE,
@@ -104,7 +104,7 @@ async function typeIntoChat(win: WechatWin, text: string): Promise<void> {
 
   clipboard.set(text);
   await sleep(150);
-  keyboard.shortcut(["Ctrl", "V"]);
+  keyboard.hotkey(["Ctrl", "V"]);
   await sleep(400);
 }
 
@@ -171,7 +171,7 @@ export async function run(): Promise<void> {
     );
     info("已点击发送按钮模板");
   } else {
-    keyboard.press(["Enter"]);
+    keyboard.tap("Enter");
     info("已按 Enter 发送");
   }
 

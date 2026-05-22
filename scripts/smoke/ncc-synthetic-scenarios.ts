@@ -4,11 +4,11 @@
  *   npm run smoke:ncc:synthetic
  *
  * Keep scenario names aligned with:
- *   crates/spotter-plugin-match-ncc/tests/common/fixtures.rs
+ *   crates/spotterjs-plugin-match-ncc/tests/common/fixtures.rs
  */
 import * as fs from "fs";
 import * as path from "path";
-import { loadNative } from "@spotter/core";
+import { loadNative } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { drawRectOutline, writeRgbaPng } from "../lib/png";
 

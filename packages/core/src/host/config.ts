@@ -22,7 +22,7 @@ let _config: HostConfig | null = null;
 
 function envRoot(): string {
   return (
-    process.env.SPOTTER_WORKSPACE_ROOT?.trim() ||
+    process.env.SPOTTERJS_WORKSPACE_ROOT?.trim() ||
     process.cwd()
   );
 }
@@ -38,9 +38,9 @@ export function getHostConfig(): HostConfig {
   if (_config) return _config;
   _config = {
     workspaceRoot: path.resolve(envRoot()),
-    allowShell: envBool("SPOTTER_ALLOW_SHELL", false),
-    maxBytes: Number(process.env.SPOTTER_FS_MAX_BYTES || 1048576),
-    execTimeoutMs: Number(process.env.SPOTTER_EXEC_TIMEOUT_MS || 60000),
+    allowShell: envBool("SPOTTERJS_ALLOW_SHELL", false),
+    maxBytes: Number(process.env.SPOTTERJS_FS_MAX_BYTES || 1048576),
+    execTimeoutMs: Number(process.env.SPOTTERJS_EXEC_TIMEOUT_MS || 60000),
     writeDenylist: [".env", ".env.local", "credentials.json", "secrets.json"],
   };
   return _config;

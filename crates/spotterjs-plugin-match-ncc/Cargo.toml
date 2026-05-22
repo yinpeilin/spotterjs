@@ -1,0 +1,17 @@
+[package]
+name = "spotterjs-plugin-match-ncc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "NCC template matching plugin for spotterjs"
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon"]
+
+[dependencies]
+spotterjs-base = { path = "../spotterjs-base" }
+rayon = { version = "1.10", optional = true }
+
+[dev-dependencies]
+spotterjs-core = { path = "../spotterjs-core" }

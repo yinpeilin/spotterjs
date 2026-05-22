@@ -1,4 +1,4 @@
-import type { DesktopApp, WindowInfo } from "@spotter/base";
+import type { DesktopApp, WindowInfo } from "@spotterjs/base";
 import { loadNative, type NativeDesktopApp, type NativeWindow } from "./native";
 
 function mapWindow(w: NativeWindow): WindowInfo {

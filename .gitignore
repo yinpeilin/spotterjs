@@ -1,10 +1,12 @@
 /target/
 **/target/
 node_modules/
+.npmrc
 packages/*/dist/
-crates/spotter-node/*.node
-crates/spotter-node/index.js
-crates/spotter-node/index.d.ts
+crates/spotterjs-node/*.node
+crates/spotterjs-node/*/*.node
+crates/spotterjs-node/index.js
+crates/spotterjs-node/index.d.ts
 *.png
 !assets/sample-template.png
 test-output/

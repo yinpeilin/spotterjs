@@ -1,24 +1,24 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/spotter-base",
-    "crates/spotter-core",
-    "crates/spotter-plugin-match-ncc",
-    "crates/spotter-node",
+    "crates/spotterjs-base",
+    "crates/spotterjs-core",
+    "crates/spotterjs-plugin-match-ncc",
+    "crates/spotterjs-node",
 ]
 default-members = [
-    "crates/spotter-base",
-    "crates/spotter-core",
-    "crates/spotter-plugin-match-ncc",
-    "crates/spotter-node",
+    "crates/spotterjs-base",
+    "crates/spotterjs-core",
+    "crates/spotterjs-plugin-match-ncc",
+    "crates/spotterjs-node",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "LicenseRef-Spotter-1.0"
-authors = ["Spotter Contributors"]
-repository = "https://gitee.com/ypl0lpy/spotter"
+license = "LicenseRef-spotterjs-1.0"
+authors = ["spotterjs Contributors"]
+repository = "https://gitee.com/ypl0lpy/spotterjs"
 
 [workspace.dependencies]
 thiserror = "2"

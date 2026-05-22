@@ -16,7 +16,7 @@ const SCRIPTS: Array<{ name: string; run: () => Promise<void> }> = [
 ];
 
 async function main(): Promise<void> {
-  console.log("Spotter smoke tests\n");
+  console.log("spotterjs smoke tests\n");
   let failed = 0;
 
   for (const { name, run } of SCRIPTS) {

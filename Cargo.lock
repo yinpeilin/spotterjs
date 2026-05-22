@@ -1419,7 +1419,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spotter-base"
+name = "spotterjs-base"
 version = "0.1.0"
 dependencies = [
  "napi",
@@ -1429,7 +1429,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spotter-core"
+name = "spotterjs-core"
 version = "0.1.0"
 dependencies = [
  "arboard",
@@ -1440,8 +1440,8 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "spotter-base",
- "spotter-plugin-match-ncc",
+ "spotterjs-base",
+ "spotterjs-plugin-match-ncc",
  "thiserror",
  "tokio",
  "windows",
@@ -1451,24 +1451,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "spotter-node"
+name = "spotterjs-node"
 version = "0.1.0"
 dependencies = [
  "base64",
  "napi",
  "napi-build",
  "napi-derive",
- "spotter-base",
- "spotter-core",
+ "spotterjs-base",
+ "spotterjs-core",
 ]
 
 [[package]]
-name = "spotter-plugin-match-ncc"
+name = "spotterjs-plugin-match-ncc"
 version = "0.1.0"
 dependencies = [
  "rayon",
- "spotter-base",
- "spotter-core",
+ "spotterjs-base",
+ "spotterjs-core",
 ]
 
 [[package]]

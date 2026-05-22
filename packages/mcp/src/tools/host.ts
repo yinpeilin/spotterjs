@@ -1,12 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { host } from "@spotter/core";
+import { host } from "@spotterjs/core";
 
 export function registerHostTools(server: McpServer): void {
   server.registerTool(
     "host_read_file",
     {
-      description: "Read a text file inside SPOTTER_WORKSPACE_ROOT",
+      description: "Read a text file inside SPOTTERJS_WORKSPACE_ROOT",
       inputSchema: z.object({ path: z.string() }),
     },
     async ({ path: filePath }) => {
@@ -75,7 +75,7 @@ export function registerHostTools(server: McpServer): void {
     "host_exec",
     {
       description:
-        "Run a command in the workspace shell (requires SPOTTER_ALLOW_SHELL=1)",
+        "Run a command in the workspace shell (requires SPOTTERJS_ALLOW_SHELL=1)",
       inputSchema: z.object({
         command: z.string(),
         cwd: z.string().optional(),

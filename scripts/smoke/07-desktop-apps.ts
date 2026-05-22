@@ -1,7 +1,7 @@
 /**
  * Smoke: desktop app discovery (process metadata on windows).
  */
-import { desktop, windowApi } from "@spotter/core";
+import { desktop, windowApi } from "@spotterjs/core";
 
 function main() {
   const windows = windowApi.list();
