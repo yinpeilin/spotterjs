@@ -45,8 +45,7 @@ pub fn set_mouse_config(config: MouseConfig) {
 
 #[cfg(not(windows))]
 fn enigo() -> Result<Enigo> {
-    Enigo::new(&Settings::default())
-        .map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
+    Enigo::new(&Settings::default()).map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
 }
 
 #[cfg(not(windows))]

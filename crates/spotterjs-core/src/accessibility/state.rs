@@ -50,17 +50,20 @@ pub fn store_element_linux(el: crate::accessibility::linux::StoredElement) -> A1
 }
 
 #[cfg(windows)]
-pub fn with_element<T, F: FnOnce(&crate::accessibility::windows::StoredElement) -> crate::error::Result<T>>(
+pub fn with_element<
+    T,
+    F: FnOnce(&crate::accessibility::windows::StoredElement) -> crate::error::Result<T>,
+>(
     id: A11yElementId,
     f: F,
 ) -> crate::error::Result<T> {
-    REGISTRY.with(|r| {
+    let el = REGISTRY.with(|r| {
         let reg = r.borrow();
-        let el = reg.get(&id.0).ok_or_else(|| {
+        reg.get(&id.0).cloned().ok_or_else(|| {
             crate::error::SpotterError::ElementNotFound(format!("element id {}", id.0))
-        })?;
-        f(el)
-    })
+        })
+    })?;
+    f(&el)
 }
 
 #[cfg(windows)]
@@ -70,18 +73,31 @@ pub fn update_element(id: A11yElementId, el: crate::accessibility::windows::Stor
     });
 }
 
+#[cfg(windows)]
+pub fn clear_registry() {
+    REGISTRY.with(|r| r.borrow_mut().clear());
+}
+
 #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
-pub fn with_element_linux<T, F: FnOnce(&crate::accessibility::linux::StoredElement) -> crate::error::Result<T>>(
+pub fn with_element_linux<
+    T,
+    F: FnOnce(&crate::accessibility::linux::StoredElement) -> crate::error::Result<T>,
+>(
     id: A11yElementId,
     f: F,
 ) -> crate::error::Result<T> {
-    REGISTRY_LINUX.with(|r| {
+    let el = REGISTRY_LINUX.with(|r| {
         let reg = r.borrow();
-        let el = reg.get(&id.0).ok_or_else(|| {
+        reg.get(&id.0).cloned().ok_or_else(|| {
             crate::error::SpotterError::ElementNotFound(format!("element id {}", id.0))
-        })?;
-        f(el)
-    })
+        })
+    })?;
+    f(&el)
+}
+
+#[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
+pub fn clear_registry_linux() {
+    REGISTRY_LINUX.with(|r| r.borrow_mut().clear());
 }
 
 pub fn element_id_to_string(id: A11yElementId) -> String {

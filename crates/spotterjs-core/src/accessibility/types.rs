@@ -101,7 +101,7 @@ pub struct AttachReport {
 pub struct A11yQuery {
     pub name: Option<String>,
     pub name_contains: Option<String>,
-    /// e.g. ListItem, Button, Edit, Pane, Text, Document
+    /// e.g. Button, MenuItem, List, TabItem, CheckBox, Edit, Pane, Text, Document
     pub control_type: Option<String>,
     pub automation_id: Option<String>,
     /// exact | contains (for name field when `name` is set)

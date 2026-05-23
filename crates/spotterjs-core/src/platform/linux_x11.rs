@@ -5,7 +5,6 @@ use std::fs;
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::*;
 use x11rb::rust_connection::RustConnection;
-use x11rb::wrapper::ConnectionExt as _;
 
 pub struct LinuxX11Platform {
     conn: RustConnection,
@@ -18,7 +17,7 @@ impl LinuxX11Platform {
     pub fn new() -> Result<Self> {
         let (conn, screen_num) = RustConnection::connect(None)
             .map_err(|e| SpotterError::Platform(format!("X11 connect: {e}")))?;
-        let screen = &conn.setup().roots[screen_num];
+        let screen = conn.setup().roots[screen_num].clone();
         Ok(Self {
             conn,
             screen_width: screen.width_in_pixels,
@@ -35,17 +34,18 @@ impl LinuxX11Platform {
         id.0 as Window
     }
 
+    fn x11_error(context: &str, err: impl std::fmt::Display) -> SpotterError {
+        SpotterError::Platform(format!("{context}: {err}"))
+    }
+
     fn get_wm_name(&self, window: Window) -> String {
-        if let Ok(reply) = self.conn.get_property(
-            false,
-            window,
-            AtomEnum::WM_NAME,
-            AtomEnum::STRING,
-            0,
-            1024,
-        ) {
+        if let Ok(reply) =
+            self.conn
+                .get_property(false, window, AtomEnum::WM_NAME, AtomEnum::STRING, 0, 1024)
+        {
             if let Ok(r) = reply.reply() {
-                if let Some(value) = r.value {
+                let value = r.value;
+                if !value.is_empty() {
                     return String::from_utf8_lossy(&value).to_string();
                 }
             }
@@ -59,7 +59,8 @@ impl LinuxX11Platform {
             1024,
         ) {
             if let Ok(r) = reply.reply() {
-                if let Some(value) = r.value {
+                let value = r.value;
+                if !value.is_empty() {
                     return String::from_utf8_lossy(&value).to_string();
                 }
             }
@@ -73,7 +74,7 @@ impl LinuxX11Platform {
             .ok()
             .and_then(|c| c.reply().ok())
             .map(|r| r.atom)
-            .unwrap_or(Atom::from(0))
+            .unwrap_or(0)
     }
 
     fn client_windows(&self) -> Result<Vec<Window>> {
@@ -84,14 +85,15 @@ impl LinuxX11Platform {
             AtomEnum::WINDOW,
             0,
             1024,
-        )?;
-        let reply = prop.reply()?;
+        )
+        .map_err(|e| Self::x11_error("get _NET_CLIENT_LIST", e))?;
+        let reply = prop
+            .reply()
+            .map_err(|e| Self::x11_error("reply _NET_CLIENT_LIST", e))?;
         let mut wins = Vec::new();
-        if let Some(value) = reply.value {
-            for chunk in value.chunks_exact(4) {
-                let id = u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                wins.push(id);
-            }
+        for chunk in reply.value.chunks_exact(4) {
+            let id = u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+            wins.push(id);
         }
         if wins.is_empty() {
             self.collect_mapped_children(self.root, &mut wins)?;
@@ -100,9 +102,19 @@ impl LinuxX11Platform {
     }
 
     fn collect_mapped_children(&self, parent: Window, out: &mut Vec<Window>) -> Result<()> {
-        let tree = self.conn.query_tree(parent)?.reply()?;
+        let tree = self
+            .conn
+            .query_tree(parent)
+            .map_err(|e| Self::x11_error("query_tree", e))?
+            .reply()
+            .map_err(|e| Self::x11_error("query_tree reply", e))?;
         for &child in &tree.children {
-            let attrs = self.conn.get_window_attributes(child)?.reply()?;
+            let attrs = self
+                .conn
+                .get_window_attributes(child)
+                .map_err(|e| Self::x11_error("get_window_attributes", e))?
+                .reply()
+                .map_err(|e| Self::x11_error("get_window_attributes reply", e))?;
             if attrs.map_state == MapState::VIEWABLE {
                 let name = self.get_wm_name(child);
                 if !name.trim().is_empty() {
@@ -116,16 +128,31 @@ impl LinuxX11Platform {
     }
 
     fn geometry(&self, window: Window) -> Result<Region> {
-        let geo = self.conn.get_geometry(window)?.reply()?;
+        let geo = self
+            .conn
+            .get_geometry(window)
+            .map_err(|e| Self::x11_error("get_geometry", e))?
+            .reply()
+            .map_err(|e| Self::x11_error("get_geometry reply", e))?;
         let mut left = geo.x as i32;
         let mut top = geo.y as i32;
         let mut cur = window;
         loop {
-            let tree = self.conn.query_tree(cur)?.reply()?;
+            let tree = self
+                .conn
+                .query_tree(cur)
+                .map_err(|e| Self::x11_error("query_tree", e))?
+                .reply()
+                .map_err(|e| Self::x11_error("query_tree reply", e))?;
             if tree.parent == tree.root || tree.parent == 0 {
                 break;
             }
-            let pgeo = self.conn.get_geometry(tree.parent)?.reply()?;
+            let pgeo = self
+                .conn
+                .get_geometry(tree.parent)
+                .map_err(|e| Self::x11_error("parent geometry", e))?
+                .reply()
+                .map_err(|e| Self::x11_error("parent geometry reply", e))?;
             left += pgeo.x as i32;
             top += pgeo.y as i32;
             cur = tree.parent;
@@ -140,16 +167,17 @@ impl LinuxX11Platform {
 
     fn wm_pid(&self, window: Window) -> u32 {
         let atom = self.intern_atom("_NET_WM_PID");
-        if atom == Atom::from(0) {
+        if atom == 0 {
             return 0;
         }
-        if let Ok(reply) = self.conn.get_property(false, window, atom, AtomEnum::CARDINAL, 0, 1)
+        if let Ok(reply) = self
+            .conn
+            .get_property(false, window, atom, AtomEnum::CARDINAL, 0, 1)
         {
             if let Ok(r) = reply.reply() {
-                if let Some(value) = r.value {
-                    if value.len() >= 4 {
-                        return u32::from_ne_bytes([value[0], value[1], value[2], value[3]]);
-                    }
+                let value = r.value;
+                if value.len() >= 4 {
+                    return u32::from_ne_bytes([value[0], value[1], value[2], value[3]]);
                 }
             }
         }
@@ -174,24 +202,19 @@ impl LinuxX11Platform {
     fn is_minimized(&self, window: Window) -> bool {
         let state_atom = self.intern_atom("_NET_WM_STATE");
         let hidden = self.intern_atom("_NET_WM_STATE_HIDDEN");
-        if state_atom == Atom::from(0) {
+        if state_atom == 0 {
             return false;
         }
-        if let Ok(reply) = self.conn.get_property(
-            false,
-            window,
-            state_atom,
-            AtomEnum::ATOM,
-            0,
-            64,
-        ) {
+        if let Ok(reply) = self
+            .conn
+            .get_property(false, window, state_atom, AtomEnum::ATOM, 0, 64)
+        {
             if let Ok(r) = reply.reply() {
-                if let Some(value) = r.value {
-                    for chunk in value.chunks_exact(4) {
-                        let atom = u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                        if Atom::from(atom) == hidden {
-                            return true;
-                        }
+                let value = r.value;
+                for chunk in value.chunks_exact(4) {
+                    let atom = u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                    if atom == hidden {
+                        return true;
                     }
                 }
             }
@@ -212,7 +235,7 @@ impl LinuxX11Platform {
             )
             .ok()?;
         let reply = prop.reply().ok()?;
-        let value = reply.value?;
+        let value = reply.value;
         if value.len() < 4 {
             return None;
         }
@@ -252,7 +275,8 @@ impl PlatformWindow for LinuxX11Platform {
         let mut result = Vec::new();
         for w in self.client_windows()? {
             if let Ok(info) = self.build_info(w) {
-                if !info.title.trim().is_empty() && info.region.width > 0 && info.region.height > 0 {
+                if !info.title.trim().is_empty() && info.region.width > 0 && info.region.height > 0
+                {
                     result.push(info);
                 }
             }
@@ -269,11 +293,12 @@ impl PlatformWindow for LinuxX11Platform {
             AtomEnum::WINDOW,
             0,
             1,
-        )?;
-        let reply = prop.reply()?;
-        let value = reply
-            .value
-            .ok_or_else(|| SpotterError::WindowNotFound("no active window".into()))?;
+        )
+        .map_err(|e| Self::x11_error("get _NET_ACTIVE_WINDOW", e))?;
+        let reply = prop
+            .reply()
+            .map_err(|e| Self::x11_error("reply _NET_ACTIVE_WINDOW", e))?;
+        let value = reply.value;
         if value.len() < 4 {
             return Err(SpotterError::WindowNotFound("no active window".into()));
         }
@@ -291,19 +316,12 @@ impl PlatformWindow for LinuxX11Platform {
     fn focus_window(&self, id: WindowId) -> Result<()> {
         let window = Self::xid(id);
         for attempt in 0..3 {
-            let event = ClientMessageEvent {
-                response_type: ClientMessageEvent::CLIENT_MESSAGE,
-                format: 32,
-                window: self.root,
-                type_: self.intern_atom("_NET_ACTIVE_WINDOW"),
-                data: [1, window, 0, 0, 0],
-            };
+            let event =
+                ClientMessageEvent::new(32, window, self.intern_atom("_NET_ACTIVE_WINDOW"), [
+                    1, window, 0, 0, 0,
+                ]);
             let mask = EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT;
-            if self
-                .conn
-                .send_event(false, self.root, mask, event)
-                .is_ok()
-            {
+            if self.conn.send_event(false, self.root, mask, event).is_ok() {
                 let _ = self.conn.flush();
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 if let Ok(active) = self.active_window() {
@@ -348,8 +366,8 @@ impl LinuxX11Platform {
             .configure_window(
                 window,
                 &ConfigureWindowAux::new()
-                    .x(x as i16)
-                    .y(y as i16)
+                    .x(x)
+                    .y(y)
                     .width(w as u32)
                     .height(h as u32),
             )
@@ -362,13 +380,7 @@ impl LinuxX11Platform {
         let state_atom = self.intern_atom(state);
         let wm_state = self.intern_atom("_NET_WM_STATE");
         let data = if add { 1u32 } else { 0u32 };
-        let event = ClientMessageEvent {
-            response_type: ClientMessageEvent::CLIENT_MESSAGE,
-            format: 32,
-            window,
-            type_: wm_state,
-            data: [data, state_atom as u32, 0, 0, 0],
-        };
+        let event = ClientMessageEvent::new(32, window, wm_state, [data, state_atom, 0, 0, 0]);
         let mask = EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT;
         self.conn
             .send_event(false, self.root, mask, event)
@@ -389,15 +401,7 @@ impl PlatformCapture for LinuxX11Platform {
         }
         let image = self
             .conn
-            .get_image(
-                ImageFormat::Z_PIXMAP,
-                self.root,
-                x,
-                y,
-                w,
-                h,
-                !0,
-            )
+            .get_image(ImageFormat::Z_PIXMAP, self.root, x, y, w, h, !0)
             .map_err(|e| SpotterError::CaptureFailed(format!("XGetImage: {e}")))?
             .reply()
             .map_err(|e| SpotterError::CaptureFailed(format!("XGetImage reply: {e}")))?;

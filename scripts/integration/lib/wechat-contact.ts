@@ -416,13 +416,13 @@ export function findContactCandidates(
 
       const opts = matchOpts(searchRegion, conf);
 
-      let regions = findAllInWindow(win.id, templatePath, opts);
+      let matches = findAllInWindow(win.id, templatePath, opts);
 
-      if (regions.length === 0) {
+      if (matches.length === 0) {
 
         try {
 
-          regions = [findInWindow(win.id, templatePath, opts)];
+          matches = [findInWindow(win.id, templatePath, opts)];
 
         } catch {
 
@@ -432,7 +432,9 @@ export function findContactCandidates(
 
       }
 
-      for (const region of regions) {
+      for (const match of matches) {
+
+        const region = match.region;
 
         const box = toMatchBox(win.region, region);
 
@@ -747,11 +749,13 @@ export function isTargetChatActive(
 
   return hits.some((h) => {
 
+    const r = h.region;
+
     const local = toLocal(win.region, {
 
-      x: h.left + Math.floor(h.width / 2),
+      x: r.left + Math.floor(r.width / 2),
 
-      y: h.top + Math.floor(h.height / 2),
+      y: r.top + Math.floor(r.height / 2),
 
     });
 

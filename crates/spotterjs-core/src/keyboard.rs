@@ -148,9 +148,7 @@ impl Default for KeyboardConfig {
     }
 }
 
-static KEYBOARD_CONFIG: Mutex<KeyboardConfig> = Mutex::new(KeyboardConfig {
-    auto_delay_ms: 10,
-});
+static KEYBOARD_CONFIG: Mutex<KeyboardConfig> = Mutex::new(KeyboardConfig { auto_delay_ms: 10 });
 
 pub fn keyboard_config() -> KeyboardConfig {
     *KEYBOARD_CONFIG.lock().unwrap()
@@ -161,8 +159,7 @@ pub fn set_keyboard_config(config: KeyboardConfig) {
 }
 
 fn enigo() -> Result<Enigo> {
-    Enigo::new(&Settings::default())
-        .map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
+    Enigo::new(&Settings::default()).map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
 }
 
 fn auto_delay() {

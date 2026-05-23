@@ -67,13 +67,14 @@ fn bgra_to_rgba_impl(src: &[u8], dst: &mut [u8]) {
 #[target_feature(enable = "ssse3")]
 unsafe fn bgra_to_rgba_ssse3_chunk(src: *const u8, dst: *mut u8) {
     use std::arch::x86_64::*;
-    let shuffle = _mm_setr_epi8(
-        2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15,
-    );
+    let shuffle = _mm_setr_epi8(2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15);
     let mut off = 0usize;
     while off + 16 <= 64 {
         let chunk = _mm_loadu_si128(src.add(off) as *const __m128i);
-        _mm_storeu_si128(dst.add(off) as *mut __m128i, _mm_shuffle_epi8(chunk, shuffle));
+        _mm_storeu_si128(
+            dst.add(off) as *mut __m128i,
+            _mm_shuffle_epi8(chunk, shuffle),
+        );
         off += 16;
     }
 }

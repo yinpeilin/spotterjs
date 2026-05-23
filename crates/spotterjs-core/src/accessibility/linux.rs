@@ -5,13 +5,17 @@ use super::types::{A11yBounds, A11yConfig, A11yElementId, A11yQuery, TreeHealth,
 use crate::error::{Result, SpotterError};
 use crate::types::{Region, WindowId};
 use atspi::connection::AccessibilityConnection;
+use atspi::proxy::action::ActionProxy;
 use atspi::proxy::accessible::AccessibleProxy;
-use atspi_common::role::Role;
+use atspi::proxy::component::ComponentProxy;
+use atspi::proxy::editable_text::EditableTextProxy;
+use atspi::{CoordType, ObjectRef, Role};
 use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
+#[derive(Clone)]
 pub struct StoredElement {
+    pub bus_name: String,
     pub path: String,
 }
 
@@ -21,17 +25,27 @@ struct AtspiSession {
 
 static SESSION: OnceLock<AtspiSession> = OnceLock::new();
 static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+static CONFIG: OnceLock<Mutex<A11yConfig>> = OnceLock::new();
 
 fn runtime() -> Result<&'static tokio::runtime::Runtime> {
-    RT.get_or_try_init(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| SpotterError::Platform(format!("tokio runtime: {e}")))
-    })
+    if let Some(rt) = RT.get() {
+        return Ok(rt);
+    }
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| SpotterError::Platform(format!("tokio runtime: {e}")))?;
+    let _ = RT.set(rt);
+    RT.get()
+        .ok_or_else(|| SpotterError::Platform("tokio runtime unavailable".into()))
 }
 
-pub fn set_config(_config: A11yConfig) {}
+pub fn set_config(config: A11yConfig) {
+    *CONFIG
+        .get_or_init(|| Mutex::new(A11yConfig::default()))
+        .lock()
+        .expect("accessibility config poisoned") = config;
+}
 
 pub fn init_session() -> Result<()> {
     if SESSION.get().is_some() {
@@ -46,45 +60,128 @@ pub fn init_session() -> Result<()> {
 }
 
 fn session() -> Result<&'static AtspiSession> {
-    SESSION
-        .get()
-        .ok_or(SpotterError::AccessibilityDisabled)
+    SESSION.get().ok_or(SpotterError::AccessibilityDisabled)
 }
 
-fn role_from_control_type(s: &str) -> Option<Role> {
-    match s.trim().to_ascii_lowercase().as_str() {
-        "listitem" | "list_item" => Some(Role::ListItem),
-        "button" => Some(Role::PushButton),
-        "edit" | "text" => Some(Role::Text),
-        "document" => Some(Role::Document),
-        "pane" => Some(Role::Panel),
+fn normalize_control_type_name(s: &str) -> String {
+    s.chars()
+        .filter(|c| !matches!(c, '_' | '-' | ' '))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn role_aliases_for_control_type(s: &str) -> Option<&'static [&'static str]> {
+    match normalize_control_type_name(s).as_str() {
+        "listitem" => Some(&["ListItem"]),
+        "menuitem" => Some(&["MenuItem", "CheckMenuItem", "RadioMenuItem", "TearoffMenuItem"]),
+        "menu" => Some(&["Menu", "PopupMenu", "MenuBar"]),
+        "list" => Some(&["List", "ListBox"]),
+        "tab" => Some(&["PageTabList", "TabList", "Tab"]),
+        "tabitem" => Some(&["PageTab", "TabItem"]),
+        "checkbox" => Some(&["CheckBox", "CheckMenuItem"]),
+        "radiobutton" => Some(&["RadioButton", "RadioMenuItem"]),
+        "combobox" => Some(&["ComboBox"]),
+        "window" => Some(&["Window", "Frame", "Dialog"]),
+        "toolbar" => Some(&["ToolBar"]),
+        "tree" => Some(&["Tree", "TreeTable"]),
+        "treeitem" => Some(&["TreeItem"]),
+        "group" => Some(&["Grouping", "Group", "Panel"]),
+        "image" => Some(&["Image", "Icon", "ImageMap"]),
+        "slider" => Some(&["Slider"]),
+        "spinner" => Some(&["SpinButton", "Spinner"]),
+        "hyperlink" | "link" => Some(&["Link", "Hyperlink"]),
+        "custom" => Some(&["Extended", "Custom", "Canvas", "DrawingArea"]),
+        "button" => Some(&["PushButton", "Button", "ToggleButton", "PushButtonMenu"]),
+        "edit" => Some(&["Entry", "PasswordText", "Editbar", "Text"]),
+        "text" => Some(&["Text", "Static", "Label"]),
+        "document" => Some(&[
+            "Document",
+            "DocumentFrame",
+            "DocumentSpreadsheet",
+            "DocumentPresentation",
+            "DocumentText",
+            "DocumentWeb",
+            "DocumentEmail",
+            "HTMLContainer",
+        ]),
+        "pane" => Some(&[
+            "Panel",
+            "Pane",
+            "ScrollPane",
+            "RootPane",
+            "LayeredPane",
+            "GlassPane",
+            "DesktopFrame",
+            "DirectoryPane",
+            "OptionPane",
+            "Viewport",
+        ]),
         _ => None,
     }
+}
+
+fn role_matches(actual: Role, expected_name: &str) -> bool {
+    role_name_matches(&role_name(actual), expected_name)
+}
+
+fn role_name_matches(actual_name: &str, expected_name: &str) -> bool {
+    role_aliases_for_control_type(expected_name)
+        .map(|aliases| {
+            let actual = normalize_control_type_name(actual_name);
+            aliases
+                .iter()
+                .any(|alias| actual == normalize_control_type_name(alias))
+        })
+        .unwrap_or(false)
 }
 
 fn role_name(role: Role) -> String {
     format!("{role:?}")
 }
 
-async fn proxy_for_path<'a>(
+fn stored_from_ref(reference: &ObjectRef) -> StoredElement {
+    StoredElement {
+        bus_name: reference.name.as_str().to_string(),
+        path: reference.path.as_str().to_string(),
+    }
+}
+
+fn runtime_id(stored: &StoredElement) -> String {
+    format!("{}:{}", stored.bus_name, stored.path)
+}
+
+async fn accessible_proxy<'a>(
     conn: &'a AccessibilityConnection,
-    path: &str,
+    stored: &'a StoredElement,
 ) -> Result<AccessibleProxy<'a>> {
-    let p = zbus::zvariant::OwnedObjectPath::from_str(path)
-        .map_err(|e| SpotterError::Platform(format!("path: {e}")))?;
     AccessibleProxy::builder(conn.connection())
-        .path(p)?
+        .destination(stored.bus_name.as_str())
+        .map_err(|e| SpotterError::Platform(format!("AccessibleProxy destination: {e}")))?
+        .path(stored.path.as_str())
+        .map_err(|e| SpotterError::Platform(format!("AccessibleProxy path: {e}")))?
         .build()
         .await
         .map_err(|e| SpotterError::Platform(format!("AccessibleProxy: {e}")))
 }
 
+async fn component_proxy<'a>(
+    conn: &'a AccessibilityConnection,
+    stored: &'a StoredElement,
+) -> Result<ComponentProxy<'a>> {
+    ComponentProxy::builder(conn.connection())
+        .destination(stored.bus_name.as_str())
+        .map_err(|e| SpotterError::Platform(format!("ComponentProxy destination: {e}")))?
+        .path(stored.path.as_str())
+        .map_err(|e| SpotterError::Platform(format!("ComponentProxy path: {e}")))?
+        .build()
+        .await
+        .map_err(|e| SpotterError::Platform(format!("ComponentProxy: {e}")))
+}
+
 async fn matches_query(proxy: &AccessibleProxy<'_>, query: &A11yQuery) -> Result<bool> {
     if let Some(ref ct) = query.control_type {
-        if let Some(expected) = role_from_control_type(ct) {
-            if proxy.get_role().await.unwrap_or(Role::Unknown) != expected {
-                return Ok(false);
-            }
+        if !role_matches(proxy.get_role().await.unwrap_or(Role::Unknown), ct) {
+            return Ok(false);
         }
     }
     let name = proxy.name().await.unwrap_or_default();
@@ -108,25 +205,26 @@ async fn matches_query(proxy: &AccessibleProxy<'_>, query: &A11yQuery) -> Result
 
 async fn find_rec(
     conn: &AccessibilityConnection,
-    path: &str,
+    stored: &StoredElement,
     query: &A11yQuery,
     depth: u32,
     max_depth: u32,
-) -> Result<String> {
+) -> Result<StoredElement> {
     if depth > max_depth {
         return Err(SpotterError::ElementNotFound("max depth exceeded".into()));
     }
-    let proxy = proxy_for_path(conn, path).await?;
+    let proxy = accessible_proxy(conn, stored).await?;
     if matches_query(&proxy, query).await? {
-        return Ok(path.to_string());
+        return Ok(stored.clone());
     }
     let children = proxy
         .get_children()
         .await
         .map_err(|e| SpotterError::Platform(format!("get_children: {e}")))?;
     for child in children {
-        let child_path = child.to_string();
-        if let Ok(found) = Box::pin(find_rec(conn, &child_path, query, depth + 1, max_depth)).await {
+        let child_stored = stored_from_ref(&child);
+        if let Ok(found) = Box::pin(find_rec(conn, &child_stored, query, depth + 1, max_depth)).await
+        {
             return Ok(found);
         }
     }
@@ -136,9 +234,12 @@ async fn find_rec(
 pub fn attach_window(_id: WindowId) -> Result<A11yElementId> {
     let s = session()?;
     let rt = runtime()?;
-    let path = rt.block_on(async {
+    let root = rt.block_on(async {
         let desktop = AccessibleProxy::builder(s.conn.connection())
-            .path("/org/a11y/atspi/accessible/root")?
+            .destination("org.a11y.atspi.Registry")
+            .map_err(|e| SpotterError::Platform(format!("desktop destination: {e}")))?
+            .path("/org/a11y/atspi/accessible/root")
+            .map_err(|e| SpotterError::Platform(format!("desktop path: {e}")))?
             .build()
             .await
             .map_err(|e| SpotterError::Platform(format!("desktop: {e}")))?;
@@ -147,10 +248,10 @@ pub fn attach_window(_id: WindowId) -> Result<A11yElementId> {
             .await
             .map_err(|e| SpotterError::Platform(format!("apps: {e}")))?;
         apps.first()
-            .map(|p| p.to_string())
+            .map(stored_from_ref)
             .ok_or_else(|| SpotterError::WindowNotFound("no AT-SPI applications".into()))
     })?;
-    Ok(store_element_linux(StoredElement { path }))
+    Ok(store_element_linux(root))
 }
 
 pub fn attach_active() -> Result<A11yElementId> {
@@ -166,8 +267,8 @@ pub fn find_descendant(
     let s = session()?;
     let rt = runtime()?;
     state::with_element_linux(root, |stored| {
-        let found = rt.block_on(find_rec(&s.conn, &stored.path, query, 0, max_depth))?;
-        Ok(store_element_linux(StoredElement { path: found }))
+        let found = rt.block_on(find_rec(&s.conn, stored, query, 0, max_depth))?;
+        Ok(store_element_linux(found))
     })
 }
 
@@ -201,16 +302,16 @@ pub fn get_bounds(id: A11yElementId) -> Result<Region> {
     let rt = runtime()?;
     state::with_element_linux(id, |stored| {
         rt.block_on(async {
-            let proxy = proxy_for_path(&s.conn, &stored.path).await?;
-            let ext = proxy
-                .get_extents(atspi::proxy::accessible::CoordinateType::Screen)
+            let proxy = component_proxy(&s.conn, stored).await?;
+            let (left, top, width, height) = proxy
+                .get_extents(CoordType::Screen)
                 .await
                 .map_err(|e| SpotterError::Platform(format!("extents: {e}")))?;
             Ok(Region {
-                left: ext.x,
-                top: ext.y,
-                width: ext.width as i32,
-                height: ext.height as i32,
+                left,
+                top,
+                width,
+                height,
             })
         })
     })
@@ -221,7 +322,14 @@ pub fn invoke(id: A11yElementId) -> Result<()> {
     let rt = runtime()?;
     state::with_element_linux(id, |stored| {
         rt.block_on(async {
-            let proxy = proxy_for_path(&s.conn, &stored.path).await?;
+            let proxy = ActionProxy::builder(s.conn.connection())
+                .destination(stored.bus_name.as_str())
+                .map_err(|e| SpotterError::Platform(format!("ActionProxy destination: {e}")))?
+                .path(stored.path.as_str())
+                .map_err(|e| SpotterError::Platform(format!("ActionProxy path: {e}")))?
+                .build()
+                .await
+                .map_err(|e| SpotterError::PatternNotSupported(format!("Action: {e}")))?;
             proxy
                 .do_action(0)
                 .await
@@ -237,13 +345,16 @@ pub fn set_value(id: A11yElementId, text: &str) -> Result<()> {
     let text = text.to_string();
     state::with_element_linux(id, |stored| {
         rt.block_on(async {
-            let text_iface = atspi::proxy::text::TextProxy::builder(s.conn.connection())
-                .path(stored.path.as_str())?
+            let text_iface = EditableTextProxy::builder(s.conn.connection())
+                .destination(stored.bus_name.as_str())
+                .map_err(|e| SpotterError::Platform(format!("EditableText destination: {e}")))?
+                .path(stored.path.as_str())
+                .map_err(|e| SpotterError::Platform(format!("EditableText path: {e}")))?
                 .build()
                 .await
-                .map_err(|e| SpotterError::PatternNotSupported(format!("Text: {e}")))?;
+                .map_err(|e| SpotterError::PatternNotSupported(format!("EditableText: {e}")))?;
             text_iface
-                .set_text_contents(0, i32::MAX, &text)
+                .set_text_contents(&text)
                 .await
                 .map_err(|e| SpotterError::Platform(format!("set_text: {e}")))?;
             Ok(())
@@ -253,29 +364,33 @@ pub fn set_value(id: A11yElementId, text: &str) -> Result<()> {
 
 async fn build_dump(
     conn: &AccessibilityConnection,
-    path: &str,
+    stored: &StoredElement,
     depth: u32,
     max_depth: u32,
 ) -> Result<TreeNodeDump> {
-    let proxy = proxy_for_path(conn, path).await?;
+    let proxy = accessible_proxy(conn, stored).await?;
     let name = proxy.name().await.unwrap_or_default();
     let role = proxy.get_role().await.unwrap_or(Role::Unknown);
-    let bounds = proxy
-        .get_extents(atspi::proxy::accessible::CoordinateType::Screen)
-        .await
-        .ok()
-        .map(|ext| A11yBounds {
-            left: ext.x,
-            top: ext.y,
-            width: ext.width as i32,
-            height: ext.height as i32,
-        });
+    let bounds = match component_proxy(conn, stored).await {
+        Ok(component) => component
+            .get_extents(CoordType::Screen)
+            .await
+            .ok()
+            .map(|(left, top, width, height)| A11yBounds {
+                left,
+                top,
+                width,
+                height,
+            }),
+        Err(_) => None,
+    };
     let mut children = Vec::new();
     if depth < max_depth {
         if let Ok(kids) = proxy.get_children().await {
             for child in kids {
-                let child_path = child.to_string();
-                if let Ok(node) = Box::pin(build_dump(conn, &child_path, depth + 1, max_depth)).await
+                let child_stored = stored_from_ref(&child);
+                if let Ok(node) =
+                    Box::pin(build_dump(conn, &child_stored, depth + 1, max_depth)).await
                 {
                     children.push(node);
                 }
@@ -289,7 +404,7 @@ async fn build_dump(
         automation_id: String::new(),
         class_name: String::new(),
         framework_id: String::new(),
-        runtime_id: path.to_string(),
+        runtime_id: runtime_id(stored),
         is_offscreen: false,
         patterns: Vec::new(),
         bounds,
@@ -305,7 +420,7 @@ pub fn dump_tree(root: A11yElementId, max_depth: u32) -> Result<String> {
     let s = session()?;
     let rt = runtime()?;
     state::with_element_linux(root, |stored| {
-        let tree = rt.block_on(build_dump(&s.conn, &stored.path, 0, max_depth))?;
+        let tree = rt.block_on(build_dump(&s.conn, stored, 0, max_depth))?;
         serde_json::to_string_pretty(&tree)
             .map_err(|e| SpotterError::Platform(format!("json: {e}")))
     })
@@ -363,4 +478,43 @@ pub fn check_tree_health(
         )));
     }
     Ok(h)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_common_control_type_names() {
+        let cases = [
+            ("MenuItem", "MenuItem"),
+            ("Menu", "Menu"),
+            ("List", "List"),
+            ("Tab", "PageTabList"),
+            ("TabItem", "PageTab"),
+            ("CheckBox", "CheckBox"),
+            ("RadioButton", "RadioButton"),
+            ("ComboBox", "ComboBox"),
+            ("Window", "Frame"),
+            ("ToolBar", "ToolBar"),
+            ("Tree", "Tree"),
+            ("TreeItem", "TreeItem"),
+            ("Group", "Grouping"),
+            ("Image", "Image"),
+            ("Slider", "Slider"),
+            ("Spinner", "SpinButton"),
+            ("Hyperlink", "Link"),
+            ("Custom", "Extended"),
+        ];
+
+        for (name, role_name) in cases {
+            assert!(role_name_matches(role_name, name), "{name}");
+        }
+    }
+
+    #[test]
+    fn unknown_control_type_matches_nothing() {
+        assert!(role_name_matches("PushButton", "Button"));
+        assert!(!role_name_matches("PushButton", "DefinitelyUnknown"));
+    }
 }

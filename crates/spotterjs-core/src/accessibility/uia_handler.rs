@@ -34,10 +34,7 @@ impl IUIAutomationStructureChangedEventHandler_Impl for StructureChangedHandler_
     }
 }
 
-pub fn create_structure_handler() -> (
-    IUIAutomationStructureChangedEventHandler,
-    Arc<AtomicU32>,
-) {
+pub fn create_structure_handler() -> (IUIAutomationStructureChangedEventHandler, Arc<AtomicU32>) {
     let handler = StructureChangedHandler::new();
     let count = handler.count();
     (handler.into(), count)

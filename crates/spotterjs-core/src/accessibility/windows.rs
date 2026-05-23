@@ -9,29 +9,36 @@ use crate::types::{Region, WindowId};
 use crate::window::get_active_window;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
-use windows::core::BSTR;
 use windows::core::BOOL;
+use windows::core::BSTR;
 use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::ClientToScreen;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
-use windows::Win32::System::Ole::{
-    SafeArrayGetDim, SafeArrayGetElement,
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
 };
+use windows::Win32::System::Ole::{SafeArrayGetDim, SafeArrayGetElement};
 use windows::Win32::UI::Accessibility::{
     CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationInvokePattern,
     IUIAutomationStructureChangedEventHandler, IUIAutomationTreeWalker, IUIAutomationValuePattern,
-    TreeScope_Subtree, UIA_ButtonControlTypeId, UIA_DocumentControlTypeId, UIA_EditControlTypeId,
-    UIA_ExpandCollapsePatternId, UIA_InvokePatternId, UIA_ListItemControlTypeId, UIA_PaneControlTypeId,
-    UIA_PATTERN_ID, UIA_ScrollPatternId, UIA_SelectionPatternId, UIA_TextControlTypeId,
-    UIA_TextPatternId, UIA_ValuePatternId,
+    TreeScope_Subtree, UIA_ButtonControlTypeId, UIA_CheckBoxControlTypeId,
+    UIA_ComboBoxControlTypeId, UIA_CustomControlTypeId, UIA_DocumentControlTypeId,
+    UIA_EditControlTypeId, UIA_ExpandCollapsePatternId, UIA_GroupControlTypeId,
+    UIA_HyperlinkControlTypeId, UIA_ImageControlTypeId, UIA_InvokePatternId,
+    UIA_ListControlTypeId, UIA_ListItemControlTypeId, UIA_MenuControlTypeId,
+    UIA_MenuItemControlTypeId, UIA_PaneControlTypeId, UIA_RadioButtonControlTypeId,
+    UIA_ScrollPatternId, UIA_SelectionPatternId, UIA_SliderControlTypeId,
+    UIA_SpinnerControlTypeId, UIA_TabControlTypeId, UIA_TabItemControlTypeId,
+    UIA_TextControlTypeId, UIA_TextPatternId, UIA_ToolBarControlTypeId, UIA_TreeControlTypeId,
+    UIA_TreeItemControlTypeId, UIA_ValuePatternId, UIA_WindowControlTypeId, UIA_PATTERN_ID,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, GetClassNameW, GetClientRect, IsWindowVisible,
 };
 
+#[derive(Clone)]
 pub struct StoredElement {
     pub element: IUIAutomationElement,
     pub attached_hwnd: HWND,
@@ -52,17 +59,24 @@ thread_local! {
     static SESSION: RefCell<Option<UiaSessionInner>> = RefCell::new(None);
 }
 
-static CONFIG: OnceLock<A11yConfig> = OnceLock::new();
+static CONFIG: Mutex<A11yConfig> = Mutex::new(A11yConfig {
+    attach_delay_ms: 500,
+    event_subscription: true,
+    tree_wait_timeout_ms: 15_000,
+    tree_wait_poll_ms: 300,
+    min_list_item_count: 1,
+    tree_view: TreeViewMode::Auto,
+});
 
 const MIN_CLIENT_AREA: i32 = 50;
 const THIN_TREE_NODES: u32 = 5;
 
 pub fn set_config(config: A11yConfig) {
-    let _ = CONFIG.set(config);
+    *CONFIG.lock().unwrap() = config;
 }
 
 fn config() -> A11yConfig {
-    CONFIG.get().cloned().unwrap_or_default()
+    CONFIG.lock().unwrap().clone()
 }
 
 fn resolve_tree_view(cfg: &A11yConfig, client_mode: bool) -> TreeViewMode {
@@ -107,8 +121,8 @@ pub fn init_session() -> Result<()> {
         }
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-            let automation: IUIAutomation =
-                CoCreateInstance(&CUIAutomation, None, CLSCTX_ALL).map_err(|e| {
+            let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_ALL)
+                .map_err(|e| {
                     SpotterError::Platform(format!("CoCreateInstance(CUIAutomation): {e}"))
                 })?;
             let walker = automation
@@ -135,15 +149,24 @@ pub fn init_session() -> Result<()> {
     })
 }
 
+pub fn shutdown_session() {
+    SESSION.with(|cell| {
+        if let Some(mut session) = cell.borrow_mut().take() {
+            unsafe {
+                unregister_structure_handler(&mut session);
+            }
+        }
+    });
+    state::clear_registry();
+}
+
 fn with_session<F, T>(f: F) -> Result<T>
 where
     F: FnOnce(&UiaSessionInner) -> Result<T>,
 {
     SESSION.with(|cell| {
         let guard = cell.borrow();
-        let s = guard
-            .as_ref()
-            .ok_or(SpotterError::AccessibilityDisabled)?;
+        let s = guard.as_ref().ok_or(SpotterError::AccessibilityDisabled)?;
         f(s)
     })
 }
@@ -154,9 +177,7 @@ where
 {
     SESSION.with(|cell| {
         let mut guard = cell.borrow_mut();
-        let s = guard
-            .as_mut()
-            .ok_or(SpotterError::AccessibilityDisabled)?;
+        let s = guard.as_mut().ok_or(SpotterError::AccessibilityDisabled)?;
         f(s)
     })
 }
@@ -169,7 +190,10 @@ fn hwnd_to_u64(hwnd: HWND) -> u64 {
     hwnd.0 as usize as u64
 }
 
-unsafe fn element_from_hwnd(automation: &IUIAutomation, hwnd: HWND) -> Result<IUIAutomationElement> {
+unsafe fn element_from_hwnd(
+    automation: &IUIAutomation,
+    hwnd: HWND,
+) -> Result<IUIAutomationElement> {
     automation
         .ElementFromHandle(hwnd)
         .map_err(|e| SpotterError::Platform(format!("ElementFromHandle: {e}")))
@@ -276,8 +300,7 @@ fn tree_is_rich(health: &TreeHealth, min_list_items: u32) -> bool {
 }
 
 unsafe fn unregister_structure_handler(session: &mut UiaSessionInner) {
-    if let (Some(ref handler), Some(hwnd)) = (&session.structure_handler, session.subscribed_hwnd)
-    {
+    if let (Some(ref handler), Some(hwnd)) = (&session.structure_handler, session.subscribed_hwnd) {
         if let Ok(el) = session.automation.ElementFromHandle(hwnd) {
             let _ = session
                 .automation
@@ -301,9 +324,7 @@ unsafe fn register_structure_handler(
     session
         .automation
         .AddStructureChangedEventHandler(element, TreeScope_Subtree, cache_ref, &handler)
-        .map_err(|e| {
-            SpotterError::Platform(format!("AddStructureChangedEventHandler: {e}"))
-        })?;
+        .map_err(|e| SpotterError::Platform(format!("AddStructureChangedEventHandler: {e}")))?;
     session.structure_handler = Some(handler);
     session.handler_events = Some(count);
     session.subscribed_hwnd = Some(hwnd);
@@ -393,9 +414,8 @@ unsafe fn select_attach_target(
         .first()
         .map(|(_, el, _)| el.clone())
         .unwrap_or_else(|| {
-            element_from_hwnd(&session.automation, top_hwnd).unwrap_or_else(|_| {
-                panic!("top hwnd must resolve")
-            })
+            element_from_hwnd(&session.automation, top_hwnd)
+                .unwrap_or_else(|_| panic!("top hwnd must resolve"))
         });
 
     if let Some((hwnd, el, _)) = probes.get(best_idx) {
@@ -508,8 +528,7 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
             session.active_tree_view = active_tree_view;
             let walker = walker_for(session, Some(active_tree_view));
             let selection = select_attach_target(session, top_hwnd, max_depth, walker);
-            let health_initial =
-                tree_health_on_element(walker, &selection.element, max_depth);
+            let health_initial = tree_health_on_element(walker, &selection.element, max_depth);
             let event_handler_registered = if client_mode {
                 register_structure_handler(session, selection.hwnd, &selection.element)
                     .unwrap_or(false)
@@ -527,12 +546,7 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
         })?;
 
     let tree_wait_ms = if should_wait {
-        wait_for_tree_expand(
-            selection.hwnd,
-            max_depth,
-            active_tree_view,
-            &health_initial,
-        )
+        wait_for_tree_expand(selection.hwnd, max_depth, active_tree_view, &health_initial)
     } else {
         0
     };
@@ -579,9 +593,7 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
 }
 
 pub fn attach_window(id: WindowId) -> Result<A11yElementId> {
-    Ok(A11yElementId(
-        attach_window_report(id, 12)?.element_id,
-    ))
+    Ok(A11yElementId(attach_window_report(id, 12)?.element_id))
 }
 
 pub fn attach_active() -> Result<A11yElementId> {
@@ -593,10 +605,13 @@ pub fn refresh_root(id: A11yElementId) -> Result<()> {
     with_session(|session| {
         state::with_element(id, |stored| unsafe {
             let fresh = element_from_hwnd(&session.automation, stored.attached_hwnd)?;
-            update_element(id, StoredElement {
-                element: fresh,
-                attached_hwnd: stored.attached_hwnd,
-            });
+            update_element(
+                id,
+                StoredElement {
+                    element: fresh,
+                    attached_hwnd: stored.attached_hwnd,
+                },
+            );
             Ok(())
         })
     })
@@ -605,6 +620,24 @@ pub fn refresh_root(id: A11yElementId) -> Result<()> {
 fn control_type_from_str(s: &str) -> Option<i32> {
     match s.trim().to_ascii_lowercase().as_str() {
         "listitem" | "list_item" => Some(UIA_ListItemControlTypeId.0 as i32),
+        "menuitem" | "menu_item" => Some(UIA_MenuItemControlTypeId.0 as i32),
+        "menu" => Some(UIA_MenuControlTypeId.0 as i32),
+        "list" => Some(UIA_ListControlTypeId.0 as i32),
+        "tab" => Some(UIA_TabControlTypeId.0 as i32),
+        "tabitem" | "tab_item" => Some(UIA_TabItemControlTypeId.0 as i32),
+        "checkbox" | "check_box" => Some(UIA_CheckBoxControlTypeId.0 as i32),
+        "radiobutton" | "radio_button" => Some(UIA_RadioButtonControlTypeId.0 as i32),
+        "combobox" | "combo_box" => Some(UIA_ComboBoxControlTypeId.0 as i32),
+        "window" => Some(UIA_WindowControlTypeId.0 as i32),
+        "toolbar" | "tool_bar" => Some(UIA_ToolBarControlTypeId.0 as i32),
+        "tree" => Some(UIA_TreeControlTypeId.0 as i32),
+        "treeitem" | "tree_item" => Some(UIA_TreeItemControlTypeId.0 as i32),
+        "group" => Some(UIA_GroupControlTypeId.0 as i32),
+        "image" => Some(UIA_ImageControlTypeId.0 as i32),
+        "slider" => Some(UIA_SliderControlTypeId.0 as i32),
+        "spinner" => Some(UIA_SpinnerControlTypeId.0 as i32),
+        "hyperlink" | "hyper_link" => Some(UIA_HyperlinkControlTypeId.0 as i32),
+        "custom" => Some(UIA_CustomControlTypeId.0 as i32),
         "button" => Some(UIA_ButtonControlTypeId.0 as i32),
         "edit" => Some(UIA_EditControlTypeId.0 as i32),
         "pane" => Some(UIA_PaneControlTypeId.0 as i32),
@@ -614,9 +647,51 @@ fn control_type_from_str(s: &str) -> Option<i32> {
     }
 }
 
+fn control_type_matches(actual: i32, expected_name: &str) -> bool {
+    control_type_from_str(expected_name)
+        .map(|expected| actual == expected)
+        .unwrap_or(false)
+}
+
 fn control_type_name(id: i32) -> String {
     if id == UIA_ListItemControlTypeId.0 {
         "ListItem".into()
+    } else if id == UIA_MenuItemControlTypeId.0 {
+        "MenuItem".into()
+    } else if id == UIA_MenuControlTypeId.0 {
+        "Menu".into()
+    } else if id == UIA_ListControlTypeId.0 {
+        "List".into()
+    } else if id == UIA_TabControlTypeId.0 {
+        "Tab".into()
+    } else if id == UIA_TabItemControlTypeId.0 {
+        "TabItem".into()
+    } else if id == UIA_CheckBoxControlTypeId.0 {
+        "CheckBox".into()
+    } else if id == UIA_RadioButtonControlTypeId.0 {
+        "RadioButton".into()
+    } else if id == UIA_ComboBoxControlTypeId.0 {
+        "ComboBox".into()
+    } else if id == UIA_WindowControlTypeId.0 {
+        "Window".into()
+    } else if id == UIA_ToolBarControlTypeId.0 {
+        "ToolBar".into()
+    } else if id == UIA_TreeControlTypeId.0 {
+        "Tree".into()
+    } else if id == UIA_TreeItemControlTypeId.0 {
+        "TreeItem".into()
+    } else if id == UIA_GroupControlTypeId.0 {
+        "Group".into()
+    } else if id == UIA_ImageControlTypeId.0 {
+        "Image".into()
+    } else if id == UIA_SliderControlTypeId.0 {
+        "Slider".into()
+    } else if id == UIA_SpinnerControlTypeId.0 {
+        "Spinner".into()
+    } else if id == UIA_HyperlinkControlTypeId.0 {
+        "Hyperlink".into()
+    } else if id == UIA_CustomControlTypeId.0 {
+        "Custom".into()
     } else if id == UIA_ButtonControlTypeId.0 {
         "Button".into()
     } else if id == UIA_EditControlTypeId.0 {
@@ -671,9 +746,7 @@ unsafe fn element_patterns(el: &IUIAutomationElement) -> Vec<String> {
 }
 
 unsafe fn element_name(el: &IUIAutomationElement) -> String {
-    el.CurrentName()
-        .map(|b| b.to_string())
-        .unwrap_or_default()
+    el.CurrentName().map(|b| b.to_string()).unwrap_or_default()
 }
 
 unsafe fn element_control_type(el: &IUIAutomationElement) -> i32 {
@@ -729,15 +802,15 @@ unsafe fn element_info_from(el: &IUIAutomationElement) -> ElementInfo {
 }
 
 pub fn get_element_info(id: A11yElementId) -> Result<ElementInfo> {
-    state::with_element(id, |stored| unsafe { Ok(element_info_from(&stored.element)) })
+    state::with_element(id, |stored| unsafe {
+        Ok(element_info_from(&stored.element))
+    })
 }
 
 unsafe fn matches_query(el: &IUIAutomationElement, query: &A11yQuery) -> bool {
     if let Some(ref ct) = query.control_type {
-        if let Some(expected) = control_type_from_str(ct) {
-            if element_control_type(el) != expected {
-                return false;
-            }
+        if !control_type_matches(element_control_type(el), ct) {
+            return false;
         }
     }
     if let Some(ref aid) = query.automation_id {
@@ -831,9 +904,8 @@ pub fn wait_for_descendant(
 
 pub fn get_bounds(id: A11yElementId) -> Result<Region> {
     state::with_element(id, |stored| unsafe {
-        let b = element_bounds(&stored.element).ok_or_else(|| {
-            SpotterError::Platform("no bounding rectangle".into())
-        })?;
+        let b = element_bounds(&stored.element)
+            .ok_or_else(|| SpotterError::Platform("no bounding rectangle".into()))?;
         Ok(Region {
             left: b.left,
             top: b.top,
@@ -922,8 +994,7 @@ pub fn dump_tree(
     tree_view: Option<TreeViewMode>,
 ) -> Result<String> {
     let tree = dump_tree_node(root, max_depth, tree_view)?;
-    serde_json::to_string_pretty(&tree)
-        .map_err(|e| SpotterError::Platform(format!("json: {e}")))
+    serde_json::to_string_pretty(&tree).map_err(|e| SpotterError::Platform(format!("json: {e}")))
 }
 
 unsafe fn health_rec(
@@ -956,7 +1027,16 @@ unsafe fn health_rec(
     let mut child = walker.GetFirstChildElement(el).ok();
     while let Some(ref c) = child {
         health_rec(
-            walker, c, depth + 1, max_depth, counts, list_items, edits, buttons, total, max_d,
+            walker,
+            c,
+            depth + 1,
+            max_depth,
+            counts,
+            list_items,
+            edits,
+            buttons,
+            total,
+            max_d,
         );
         child = walker.GetNextSiblingElement(c).ok();
     }
@@ -1013,4 +1093,63 @@ pub fn check_tree_health(
         )));
     }
     Ok(h)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_config_replaces_existing_config() {
+        let mut first = A11yConfig::default();
+        first.attach_delay_ms = 111;
+        first.tree_wait_timeout_ms = 222;
+        first.tree_view = TreeViewMode::Raw;
+
+        let mut second = A11yConfig::default();
+        second.attach_delay_ms = 333;
+        second.tree_wait_timeout_ms = 444;
+        second.tree_view = TreeViewMode::Content;
+
+        set_config(first);
+        set_config(second);
+
+        let actual = config();
+        assert_eq!(actual.attach_delay_ms, 333);
+        assert_eq!(actual.tree_wait_timeout_ms, 444);
+        assert_eq!(actual.tree_view, TreeViewMode::Content);
+    }
+
+    #[test]
+    fn maps_common_control_type_names() {
+        let cases = [
+            ("Menu", UIA_MenuControlTypeId.0),
+            ("List", UIA_ListControlTypeId.0),
+            ("Tab", UIA_TabControlTypeId.0),
+            ("TabItem", UIA_TabItemControlTypeId.0),
+            ("CheckBox", UIA_CheckBoxControlTypeId.0),
+            ("RadioButton", UIA_RadioButtonControlTypeId.0),
+            ("ComboBox", UIA_ComboBoxControlTypeId.0),
+            ("Window", UIA_WindowControlTypeId.0),
+            ("ToolBar", UIA_ToolBarControlTypeId.0),
+            ("Tree", UIA_TreeControlTypeId.0),
+            ("TreeItem", UIA_TreeItemControlTypeId.0),
+            ("Group", UIA_GroupControlTypeId.0),
+            ("Image", UIA_ImageControlTypeId.0),
+            ("Slider", UIA_SliderControlTypeId.0),
+            ("Spinner", UIA_SpinnerControlTypeId.0),
+            ("Hyperlink", UIA_HyperlinkControlTypeId.0),
+            ("Custom", UIA_CustomControlTypeId.0),
+        ];
+
+        for (name, expected) in cases {
+            assert_eq!(control_type_from_str(name), Some(expected), "{name}");
+        }
+    }
+
+    #[test]
+    fn unknown_control_type_matches_nothing() {
+        assert!(control_type_matches(UIA_ButtonControlTypeId.0, "Button"));
+        assert!(!control_type_matches(UIA_ButtonControlTypeId.0, "DefinitelyUnknown"));
+    }
 }

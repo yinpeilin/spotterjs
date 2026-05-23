@@ -126,9 +126,9 @@ pub(crate) mod x11_image;
 
 mod bgra;
 #[cfg(windows)]
-pub mod windows_input;
-#[cfg(windows)]
 pub mod windows;
+#[cfg(windows)]
+pub mod windows_input;
 
 #[cfg(all(target_os = "linux", feature = "linux-x11"))]
 pub mod linux_x11;

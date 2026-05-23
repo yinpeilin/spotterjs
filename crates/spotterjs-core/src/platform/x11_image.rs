@@ -59,10 +59,7 @@ mod tests {
     #[test]
     fn unsupported_depth_errors() {
         let err = pixels_to_rgba(15, &[], 1, 1).unwrap_err();
-        assert!(matches!(
-            err,
-            SpotterError::CaptureFailed(_)
-        ));
+        assert!(matches!(err, SpotterError::CaptureFailed(_)));
     }
 
     #[test]

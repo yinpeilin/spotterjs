@@ -21,7 +21,9 @@ pub use types::{
 
 use crate::error::{Result, SpotterError};
 use crate::types::WindowId;
-use state::{element_id_from_string, element_id_to_string, is_enabled, require_enabled, set_enabled};
+use state::{
+    element_id_from_string, element_id_to_string, is_enabled, require_enabled, set_enabled,
+};
 use std::env;
 
 /// Enable accessibility (idempotent). Honors `SPOTTERJS_ACCESSIBILITY=1`.
@@ -37,6 +39,7 @@ pub fn enable(config: Option<A11yConfig>) -> Result<()> {
 }
 
 pub fn disable() -> Result<()> {
+    platform_shutdown_session();
     set_enabled(false);
     Ok(())
 }
@@ -61,7 +64,11 @@ pub fn attach_active() -> Result<A11yElementId> {
     platform_attach_active()
 }
 
-pub fn find_descendant(root: A11yElementId, query: &A11yQuery, max_depth: u32) -> Result<A11yElementId> {
+pub fn find_descendant(
+    root: A11yElementId,
+    query: &A11yQuery,
+    max_depth: u32,
+) -> Result<A11yElementId> {
     require_enabled()?;
     platform_find_descendant(root, query, max_depth)
 }
@@ -162,6 +169,13 @@ fn platform_init_session() -> Result<()> {
     return linux::init_session();
     #[cfg(not(any(windows, all(target_os = "linux", feature = "accessibility-linux"))))]
     Err(SpotterError::AccessibilityNotSupported)
+}
+
+fn platform_shutdown_session() {
+    #[cfg(windows)]
+    windows::shutdown_session();
+    #[cfg(all(target_os = "linux", feature = "accessibility-linux"))]
+    state::clear_registry_linux();
 }
 
 fn platform_attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport> {

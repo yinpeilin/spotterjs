@@ -35,7 +35,11 @@ fn aggregate_apps(windows: Vec<WindowInfo>) -> Vec<DesktopApp> {
         entry.windows.push(w);
     }
     let mut apps: Vec<DesktopApp> = by_pid.into_values().collect();
-    apps.sort_by(|a, b| a.process_name.to_lowercase().cmp(&b.process_name.to_lowercase()));
+    apps.sort_by(|a, b| {
+        a.process_name
+            .to_lowercase()
+            .cmp(&b.process_name.to_lowercase())
+    });
     apps
 }
 
@@ -55,17 +59,15 @@ pub fn find_apps(title_contains: &str) -> Result<Vec<DesktopApp>> {
         .into_iter()
         .filter(|a| {
             a.process_name.to_lowercase().contains(&needle)
-                || a.windows.iter().any(|w| w.title.to_lowercase().contains(&needle))
+                || a.windows
+                    .iter()
+                    .any(|w| w.title.to_lowercase().contains(&needle))
         })
         .collect())
 }
 
 /// Wait until a window title contains `substring`, then return that window.
-pub fn wait_for_window(
-    title_contains: &str,
-    timeout_ms: u64,
-    poll_ms: u64,
-) -> Result<WindowInfo> {
+pub fn wait_for_window(title_contains: &str, timeout_ms: u64, poll_ms: u64) -> Result<WindowInfo> {
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
     let poll = Duration::from_millis(poll_ms.max(50));
     loop {

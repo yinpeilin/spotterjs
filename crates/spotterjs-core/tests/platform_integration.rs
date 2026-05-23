@@ -17,10 +17,7 @@ fn capture_screen_returns_pixels() {
     let img = capture_screen(None).expect("capture");
     assert!(img.width > 0);
     assert!(img.height > 0);
-    assert_eq!(
-        img.data.len(),
-        (img.width * img.height * 4) as usize
-    );
+    assert_eq!(img.data.len(), (img.width * img.height * 4) as usize);
 }
 
 #[test]

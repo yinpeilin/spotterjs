@@ -2,12 +2,13 @@ use crate::error::{Result, SpotterError};
 use crate::platform::{PlatformCapture, PlatformScreen, PlatformWindow};
 use crate::types::{Region, RgbaImage, WindowId, WindowInfo};
 use std::mem::size_of;
-use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
+use std::path::Path;
 use windows::core::BOOL;
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
-    BitBlt, ClientToScreen, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject,
-    GetDC, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-    DIB_RGB_COLORS, HGDIOBJ, SRCCOPY,
+    BitBlt, ClientToScreen, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC,
+    ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
+    SRCCOPY,
 };
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::System::Threading::{
@@ -18,9 +19,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, EnumWindows, GetForegroundWindow, GetSystemMetrics, GetWindowRect,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
     SetForegroundWindow, SetWindowPos, ShowWindow, HWND_TOP, SM_CXSCREEN, SM_CYSCREEN,
-    SW_MINIMIZE, SW_RESTORE, SWP_NOZORDER,
+    SWP_NOZORDER, SW_MINIMIZE, SW_RESTORE,
 };
-use std::path::Path;
 
 /// `PW_RENDERFULLCONTENT` (value 2) — use Xps `PRINT_WINDOW_FLAGS` for `PrintWindow`.
 const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(2);
@@ -137,12 +137,7 @@ impl WindowsPlatform {
 
 impl PlatformScreen for WindowsPlatform {
     fn screen_size(&self) -> Result<(i32, i32)> {
-        unsafe {
-            Ok((
-                GetSystemMetrics(SM_CXSCREEN),
-                GetSystemMetrics(SM_CYSCREEN),
-            ))
-        }
+        unsafe { Ok((GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN))) }
     }
 }
 
@@ -150,11 +145,8 @@ impl PlatformWindow for WindowsPlatform {
     fn list_windows(&self) -> Result<Vec<WindowInfo>> {
         let mut out: Vec<WindowInfo> = Vec::new();
         unsafe {
-            EnumWindows(
-                Some(enum_callback),
-                LPARAM(&mut out as *mut _ as isize),
-            )
-            .map_err(|e| SpotterError::Platform(format!("EnumWindows: {e}")))?;
+            EnumWindows(Some(enum_callback), LPARAM(&mut out as *mut _ as isize))
+                .map_err(|e| SpotterError::Platform(format!("EnumWindows: {e}")))?;
         }
         out.sort_by(|a, b| a.title.cmp(&b.title));
         Ok(out)
@@ -164,9 +156,7 @@ impl PlatformWindow for WindowsPlatform {
         unsafe {
             let hwnd = GetForegroundWindow();
             if hwnd.0.is_null() {
-                return Err(SpotterError::WindowNotFound(
-                    "no foreground window".into(),
-                ));
+                return Err(SpotterError::WindowNotFound("no foreground window".into()));
             }
             Self::build_info(hwnd)
         }
@@ -191,8 +181,7 @@ impl PlatformWindow for WindowsPlatform {
 
                 let foreground = GetForegroundWindow();
                 let fg_thread = windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(
-                    foreground,
-                    None,
+                    foreground, None,
                 );
                 let target_thread =
                     windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(hwnd, None);
@@ -316,7 +305,12 @@ impl PlatformCapture for WindowsPlatform {
 
             let (x, y, w, h) = match region {
                 Some(r) => (r.left, r.top, r.width, r.height),
-                None => (0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)),
+                None => (
+                    0,
+                    0,
+                    GetSystemMetrics(SM_CXSCREEN),
+                    GetSystemMetrics(SM_CYSCREEN),
+                ),
             };
 
             if w <= 0 || h <= 0 {
@@ -360,7 +354,9 @@ fn capture_print_window(hwnd: HWND, width: i32, height: i32) -> Result<RgbaImage
         let hdc_mem = CreateCompatibleDC(Some(hdc_window));
         if hdc_mem.is_invalid() {
             let _ = ReleaseDC(Some(hwnd), hdc_window);
-            return Err(SpotterError::CaptureFailed("CreateCompatibleDC failed".into()));
+            return Err(SpotterError::CaptureFailed(
+                "CreateCompatibleDC failed".into(),
+            ));
         }
 
         let w = width;
@@ -385,7 +381,9 @@ fn capture_print_window(hwnd: HWND, width: i32, height: i32) -> Result<RgbaImage
             _ => {
                 let _ = DeleteDC(hdc_mem);
                 let _ = ReleaseDC(Some(hwnd), hdc_window);
-                return Err(SpotterError::CaptureFailed("CreateDIBSection failed".into()));
+                return Err(SpotterError::CaptureFailed(
+                    "CreateDIBSection failed".into(),
+                ));
             }
         };
 
@@ -416,14 +414,22 @@ fn capture_print_window(hwnd: HWND, width: i32, height: i32) -> Result<RgbaImage
     }
 }
 
-fn capture_hdc_region(hdc_src: windows::Win32::Graphics::Gdi::HDC, x: i32, y: i32, w: i32, h: i32) -> Result<RgbaImage> {
+fn capture_hdc_region(
+    hdc_src: windows::Win32::Graphics::Gdi::HDC,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+) -> Result<RgbaImage> {
     unsafe {
         if w <= 0 || h <= 0 {
             return Err(SpotterError::CaptureFailed("invalid capture size".into()));
         }
         let hdc_mem = CreateCompatibleDC(Some(hdc_src));
         if hdc_mem.is_invalid() {
-            return Err(SpotterError::CaptureFailed("CreateCompatibleDC failed".into()));
+            return Err(SpotterError::CaptureFailed(
+                "CreateCompatibleDC failed".into(),
+            ));
         }
 
         let mut bmi = BITMAPINFO {
@@ -445,7 +451,9 @@ fn capture_hdc_region(hdc_src: windows::Win32::Graphics::Gdi::HDC, x: i32, y: i3
             Ok(b) if !b.is_invalid() && !bits.is_null() => b,
             _ => {
                 let _ = DeleteDC(hdc_mem);
-                return Err(SpotterError::CaptureFailed("CreateDIBSection failed".into()));
+                return Err(SpotterError::CaptureFailed(
+                    "CreateDIBSection failed".into(),
+                ));
             }
         };
 
