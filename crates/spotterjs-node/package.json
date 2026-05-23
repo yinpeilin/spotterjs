@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/node",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "spotterjs desktop automation for Node.js",
   "main": "index.js",
   "types": "index.d.ts",
@@ -44,7 +44,7 @@
     "@napi-rs/cli": "^2.18.0"
   },
   "optionalDependencies": {
-    "@spotterjs/node-win32-x64-msvc": "0.1.0",
-    "@spotterjs/node-linux-x64-gnu": "0.1.0"
+    "@spotterjs/node-win32-x64-msvc": "1.0.0",
+    "@spotterjs/node-linux-x64-gnu": "1.0.0"
   }
 }

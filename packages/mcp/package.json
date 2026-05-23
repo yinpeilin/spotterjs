@@ -1,47 +1,47 @@
-﻿{
-    "name":  "@spotterjs/mcp",
-    "version":  "0.1.0",
-    "description":  "spotterjs MCP server - desktop automation, workspace files, and shell",
-    "license":  "SEE LICENSE IN LICENSE",
-    "type":  "module",
-    "publishConfig":  {
-                          "access":  "public",
-                          "registry":  "https://registry.npmjs.org/"
-                      },
-    "bin":  {
-                "spotterjs-mcp":  "dist/cli.js"
-            },
-    "files":  [
-                  "dist",
-                  "LICENSE",
-                  "README.md"
-              ],
-    "engines":  {
-                    "node":  "\u003e=18"
-                },
-    "scripts":  {
-                    "build":  "tsc",
-                    "start":  "node dist/cli.js",
-                    "prepublishOnly":  "npm run build \u0026\u0026 node ../../scripts/sync-license.mjs",
-                    "test":  "vitest run"
-                },
-    "dependencies":  {
-                         "@modelcontextprotocol/sdk":  "^1.12.0",
-                         "@spotterjs/core":  "0.1.0",
-                         "zod":  "^3.24.0"
-                     },
-    "peerDependencies":  {
-                             "@spotterjs/plugin-android-adb":  "0.1.0"
-                         },
-    "peerDependenciesMeta":  {
-                                 "@spotterjs/plugin-android-adb":  {
-                                                                      "optional":  true
-                                                                  }
-                             },
-    "devDependencies":  {
-                            "@spotterjs/plugin-android-adb":  "0.1.0",
-                            "@types/node":  "^22.0.0",
-                            "typescript":  "^5.4.0",
-                            "vitest":  "^3.0.0"
-                        }
+{
+    "name": "@spotterjs/mcp",
+    "version": "1.0.0",
+    "description": "spotterjs MCP server - desktop automation, workspace files, and shell",
+    "license": "SEE LICENSE IN LICENSE",
+    "type": "module",
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    },
+    "bin": {
+        "spotterjs-mcp": "dist/cli.js"
+    },
+    "files": [
+        "dist",
+        "LICENSE",
+        "README.md"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/cli.js",
+        "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.12.0",
+        "@spotterjs/core": "1.0.0",
+        "zod": "^3.24.0"
+    },
+    "peerDependencies": {
+        "@spotterjs/plugin-android-adb": "0.2.0"
+    },
+    "peerDependenciesMeta": {
+        "@spotterjs/plugin-android-adb": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@spotterjs/plugin-android-adb": "0.2.0",
+        "@types/node": "^22.0.0",
+        "typescript": "^5.4.0",
+        "vitest": "^3.0.0"
+    }
 }

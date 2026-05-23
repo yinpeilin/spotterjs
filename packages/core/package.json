@@ -1,42 +1,42 @@
-﻿{
-    "name":  "@spotterjs/core",
-    "version":  "0.1.0",
-    "description":  "spotterjs desktop automation - TypeScript API",
-    "main":  "dist/index.js",
-    "types":  "dist/index.d.ts",
-    "license":  "SEE LICENSE IN LICENSE",
-    "repository":  {
-                       "type":  "git",
-                       "url":  "https://gitee.com/ypl0lpy/spotterjs.git",
-                       "directory":  "packages/core"
-                   },
-    "publishConfig":  {
-                          "access":  "public",
-                          "registry":  "https://registry.npmjs.org/"
-                      },
-    "bugs":  {
-                 "url":  "https://gitee.com/ypl0lpy/spotterjs/issues"
-             },
-    "homepage":  "https://gitee.com/ypl0lpy/spotterjs#readme",
-    "files":  [
-                  "dist",
-                  "LICENSE",
-                  "README.md"
-              ],
-    "engines":  {
-                    "node":  "\u003e=18"
-                },
-    "scripts":  {
-                    "build":  "tsc",
-                    "test":  "vitest run",
-                    "prepublishOnly":  "npm run build \u0026\u0026 node ../../scripts/sync-license.mjs"
-                },
-    "dependencies":  {
-                         "@spotterjs/base":  "0.1.0",
-                         "@spotterjs/node":  "0.1.0"
-                     },
-    "devDependencies":  {
-                            "typescript":  "^5.4.0",
-                            "vitest":  "^3.0.0"
-                        }
+{
+    "name": "@spotterjs/core",
+    "version": "1.0.0",
+    "description": "spotterjs desktop automation - TypeScript API",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "license": "SEE LICENSE IN LICENSE",
+    "repository": {
+        "type": "git",
+        "url": "https://gitee.com/ypl0lpy/spotterjs.git",
+        "directory": "packages/core"
+    },
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    },
+    "bugs": {
+        "url": "https://gitee.com/ypl0lpy/spotterjs/issues"
+    },
+    "homepage": "https://gitee.com/ypl0lpy/spotterjs#readme",
+    "files": [
+        "dist",
+        "LICENSE",
+        "README.md"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "build": "tsc",
+        "test": "vitest run",
+        "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
+    },
+    "dependencies": {
+        "@spotterjs/base": "1.0.0",
+        "@spotterjs/node": "1.0.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.4.0",
+        "vitest": "^3.0.0"
+    }
 }
