@@ -15,6 +15,7 @@ Cross-platform desktop automation with a **TypeScript-first** API, Rust native a
 | `@spotterjs/node-win32-x64-msvc` | Optional | Windows x64 native binary |
 | `@spotterjs/node-linux-x64-gnu` | Optional | Linux x64 glibc native binary |
 | `@spotterjs/plugin-ocr` | Optional | **Preview** — OCR placeholder only |
+| `@spotterjs/plugin-android-adb` | Optional | Android device automation through ADB |
 | `@spotterjs/mcp` | Optional | MCP server — desktop + workspace file + shell tools |
 
 ## Install (users)
@@ -63,15 +64,13 @@ All template matching goes through `@spotterjs/node` — there is no separate vi
 
 ```typescript
 import { screen, mouse } from "@spotterjs/core";
-import { centerOf } from "@spotterjs/base";
 
-// NCC template match (path or PNG/JPEG Buffer needle)
-const region = await screen.find("./button.png", {
+// NCC template match: a string is a path, a Buffer is encoded image bytes
+const match = await screen.find("./button.png", {
   confidence: 0.9,
   multiScale: true,
 });
-const { x, y } = centerOf(region);
-mouse.move(x, y);
+mouse.move(match.center.x, match.center.y);
 mouse.click("left");
 
 // In-memory needle (image file bytes)
@@ -91,6 +90,10 @@ keyboard.hotkey(["Ctrl", "V"]);
 ```
 
 See [docs/MATCHING.md](docs/MATCHING.md) for match options and buffer APIs.
+
+Matching types are intentionally distinct: `TemplateImage` is a file path or encoded image
+bytes, `CaptureImage` is raw RGBA capture data, `Region` is a screen-space rectangle, and
+`MatchResult` returns `{ region, center, score }` in screen coordinates.
 
 ### MCP server
 

@@ -12,6 +12,7 @@ const workspaces = [
   "@spotterjs/base",
   "@spotterjs/core",
   "@spotterjs/plugin-ocr",
+  "@spotterjs/plugin-android-adb",
   "@spotterjs/node",
   "@spotterjs/mcp",
 ];

@@ -12,6 +12,7 @@ const targets = [
   "packages/base",
   "packages/core",
   "packages/plugin-ocr",
+  "packages/plugin-android-adb",
   "packages/mcp",
   "crates/spotterjs-node",
   "crates/spotterjs-node/win32-x64-msvc",
