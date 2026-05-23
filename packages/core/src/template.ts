@@ -1,10 +1,14 @@
-import { centerOf, type MatchOptions, type Region } from "@spotterjs/base";
+import {
+  type MatchOptions,
+  type MatchResult,
+  type TemplateImage,
+} from "@spotterjs/base";
 
-import { toNativeOpts } from "./match";
+import { toMatchResult, toNativeOpts } from "./match";
 
 import { loadNative } from "./native";
 
-function needleArgs(needle: string | Buffer): { path: string; buffer?: Buffer } {
+function needleArgs(needle: TemplateImage): { path: string; buffer?: Buffer } {
   if (typeof needle === "string") {
     return { path: needle };
   }
@@ -24,16 +28,13 @@ function needleArgs(needle: string | Buffer): { path: string; buffer?: Buffer } 
  */
 export function findInWindow(
   windowId: string,
-  needle: string | Buffer,
+  needle: TemplateImage,
   options?: MatchOptions
-): Region {
+): MatchResult {
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
-  return native.findTemplateInWindow(
-    windowId,
-    path,
-    buffer,
-    toNativeOpts(options)
+  return toMatchResult(
+    native.findTemplateInWindow(windowId, path, buffer, toNativeOpts(options))
   );
 }
 
@@ -45,17 +46,14 @@ export function findInWindow(
  */
 export function findAllInWindow(
   windowId: string,
-  needle: string | Buffer,
+  needle: TemplateImage,
   options?: MatchOptions
-): Region[] {
+): MatchResult[] {
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
-  return native.findAllTemplatesInWindow(
-    windowId,
-    path,
-    buffer,
-    toNativeOpts(options)
-  );
+  return native
+    .findAllTemplatesInWindow(windowId, path, buffer, toNativeOpts(options))
+    .map(toMatchResult);
 }
 
 /**
@@ -67,11 +65,11 @@ export function findAllInWindow(
  */
 export function tapInWindow(
   windowId: string,
-  needle: string | Buffer,
+  needle: TemplateImage,
   options?: MatchOptions
-): Region {
-  const region = findInWindow(windowId, needle, options);
-  const { x, y } = centerOf(region);
+): MatchResult {
+  const match = findInWindow(windowId, needle, options);
+  const { x, y } = match.center;
   loadNative().tapAt(x, y);
-  return region;
+  return match;
 }

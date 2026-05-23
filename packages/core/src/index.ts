@@ -456,6 +456,12 @@ export { host, configureHost, HostPathError } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";
 export { encodePng, encodePngBase64 } from "./capture";
 export {
+  findAllInCapture,
+  findInCapture,
+  loadImageFromBuffer,
+  waitForInCapture,
+} from "./buffer-match";
+export {
   matchTapScreen,
   toLocal,
   toMatchBox,

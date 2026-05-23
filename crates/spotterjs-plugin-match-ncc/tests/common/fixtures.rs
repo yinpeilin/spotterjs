@@ -19,7 +19,11 @@ pub fn solid(w: u32, h: u32, rgb: [u8; 3]) -> RgbaImage {
     for px in data.chunks_mut(4) {
         px.copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
     }
-    RgbaImage { width: w, height: h, data }
+    RgbaImage {
+        width: w,
+        height: h,
+        data,
+    }
 }
 
 pub fn gradient_bg(w: u32, h: u32) -> RgbaImage {
@@ -33,7 +37,11 @@ pub fn gradient_bg(w: u32, h: u32) -> RgbaImage {
             data[i + 3] = 255;
         }
     }
-    RgbaImage { width: w, height: h, data }
+    RgbaImage {
+        width: w,
+        height: h,
+        data,
+    }
 }
 
 pub fn noise_bg(w: u32, h: u32, seed: u32) -> RgbaImage {
@@ -41,14 +49,22 @@ pub fn noise_bg(w: u32, h: u32, seed: u32) -> RgbaImage {
     for y in 0..h {
         for x in 0..w {
             let i = ((y * w + x) * 4) as usize;
-            let v = (x.wrapping_mul(17).wrapping_add(y.wrapping_mul(31)).wrapping_add(seed)) % 256;
+            let v = (x
+                .wrapping_mul(17)
+                .wrapping_add(y.wrapping_mul(31))
+                .wrapping_add(seed))
+                % 256;
             data[i] = v as u8;
             data[i + 1] = 255u8.wrapping_sub(v as u8);
             data[i + 2] = v.wrapping_mul(3) as u8;
             data[i + 3] = 255;
         }
     }
-    RgbaImage { width: w, height: h, data }
+    RgbaImage {
+        width: w,
+        height: h,
+        data,
+    }
 }
 
 pub fn paint_rect(hay: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, rgb: [u8; 3]) {

@@ -27,7 +27,11 @@ impl IntegralImage {
             }
         }
 
-        Self { stride, sum, sum_sq }
+        Self {
+            stride,
+            sum,
+            sum_sq,
+        }
     }
 
     #[inline]

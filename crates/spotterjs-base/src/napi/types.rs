@@ -10,6 +10,12 @@ pub struct JsRegion {
 }
 
 #[napi(object)]
+pub struct JsMatchResult {
+    pub region: JsRegion,
+    pub score: f64,
+}
+
+#[napi(object)]
 pub struct JsCaptureImage {
     pub data: Buffer,
     pub width: u32,

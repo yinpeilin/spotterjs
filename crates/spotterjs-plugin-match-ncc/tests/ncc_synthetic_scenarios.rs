@@ -6,8 +6,8 @@ mod common;
 
 use common::fixtures::{self, Scenario};
 use spotterjs_base::{MatchOptions, MatchPlugin, Region, SpotterError};
-use spotterjs_plugin_match_ncc::{find_best, find_best_serial, prepare_needle, rgba_to_gray};
 use spotterjs_plugin_match_ncc::NccMatcher;
+use spotterjs_plugin_match_ncc::{find_best, find_best_serial, prepare_needle, rgba_to_gray};
 
 fn assert_near(name: &str, found: &Region, expected: (i32, i32), tol: i32) {
     let dx = (found.left - expected.0).abs();
@@ -25,10 +25,18 @@ fn assert_near(name: &str, found: &Region, expected: (i32, i32), tol: i32) {
 fn run_find(s: &Scenario) -> Region {
     NccMatcher
         .find(&s.hay, &s.needle, &s.opts)
+        .map(|m| {
+            assert!(m.score >= s.opts.confidence);
+            m.region
+        })
         .unwrap_or_else(|e| panic!("scenario {} failed: {e:?}", s.name))
 }
 
-fn fast_serial_agree(hay: &spotterjs_base::RgbaImage, needle: &spotterjs_base::RgbaImage, opts: &MatchOptions) {
+fn fast_serial_agree(
+    hay: &spotterjs_base::RgbaImage,
+    needle: &spotterjs_base::RgbaImage,
+    opts: &MatchOptions,
+) {
     let hay_gray = rgba_to_gray(hay).expect("hay gray");
     let needle_gray = rgba_to_gray(needle).expect("needle gray");
     let prepared = prepare_needle(needle_gray, needle.width, needle.height);
@@ -97,10 +105,12 @@ fn exact_copy_scores_high() {
     let hay_gray = rgba_to_gray(&hay).unwrap();
     let needle_gray = rgba_to_gray(&needle).unwrap();
     let prepared = prepare_needle(needle_gray, needle.width, needle.height);
-    let (_, score) =
-        find_best_serial(&hay, &hay_gray, &prepared, &fixtures::default_opts(), None)
-            .expect("serial at exact");
-    assert!(score > 0.99, "exact position should score ~1.0, got {score}");
+    let (_, score) = find_best_serial(&hay, &hay_gray, &prepared, &fixtures::default_opts(), None)
+        .expect("serial at exact");
+    assert!(
+        score > 0.99,
+        "exact position should score ~1.0, got {score}"
+    );
 }
 
 #[test]

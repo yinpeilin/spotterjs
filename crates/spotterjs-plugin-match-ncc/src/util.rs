@@ -32,13 +32,3 @@ pub fn regions_overlap(a: &Region, b: &Region) -> bool {
     let dy = (a.top - b.top).abs();
     dx < a.width / 2 && dy < a.height / 2
 }
-
-pub fn dedupe_regions(regions: Vec<Region>) -> Vec<Region> {
-    let mut out = Vec::new();
-    for r in regions {
-        if !out.iter().any(|o| regions_overlap(o, &r)) {
-            out.push(r);
-        }
-    }
-    out
-}

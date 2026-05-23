@@ -3,25 +3,24 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use spotterjs_base::napi::{
-    capture_from_js, capture_to_js, map_err, match_opts_from_js, region_from_js, region_to_js,
-    JsCaptureImage, JsMatchOptions, JsRegion,
+    capture_from_js, capture_to_js, map_err, match_opts_from_js, match_result_to_js,
+    region_from_js, region_to_js, JsCaptureImage, JsMatchOptions, JsMatchResult, JsRegion,
 };
 use spotterjs_core::{
-    a11y_attach_active, a11y_attach_window, a11y_attach_window_report, a11y_disable, a11y_dump_tree,
-    a11y_dump_tree_node, a11y_enable, a11y_find_descendant, a11y_get_bounds, a11y_get_element_info,
-    a11y_invoke, a11y_refresh_root, a11y_set_value, a11y_tree_health, a11y_wait_for_descendant,
-    check_tree_health, clipboard_get, clipboard_set, find_apps, find_windows,
-    format_element_id, get_foreground_app, is_accessibility_enabled, list_desktop_apps, wait_for_window,
-    A11yElementId, DesktopApp,
-    keyboard_press, keyboard_release, keyboard_type, keyboard_type_keys, minimize_window, mouse_click,
-    mouse_drag_to, mouse_get_position, mouse_move, move_window, parse_element_id, parse_key, parse_keys,
-    parse_window_id, resize_window, restore_window, screen_height, screen_size, screen_width,
-    set_keyboard_config, set_mouse_config, straight_line_points, A11yConfig, A11yQuery, AttachReport,
-    ElementInfo, KeyboardConfig, MouseButton, MouseConfig, Point, TreeHealth, TreeNodeDump, TreeViewMode,
-    A11yBounds, WindowInfo, VERSION,
+    a11y_attach_active, a11y_attach_window, a11y_attach_window_report, a11y_disable,
+    a11y_dump_tree, a11y_dump_tree_node, a11y_enable, a11y_find_descendant, a11y_get_bounds,
+    a11y_get_element_info, a11y_invoke, a11y_refresh_root, a11y_set_value, a11y_tree_health,
+    a11y_wait_for_descendant, check_tree_health, clipboard_get, clipboard_set, find_apps,
+    find_windows, format_element_id, get_foreground_app, is_accessibility_enabled, keyboard_press,
+    keyboard_release, keyboard_type, keyboard_type_keys, list_desktop_apps, minimize_window,
+    mouse_click, mouse_drag_to, mouse_get_position, mouse_move, move_window, parse_element_id,
+    parse_key, parse_keys, parse_window_id, resize_window, restore_window, screen_height,
+    screen_size, screen_width, set_keyboard_config, set_mouse_config, straight_line_points,
+    wait_for_window, A11yBounds, A11yConfig, A11yElementId, A11yQuery, AttachReport, DesktopApp,
+    ElementInfo, KeyboardConfig, MouseButton, MouseConfig, Point, TreeHealth, TreeNodeDump,
+    TreeViewMode, WindowInfo, VERSION,
 };
 use std::path::Path;
-
 
 #[napi(object)]
 pub struct JsPoint {
@@ -154,6 +153,12 @@ pub fn load_image_from_path(path: String) -> Result<JsCaptureImage> {
     Ok(capture_to_js(img))
 }
 
+#[napi(js_name = "loadImageFromBuffer")]
+pub fn load_image_from_buffer(bytes: Buffer) -> Result<JsCaptureImage> {
+    let img = spotterjs_core::load_rgba_from_bytes(bytes.as_ref()).map_err(map_err)?;
+    Ok(capture_to_js(img))
+}
+
 #[napi(js_name = "getImageSize")]
 pub fn get_image_size(path: String) -> Result<JsImageSize> {
     let (w, h) = spotterjs_core::image_size_from_path(Path::new(&path)).map_err(map_err)?;
@@ -193,13 +198,17 @@ pub fn list_windows() -> Result<Vec<JsWindowInfo>> {
 
 #[napi]
 pub fn get_active_window() -> Result<JsWindowInfo> {
-    spotterjs_core::get_active_window().map(window_to_js).map_err(map_err)
+    spotterjs_core::get_active_window()
+        .map(window_to_js)
+        .map_err(map_err)
 }
 
 #[napi]
 pub fn focus_window(id: String) -> Result<bool> {
     let wid = parse_window_id(&id).map_err(map_err)?;
-    spotterjs_core::focus_window(wid).map(|_| true).map_err(map_err)
+    spotterjs_core::focus_window(wid)
+        .map(|_| true)
+        .map_err(map_err)
 }
 
 #[napi]
@@ -278,13 +287,9 @@ pub fn wait_for_window_by_title(
     timeout_ms: u32,
     poll_ms: Option<u32>,
 ) -> Result<JsWindowInfo> {
-    wait_for_window(
-        &substring,
-        timeout_ms as u64,
-        poll_ms.unwrap_or(200) as u64,
-    )
-    .map(window_to_js)
-    .map_err(map_err)
+    wait_for_window(&substring, timeout_ms as u64, poll_ms.unwrap_or(200) as u64)
+        .map(window_to_js)
+        .map_err(map_err)
 }
 
 #[napi(js_name = "getForegroundApp")]
@@ -299,10 +304,10 @@ pub fn find_template(
     path: String,
     needle_buffer: Option<Buffer>,
     opts: Option<JsMatchOptions>,
-) -> Result<JsRegion> {
+) -> Result<JsMatchResult> {
     let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
     spotterjs_core::find_template_with_needle(Path::new(&path), bytes, match_opts_from_js(opts))
-        .map(region_to_js)
+        .map(match_result_to_js)
         .map_err(map_err)
 }
 
@@ -311,11 +316,15 @@ pub fn find_all_templates(
     path: String,
     needle_buffer: Option<Buffer>,
     opts: Option<JsMatchOptions>,
-) -> Result<Vec<JsRegion>> {
+) -> Result<Vec<JsMatchResult>> {
     let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
-    spotterjs_core::find_all_templates_with_needle(Path::new(&path), bytes, match_opts_from_js(opts))
-        .map(|v| v.into_iter().map(region_to_js).collect())
-        .map_err(map_err)
+    spotterjs_core::find_all_templates_with_needle(
+        Path::new(&path),
+        bytes,
+        match_opts_from_js(opts),
+    )
+    .map(|v| v.into_iter().map(match_result_to_js).collect())
+    .map_err(map_err)
 }
 
 #[napi]
@@ -324,7 +333,7 @@ pub fn find_template_in_window(
     path: String,
     needle_buffer: Option<Buffer>,
     opts: Option<JsMatchOptions>,
-) -> Result<JsRegion> {
+) -> Result<JsMatchResult> {
     let wid = parse_window_id(&id).map_err(map_err)?;
     let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
     spotterjs_core::find_template_in_window_with_needle(
@@ -333,7 +342,7 @@ pub fn find_template_in_window(
         bytes,
         match_opts_from_js(opts),
     )
-    .map(region_to_js)
+    .map(match_result_to_js)
     .map_err(map_err)
 }
 
@@ -343,7 +352,7 @@ pub fn find_all_templates_in_window(
     path: String,
     needle_buffer: Option<Buffer>,
     opts: Option<JsMatchOptions>,
-) -> Result<Vec<JsRegion>> {
+) -> Result<Vec<JsMatchResult>> {
     let wid = parse_window_id(&id).map_err(map_err)?;
     let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
     spotterjs_core::find_all_templates_in_window_with_needle(
@@ -352,7 +361,7 @@ pub fn find_all_templates_in_window(
         bytes,
         match_opts_from_js(opts),
     )
-    .map(|v| v.into_iter().map(region_to_js).collect())
+    .map(|v| v.into_iter().map(match_result_to_js).collect())
     .map_err(map_err)
 }
 
@@ -363,7 +372,7 @@ pub fn wait_for_template(
     timeout_ms: u32,
     opts: Option<JsMatchOptions>,
     interval_ms: Option<u32>,
-) -> Result<JsRegion> {
+) -> Result<JsMatchResult> {
     let bytes = needle_buffer.as_ref().map(|b| b.as_ref());
     spotterjs_core::wait_for_template_with_needle(
         Path::new(&path),
@@ -372,7 +381,7 @@ pub fn wait_for_template(
         match_opts_from_js(opts),
         interval_ms.map(|v| v as u64),
     )
-    .map(region_to_js)
+    .map(match_result_to_js)
     .map_err(map_err)
 }
 
@@ -381,11 +390,11 @@ pub fn find_template_buffers(
     haystack: JsCaptureImage,
     needle: JsCaptureImage,
     opts: Option<JsMatchOptions>,
-) -> Result<JsRegion> {
+) -> Result<JsMatchResult> {
     let hay = capture_from_js(&haystack)?;
     let needle = capture_from_js(&needle)?;
     spotterjs_core::find_template_buffers(&hay, &needle, &match_opts_from_js(opts))
-        .map(region_to_js)
+        .map(match_result_to_js)
         .map_err(map_err)
 }
 
@@ -394,11 +403,11 @@ pub fn find_all_template_buffers(
     haystack: JsCaptureImage,
     needle: JsCaptureImage,
     opts: Option<JsMatchOptions>,
-) -> Result<Vec<JsRegion>> {
+) -> Result<Vec<JsMatchResult>> {
     let hay = capture_from_js(&haystack)?;
     let needle = capture_from_js(&needle)?;
     spotterjs_core::find_all_template_buffers(&hay, &needle, &match_opts_from_js(opts))
-        .map(|v| v.into_iter().map(region_to_js).collect())
+        .map(|v| v.into_iter().map(match_result_to_js).collect())
         .map_err(map_err)
 }
 
@@ -409,7 +418,7 @@ pub fn wait_for_template_buffers(
     timeout_ms: u32,
     opts: Option<JsMatchOptions>,
     interval_ms: Option<u32>,
-) -> Result<JsRegion> {
+) -> Result<JsMatchResult> {
     let hay = capture_from_js(&haystack)?;
     let needle = capture_from_js(&needle)?;
     spotterjs_core::wait_for_template_buffers(
@@ -419,7 +428,7 @@ pub fn wait_for_template_buffers(
         match_opts_from_js(opts),
         interval_ms.map(|v| v as u64),
     )
-    .map(region_to_js)
+    .map(match_result_to_js)
     .map_err(map_err)
 }
 
@@ -459,7 +468,8 @@ pub fn mouse_move_path(points: Vec<JsPoint>) -> Result<()> {
 pub fn mouse_move_straight(x: i32, y: i32) -> Result<()> {
     let (cx, cy) = mouse_get_position().map_err(map_err)?;
     let line = straight_line_points(Point { x: cx, y: cy }, Point { x, y }, 5);
-    spotterjs_core::mouse_move_path(&line.iter().map(|p| (p.x, p.y)).collect::<Vec<_>>()).map_err(map_err)
+    spotterjs_core::mouse_move_path(&line.iter().map(|p| (p.x, p.y)).collect::<Vec<_>>())
+        .map_err(map_err)
 }
 
 #[napi(js_name = "mouseClick")]
@@ -866,12 +876,7 @@ pub fn accessibility_dump_tree(
     tree_view: Option<String>,
 ) -> Result<String> {
     let root = parse_element_id(&root_id).map_err(map_err)?;
-    a11y_dump_tree(
-        root,
-        max_depth.unwrap_or(12),
-        tree_view_from_js(tree_view),
-    )
-    .map_err(map_err)
+    a11y_dump_tree(root, max_depth.unwrap_or(12), tree_view_from_js(tree_view)).map_err(map_err)
 }
 
 #[napi]
@@ -881,13 +886,9 @@ pub fn accessibility_dump_tree_object(
     tree_view: Option<String>,
 ) -> Result<JsTreeNodeDump> {
     let root = parse_element_id(&root_id).map_err(map_err)?;
-    a11y_dump_tree_node(
-        root,
-        max_depth.unwrap_or(12),
-        tree_view_from_js(tree_view),
-    )
-    .map(tree_node_to_js)
-    .map_err(map_err)
+    a11y_dump_tree_node(root, max_depth.unwrap_or(12), tree_view_from_js(tree_view))
+        .map(tree_node_to_js)
+        .map_err(map_err)
 }
 
 #[napi]
@@ -911,13 +912,9 @@ pub fn accessibility_tree_health(
     tree_view: Option<String>,
 ) -> Result<JsTreeHealth> {
     let root = parse_element_id(&root_id).map_err(map_err)?;
-    a11y_tree_health(
-        root,
-        max_depth.unwrap_or(12),
-        tree_view_from_js(tree_view),
-    )
-    .map(tree_health_to_js)
-    .map_err(map_err)
+    a11y_tree_health(root, max_depth.unwrap_or(12), tree_view_from_js(tree_view))
+        .map(tree_health_to_js)
+        .map_err(map_err)
 }
 
 #[napi]

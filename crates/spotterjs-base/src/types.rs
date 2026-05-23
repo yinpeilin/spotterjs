@@ -30,12 +30,21 @@ pub struct Region {
     pub height: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MatchResult {
+    pub region: Region,
+    pub score: f64,
+}
+
+impl MatchResult {
+    pub fn new(region: Region, score: f64) -> Self {
+        Self { region, score }
+    }
+}
+
 impl Region {
     pub fn center(&self) -> (i32, i32) {
-        (
-            self.left + self.width / 2,
-            self.top + self.height / 2,
-        )
+        (self.left + self.width / 2, self.top + self.height / 2)
     }
 
     pub fn clamp_to_screen(self, screen_w: i32, screen_h: i32) -> Self {

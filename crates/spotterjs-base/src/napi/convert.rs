@@ -1,8 +1,8 @@
 use crate::error::SpotterError;
-use crate::types::{MatchOptions, Region, RgbaImage};
+use crate::types::{MatchOptions, MatchResult, Region, RgbaImage};
 use napi::bindgen_prelude::*;
 
-use super::types::{JsCaptureImage, JsMatchOptions, JsRegion};
+use super::types::{JsCaptureImage, JsMatchOptions, JsMatchResult, JsRegion};
 
 pub fn region_to_js(r: Region) -> JsRegion {
     JsRegion {
@@ -10,6 +10,13 @@ pub fn region_to_js(r: Region) -> JsRegion {
         top: r.top,
         width: r.width,
         height: r.height,
+    }
+}
+
+pub fn match_result_to_js(m: MatchResult) -> JsMatchResult {
+    JsMatchResult {
+        region: region_to_js(m.region),
+        score: m.score,
     }
 }
 

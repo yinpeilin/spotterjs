@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use spotterjs_base::{MatchOptions, Region, Result, RgbaImage, SpotterError};
 
 use crate::integral::IntegralImage;
-use crate::ncc::{scan_row_best, PreparedNeedle, search_bounds};
+use crate::ncc::{scan_row_best, search_bounds, PreparedNeedle};
 
 #[cfg(feature = "parallel")]
 pub fn find_best_parallel(

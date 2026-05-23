@@ -2,8 +2,8 @@
 
 use crate::error::{Result, SpotterError};
 use crate::image::load_rgba_from_path;
-use spotterjs_base::RgbaImage;
 use parking_lot::Mutex;
+use spotterjs_base::RgbaImage;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
@@ -73,7 +73,8 @@ impl NeedleCache {
     }
 }
 
-static NEEDLE_CACHE: LazyLock<Mutex<NeedleCache>> = LazyLock::new(|| Mutex::new(NeedleCache::new()));
+static NEEDLE_CACHE: LazyLock<Mutex<NeedleCache>> =
+    LazyLock::new(|| Mutex::new(NeedleCache::new()));
 
 pub fn load_needle_cached(path: &Path) -> Result<RgbaImage> {
     NEEDLE_CACHE.lock().get_or_load(path)
@@ -104,7 +105,8 @@ mod tests {
 
     #[test]
     fn cache_invalidates_on_mtime_change() {
-        let dir = std::env::temp_dir().join(format!("spotter_needle_cache_m_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("spotter_needle_cache_m_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("needle.png");
         {

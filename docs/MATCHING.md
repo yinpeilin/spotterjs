@@ -33,6 +33,13 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 | `screen.tapTemplate` | yes | yes | yes | yes |
 | `findInWindow` / `findAllInWindow` / `tapInWindow` | yes | yes | yes | yes |
 
+## Core concepts
+
+- `TemplateImage`: a template input. A `string` is always a file path; a `Buffer` is always encoded image bytes (PNG/JPEG/WebP).
+- `CaptureImage`: raw RGBA capture data from `screen.capture`, `captureWindow`, or native buffer APIs.
+- `Region`: `{ left, top, width, height }`; high-level APIs use screen coordinates.
+- `MatchResult`: `{ region, center, score }`; `region` and `center` are screen coordinates.
+
 ## Search region
 
 When `searchRegion` is set, the core captures that screen rectangle first, then resets internal search bounds to `(0, 0, width, height)` on the cropped haystack. **`find` and `findAll` use the same logic**; returned regions are in **screen coordinates**.
@@ -44,7 +51,8 @@ import { screen, findInWindow } from "@spotterjs/core";
 import fs from "fs";
 
 // File path
-await screen.find("./button.png", { confidence: 0.9 });
+const match = await screen.find("./button.png", { confidence: 0.9 });
+console.log(match.region, match.center, match.score);
 
 // Multi-scale
 await screen.find("./button.png", {
@@ -59,13 +67,13 @@ await screen.find("./button.png", {
 await screen.find(fs.readFileSync("./icon.png"), { confidence: 0.9 });
 
 // findAll in a screen sub-region
-await screen.findAll("./button.png", {
+const matches = await screen.findAll("./button.png", {
   confidence: 0.9,
   searchRegion: { left: 0, top: 0, width: 1920, height: 1080 },
 });
 
 // Match inside a window (path or Buffer)
-findInWindow(windowId, "./button.png", { confidence: 0.9 });
+const windowMatch = findInWindow(windowId, "./button.png", { confidence: 0.9 });
 findInWindow(windowId, fs.readFileSync("./icon.png"), { confidence: 0.9 });
 ```
 
@@ -88,7 +96,7 @@ After `captureScreen()`:
 ```typescript
 const hay = native.captureScreen();
 const needle = { data: needleRgba, width: 32, height: 32 }; // RGBA8
-native.findTemplateBuffers(hay, needle, { confidence: 0.9 });
+const rawMatch = native.findTemplateBuffers(hay, needle, { confidence: 0.9 });
 ```
 
 Screen capture + buffer needle (path empty when using encoded PNG bytes):

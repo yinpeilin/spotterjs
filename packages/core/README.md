@@ -18,7 +18,6 @@ import {
   mouse,
   desktop,
   windowApi,
-  centerOf,
 } from "@spotterjs/core";
 
 // 1. 等待目标窗口
@@ -29,9 +28,8 @@ import { tapInWindow } from "@spotterjs/core";
 tapInWindow(win.id, "./assets/save-btn.png", { confidence: 0.9 });
 
 // 3. 或全屏匹配
-const region = await screen.find("./assets/icon.png", { confidence: 0.85 });
-const { x, y } = centerOf(region);
-mouse.tap(x, y);
+const match = await screen.find("./assets/icon.png", { confidence: 0.85 });
+mouse.tap(match.center.x, match.center.y);
 ```
 
 ## 模块概览

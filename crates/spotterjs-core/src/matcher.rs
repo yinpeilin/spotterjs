@@ -2,9 +2,11 @@
 //! Backend: `spotterjs-plugin-match-ncc` (NCC only).
 
 use crate::capture::{capture_screen, capture_window};
-use spotterjs_base::{MatchOptions, MatchPlugin, Region, Result, RgbaImage, SpotterError, WindowId};
 use crate::image::load_rgba_from_bytes;
 use crate::needle_cache::load_needle_cached;
+use spotterjs_base::{
+    MatchOptions, MatchPlugin, MatchResult, Region, Result, RgbaImage, SpotterError, WindowId,
+};
 use spotterjs_plugin_match_ncc::NccMatcher;
 use std::path::Path;
 use std::thread;
@@ -48,7 +50,7 @@ pub fn find_template_in_haystack(
     haystack: &RgbaImage,
     needle_path: &Path,
     opts: &MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let needle = resolve_needle(needle_path)?;
     find_template_in_haystack_rgba(haystack, &needle, opts)
 }
@@ -58,7 +60,7 @@ pub fn find_template_in_haystack_rgba(
     haystack: &RgbaImage,
     needle: &RgbaImage,
     opts: &MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     NCC.find(haystack, needle, opts)
 }
 
@@ -67,7 +69,7 @@ pub fn find_template_buffers(
     haystack: &RgbaImage,
     needle: &RgbaImage,
     opts: &MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     find_template_in_haystack_rgba(haystack, needle, opts)
 }
 
@@ -75,11 +77,11 @@ pub fn find_all_template_buffers(
     haystack: &RgbaImage,
     needle: &RgbaImage,
     opts: &MatchOptions,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     NCC.find_all(haystack, needle, opts)
 }
 
-pub fn find_template_from_bytes(needle_bytes: &[u8], opts: MatchOptions) -> Result<Region> {
+pub fn find_template_from_bytes(needle_bytes: &[u8], opts: MatchOptions) -> Result<MatchResult> {
     find_template_with_needle(Path::new(""), Some(needle_bytes), opts)
 }
 
@@ -87,24 +89,24 @@ pub fn find_template_with_needle(
     path: &Path,
     needle_bytes: Option<&[u8]>,
     opts: MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let (hay, offset_x, offset_y, local_opts) = capture_haystack_for_match(&opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
     let found = NCC.find(&hay, &needle, &local_opts)?;
-    Ok(translate_region(found, offset_x, offset_y))
+    Ok(translate_match_result(found, offset_x, offset_y))
 }
 
 pub fn find_all_templates_with_needle(
     path: &Path,
     needle_bytes: Option<&[u8]>,
     opts: MatchOptions,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     let (hay, offset_x, offset_y, local_opts) = capture_haystack_for_match(&opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
-    let regions = NCC.find_all(&hay, &needle, &local_opts)?;
-    Ok(regions
+    let matches = NCC.find_all(&hay, &needle, &local_opts)?;
+    Ok(matches
         .into_iter()
-        .map(|r| translate_region(r, offset_x, offset_y))
+        .map(|m| translate_match_result(m, offset_x, offset_y))
         .collect())
 }
 
@@ -114,7 +116,7 @@ pub fn wait_for_template_with_needle(
     timeout_ms: u64,
     opts: MatchOptions,
     interval_ms: Option<u64>,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
     let interval = Duration::from_millis(interval_ms.unwrap_or(200));
     loop {
@@ -137,7 +139,7 @@ pub fn wait_for_template_buffers(
     timeout_ms: u64,
     opts: MatchOptions,
     interval_ms: Option<u64>,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
     let interval = Duration::from_millis(interval_ms.unwrap_or(200));
     loop {
@@ -161,6 +163,11 @@ pub fn translate_region(mut region: Region, offset_x: i32, offset_y: i32) -> Reg
     region
 }
 
+pub fn translate_match_result(mut found: MatchResult, offset_x: i32, offset_y: i32) -> MatchResult {
+    found.region = translate_region(found.region, offset_x, offset_y);
+    found
+}
+
 fn intersect_region(a: Region, b: Region) -> Option<Region> {
     let left = a.left.max(b.left);
     let top = a.top.max(b.top);
@@ -179,11 +186,11 @@ fn intersect_region(a: Region, b: Region) -> Option<Region> {
     })
 }
 
-pub fn find_template(path: &Path, opts: MatchOptions) -> Result<Region> {
+pub fn find_template(path: &Path, opts: MatchOptions) -> Result<MatchResult> {
     find_template_with_needle(path, None, opts)
 }
 
-pub fn find_all_templates(path: &Path, opts: MatchOptions) -> Result<Vec<Region>> {
+pub fn find_all_templates(path: &Path, opts: MatchOptions) -> Result<Vec<MatchResult>> {
     find_all_templates_with_needle(path, None, opts)
 }
 
@@ -192,7 +199,7 @@ pub fn wait_for_template(
     timeout_ms: u64,
     opts: MatchOptions,
     interval_ms: Option<u64>,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
     let interval = Duration::from_millis(interval_ms.unwrap_or(200));
     loop {
@@ -239,7 +246,7 @@ pub fn find_template_in_window(
     window_id: WindowId,
     path: &Path,
     opts: MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     find_template_in_window_with_needle(window_id, path, None, opts)
 }
 
@@ -248,18 +255,18 @@ pub fn find_template_in_window_with_needle(
     path: &Path,
     needle_bytes: Option<&[u8]>,
     opts: MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let (hay, local_opts, ox, oy) = window_haystack_and_opts(window_id, opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
     let found = NCC.find(&hay, &needle, &local_opts)?;
-    Ok(translate_region(found, ox, oy))
+    Ok(translate_match_result(found, ox, oy))
 }
 
 pub fn find_all_templates_in_window(
     window_id: WindowId,
     path: &Path,
     opts: MatchOptions,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     find_all_templates_in_window_with_needle(window_id, path, None, opts)
 }
 
@@ -268,13 +275,13 @@ pub fn find_all_templates_in_window_with_needle(
     path: &Path,
     needle_bytes: Option<&[u8]>,
     opts: MatchOptions,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     let (hay, local_opts, ox, oy) = window_haystack_and_opts(window_id, opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
-    let regions = NCC.find_all(&hay, &needle, &local_opts)?;
-    Ok(regions
+    let matches = NCC.find_all(&hay, &needle, &local_opts)?;
+    Ok(matches
         .into_iter()
-        .map(|r| translate_region(r, ox, oy))
+        .map(|m| translate_match_result(m, ox, oy))
         .collect())
 }
 
@@ -336,9 +343,10 @@ mod tests {
         let mut opts = MatchOptions::default();
         opts.confidence = 0.5;
         let local = matcher.find(&hay, &needle, &opts).unwrap();
-        let global = translate_region(local, 100, 50);
-        assert_eq!(global.left, 108);
-        assert_eq!(global.top, 62);
+        let global = translate_match_result(local, 100, 50);
+        assert_eq!(global.region.left, 108);
+        assert_eq!(global.region.top, 62);
+        assert!(global.score >= opts.confidence);
     }
 
     #[test]
@@ -385,13 +393,16 @@ mod tests {
             width: 64,
             height: 64,
         });
-        let local = matcher.find_all(&hay, &needle, &opts).expect("find_all in hay");
+        let local = matcher
+            .find_all(&hay, &needle, &opts)
+            .expect("find_all in hay");
         assert_eq!(local.len(), 1);
-        assert_eq!(local[0].left, 20);
-        assert_eq!(local[0].top, 20);
-        let global = translate_region(local[0], 100, 50);
-        assert_eq!(global.left, 120);
-        assert_eq!(global.top, 70);
+        assert_eq!(local[0].region.left, 20);
+        assert_eq!(local[0].region.top, 20);
+        let global = translate_match_result(local[0], 100, 50);
+        assert_eq!(global.region.left, 120);
+        assert_eq!(global.region.top, 70);
+        assert!(global.score >= opts.confidence);
     }
 
     #[test]

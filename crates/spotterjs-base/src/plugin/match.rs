@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::types::{MatchOptions, Region, RgbaImage};
+use crate::types::{MatchOptions, MatchResult, RgbaImage};
 
 /// Template-matching backend (NCC; extensible via `MatchPlugin` trait).
 pub trait MatchPlugin: Send + Sync {
@@ -10,12 +10,12 @@ pub trait MatchPlugin: Send + Sync {
         haystack: &RgbaImage,
         needle: &RgbaImage,
         opts: &MatchOptions,
-    ) -> Result<Region>;
+    ) -> Result<MatchResult>;
 
     fn find_all(
         &self,
         haystack: &RgbaImage,
         needle: &RgbaImage,
         opts: &MatchOptions,
-    ) -> Result<Vec<Region>>;
+    ) -> Result<Vec<MatchResult>>;
 }

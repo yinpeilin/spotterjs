@@ -1,6 +1,6 @@
 //! Single-scale normalized cross-correlation (TM_CCOEFF_NORMED equivalent).
 
-use spotterjs_base::{MatchOptions, Region, Result, RgbaImage, SpotterError};
+use spotterjs_base::{MatchOptions, MatchResult, Region, Result, RgbaImage, SpotterError};
 
 use crate::integral::IntegralImage;
 
@@ -69,13 +69,7 @@ fn score_from_dot(dot: f64, norm_h: f64, norm_n: f64, mean_h: f64, mean_n: f64) 
     dot / denom
 }
 
-fn dot_window(
-    hay: &[f32],
-    hay_w: u32,
-    needle: &PreparedNeedle,
-    ox: u32,
-    oy: u32,
-) -> f64 {
+fn dot_window(hay: &[f32], hay_w: u32, needle: &PreparedNeedle, ox: u32, oy: u32) -> f64 {
     let nw = needle.nw;
     let nh = needle.nh;
     let mut dot = 0.0f64;
@@ -118,8 +112,7 @@ fn slide_dot_horizontal(
         delta -= h_row[0] as f64 * n_row[0] as f64;
         if nw_u > 1 {
             for i in 0..nw_u - 1 {
-                delta += h_row[1 + i] as f64
-                    * (n_row[i] as f64 - n_row[i + 1] as f64);
+                delta += h_row[1 + i] as f64 * (n_row[i] as f64 - n_row[i + 1] as f64);
             }
         }
     }
@@ -135,8 +128,7 @@ fn ncc_at_prepared(
     oy: u32,
 ) -> f64 {
     let n = n_pixels(needle.nw, needle.nh);
-    let (sum_h, sum_sq_h) =
-        integral.rect_stats(ox, oy, ox + needle.nw, oy + needle.nh);
+    let (sum_h, sum_sq_h) = integral.rect_stats(ox, oy, ox + needle.nw, oy + needle.nh);
     let mean_h = sum_h / n;
     let norm_h = norm_h_from_stats(sum_h, sum_sq_h, n);
     let dot = dot_window(hay, hay_w, needle, ox, oy);
@@ -145,18 +137,18 @@ fn ncc_at_prepared(
 
 /// Reference NCC at one position (used by unit tests).
 #[cfg(test)]
-pub fn ncc_at(
-    hay: &[f32],
-    hay_w: u32,
-    needle: &PreparedNeedle,
-    ox: u32,
-    oy: u32,
-) -> f64 {
+pub fn ncc_at(hay: &[f32], hay_w: u32, needle: &PreparedNeedle, ox: u32, oy: u32) -> f64 {
     let integral = IntegralImage::from_gray(hay, hay_w, hay.len() as u32 / hay_w);
     ncc_at_prepared(hay, hay_w, &integral, needle, ox, oy)
 }
 
-pub fn search_bounds(hay_w: u32, hay_h: u32, _nw: u32, _nh: u32, opts: &MatchOptions) -> (u32, u32, u32, u32) {
+pub fn search_bounds(
+    hay_w: u32,
+    hay_h: u32,
+    _nw: u32,
+    _nh: u32,
+    opts: &MatchOptions,
+) -> (u32, u32, u32, u32) {
     let search = opts.search_region.unwrap_or(Region {
         left: 0,
         top: 0,
@@ -186,8 +178,7 @@ pub(crate) fn scan_row_best_from_dot(
     let mut best_x = x0;
 
     for ox in x0..=ox_end {
-        let (sum_h, sum_sq_h) =
-            integral.rect_stats(ox, oy, ox + needle.nw, oy + needle.nh);
+        let (sum_h, sum_sq_h) = integral.rect_stats(ox, oy, ox + needle.nw, oy + needle.nh);
         let mean_h = sum_h / n;
         let norm_h = norm_h_from_stats(sum_h, sum_sq_h, n);
         let s = score_from_dot(dot, norm_h, needle.norm, mean_h, needle.mean);
@@ -344,11 +335,11 @@ fn push_top_k(top: &mut Vec<(Region, f64)>, k: usize, region: Region, score: f64
         top.push((region, score));
         return;
     }
-    if let Some((min_idx, _)) = top
-        .iter()
-        .enumerate()
-        .min_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap_or(std::cmp::Ordering::Equal))
-    {
+    if let Some((min_idx, _)) = top.iter().enumerate().min_by(|a, b| {
+        a.1 .1
+            .partial_cmp(&b.1 .1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }) {
         if score > top[min_idx].1 {
             top[min_idx] = (region, score);
         }
@@ -380,8 +371,7 @@ pub(crate) fn find_top_k(
     for oy in y0..=(y1 - needle.nh) {
         let mut dot = dot_window(hay, hay_w, needle, x0, oy);
         for ox in x0..=ox_end {
-            let (sum_h, sum_sq_h) =
-                integral.rect_stats(ox, oy, ox + needle.nw, oy + needle.nh);
+            let (sum_h, sum_sq_h) = integral.rect_stats(ox, oy, ox + needle.nw, oy + needle.nh);
             let mean_h = sum_h / n;
             let norm_h = norm_h_from_stats(sum_h, sum_sq_h, n);
             let s = score_from_dot(dot, norm_h, needle.norm, mean_h, needle.mean);
@@ -412,16 +402,24 @@ pub fn find_single(
     needle: &PreparedNeedle,
     opts: &MatchOptions,
     blocked: Option<&[bool]>,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     let active_blocked = blocked.filter(|mask| mask.iter().any(|&b| b));
-    find_best(haystack, hay, needle, opts, active_blocked).map(|(r, _)| r)
+    find_best(haystack, hay, needle, opts, active_blocked)
+        .map(|(region, score)| MatchResult::new(region, score))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn needle_from_patch(hay: &[f32], hay_w: u32, px: u32, py: u32, nw: u32, nh: u32) -> PreparedNeedle {
+    fn needle_from_patch(
+        hay: &[f32],
+        hay_w: u32,
+        px: u32,
+        py: u32,
+        nw: u32,
+        nh: u32,
+    ) -> PreparedNeedle {
         let mut gray = Vec::with_capacity((nw * nh) as usize);
         for ty in 0..nh {
             for tx in 0..nw {

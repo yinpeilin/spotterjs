@@ -23,6 +23,29 @@ export interface Point {
 }
 
 /**
+ * 模板图片输入。
+ *
+ * - `string` 始终表示图片文件路径
+ * - `Buffer` 始终表示已编码的图片字节（PNG/JPEG/WebP），不表示 raw RGBA
+ */
+export type TemplateImage = string | Buffer;
+
+/**
+ * 一次模板匹配结果。
+ *
+ * 高层 API 返回的 `region` 与 `center` 均为屏幕绝对坐标；它们不相对
+ * `searchRegion`，也不相对窗口。
+ */
+export interface MatchResult {
+  /** 匹配框（屏幕坐标） */
+  region: Region;
+  /** 匹配框中心点（屏幕坐标） */
+  center: Point;
+  /** NCC 匹配分数 */
+  score: number;
+}
+
+/**
  * RGBA 原始像素截图。
  *
  * - `data` 为行优先排列的 RGBA 字节（每像素 4 字节，无 stride padding）
@@ -112,20 +135,20 @@ export interface MatchProvider {
    * 在全屏（或 `searchRegion`）中查找第一个匹配。
    * @throws 未找到时 native 层抛出错误
    */
-  find(needle: string | Buffer, options?: MatchOptions): Promise<Region>;
+  find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult>;
   /** 查找所有匹配（按 native 去重/排序规则返回） */
-  findAll(needle: string | Buffer, options?: MatchOptions): Promise<Region[]>;
+  findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]>;
   /**
    * 轮询等待模板出现。
    * @param timeoutMs 超时毫秒数，超时则抛错
    * @param intervalMs 轮询间隔，默认由 native 层决定
    */
   waitFor(
-    needle: string | Buffer,
+    needle: TemplateImage,
     timeoutMs: number,
     options?: MatchOptions,
     intervalMs?: number
-  ): Promise<Region>;
+  ): Promise<MatchResult>;
 }
 
 /**

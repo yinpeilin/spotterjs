@@ -25,11 +25,9 @@ pub fn rgba_to_gray(img: &RgbaImage) -> Result<Vec<f32>> {
 
     #[cfg(feature = "parallel")]
     if w * h >= 512 * 512 {
-        gray.par_chunks_mut(w)
-            .enumerate()
-            .for_each(|(y, row)| {
-                rgba_row_to_gray(&img.data[y * row_bytes..(y + 1) * row_bytes], row);
-            });
+        gray.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
+            rgba_row_to_gray(&img.data[y * row_bytes..(y + 1) * row_bytes], row);
+        });
         return Ok(gray);
     }
 
@@ -78,8 +76,9 @@ fn gray_chunk_8(src: &[u8], dst: &mut [f32]) {
     }
     for p in 0..8 {
         let s = p * 4;
-        dst[p] = (src[s] as i32 * LUMA_RI + src[s + 1] as i32 * LUMA_GI + src[s + 2] as i32 * LUMA_BI)
-            as f32
+        dst[p] = (src[s] as i32 * LUMA_RI
+            + src[s + 1] as i32 * LUMA_GI
+            + src[s + 2] as i32 * LUMA_BI) as f32
             * LUMA_SCALE;
     }
 }

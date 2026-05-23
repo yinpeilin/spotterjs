@@ -1,6 +1,6 @@
 //! Coarse-to-fine pyramid search for single-scale `find`.
 
-use spotterjs_base::{MatchOptions, Region, Result, RgbaImage};
+use spotterjs_base::{MatchOptions, MatchResult, Region, Result, RgbaImage};
 
 use crate::gray::resize_gray;
 use crate::ncc::{find_best, find_single, find_top_k, prepare_needle, PreparedNeedle};
@@ -20,14 +20,7 @@ fn dims_haystack(w: u32, h: u32) -> RgbaImage {
     }
 }
 
-fn refine_roi(
-    hay_w: i32,
-    hay_h: i32,
-    cx: i32,
-    cy: i32,
-    nw: i32,
-    nh: i32,
-) -> Region {
+fn refine_roi(hay_w: i32, hay_h: i32, cx: i32, cy: i32, nw: i32, nh: i32) -> Region {
     let margin_x = ROI_PAD_MULT as i32 * nw;
     let margin_y = ROI_PAD_MULT as i32 * nh;
     let left = (cx - margin_x).max(0);
@@ -49,7 +42,11 @@ fn region_center(region: &Region) -> (i32, i32) {
     )
 }
 
-pub fn should_use_pyramid(haystack: &RgbaImage, prepared: &PreparedNeedle, opts: &MatchOptions) -> bool {
+pub fn should_use_pyramid(
+    haystack: &RgbaImage,
+    prepared: &PreparedNeedle,
+    opts: &MatchOptions,
+) -> bool {
     !opts.multi_scale
         && opts.search_region.is_none()
         && haystack.width >= PYRAMID_MIN_HAY_DIM
@@ -65,7 +62,7 @@ pub fn find_single_pyramid(
     hay_gray: &[f32],
     prepared: &PreparedNeedle,
     opts: &MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     if !should_use_pyramid(haystack, prepared, opts) {
         return find_single(haystack, hay_gray, prepared, opts, None);
     }
@@ -136,9 +133,7 @@ pub fn find_single_pyramid(
         let mut fine_opts = *opts;
         fine_opts.search_region = Some(roi);
         if let Ok((region, score)) = find_best(haystack, hay_gray, prepared, &fine_opts, None) {
-            if score >= opts.confidence
-                && best.as_ref().map(|(_, s)| score > *s).unwrap_or(true)
-            {
+            if score >= opts.confidence && best.as_ref().map(|(_, s)| score > *s).unwrap_or(true) {
                 best = Some((region, score));
             }
         }
@@ -151,11 +146,11 @@ pub fn find_single_pyramid(
                     find_best(haystack, hay_gray, prepared, opts, None)
                 {
                     if full_score > score {
-                        return Ok(full_region);
+                        return Ok(MatchResult::new(full_region, full_score));
                     }
                 }
             }
-            return Ok(region);
+            return Ok(MatchResult::new(region, score));
         }
     }
 
@@ -165,15 +160,19 @@ pub fn find_single_pyramid(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use spotterjs_base::MatchPlugin;
     use crate::NccMatcher;
+    use spotterjs_base::MatchPlugin;
 
     fn solid(w: u32, h: u32, fill: [u8; 3]) -> RgbaImage {
         let mut data = Vec::with_capacity((w * h * 4) as usize);
         for _ in 0..(w * h) {
             data.extend_from_slice(&[fill[0], fill[1], fill[2], 255]);
         }
-        RgbaImage { width: w, height: h, data }
+        RgbaImage {
+            width: w,
+            height: h,
+            data,
+        }
     }
 
     fn paint(hay: &mut RgbaImage, px: u32, py: u32, pw: u32, ph: u32, patch: [u8; 3]) {
@@ -213,7 +212,7 @@ mod tests {
         let matcher = NccMatcher;
         let found = matcher.find(&hay, &needle, &opts).expect("pyramid find");
         assert!(
-            (found.left - 1200).abs() <= 4 && (found.top - 700).abs() <= 4,
+            (found.region.left - 1200).abs() <= 4 && (found.region.top - 700).abs() <= 4,
             "found={found:?}"
         );
     }

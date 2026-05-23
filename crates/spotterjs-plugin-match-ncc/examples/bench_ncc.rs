@@ -3,14 +3,19 @@
 //! Usage: cargo run -p spotterjs-plugin-match-ncc --release --example bench_ncc -- HAY NEEDLE
 
 use spotterjs_base::MatchOptions;
+use spotterjs_base::MatchPlugin;
 use spotterjs_core::load_rgba_from_path;
 use spotterjs_plugin_match_ncc::NccMatcher;
-use spotterjs_base::MatchPlugin;
 use std::env;
 use std::path::Path;
 use std::time::Instant;
 
-fn bench(label: &str, hay: &spotterjs_base::RgbaImage, needle: &spotterjs_base::RgbaImage, opts: MatchOptions) {
+fn bench(
+    label: &str,
+    hay: &spotterjs_base::RgbaImage,
+    needle: &spotterjs_base::RgbaImage,
+    opts: MatchOptions,
+) {
     let matcher = NccMatcher;
     let t0 = Instant::now();
     let _ = matcher.find(hay, needle, &opts).expect(label);

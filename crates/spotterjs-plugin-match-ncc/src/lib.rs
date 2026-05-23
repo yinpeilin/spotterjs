@@ -9,15 +9,12 @@ mod pyramid;
 mod simd;
 mod util;
 
-use spotterjs_base::{
-    MatchOptions, MatchPlugin, Region, Result, RgbaImage,
-};
+use spotterjs_base::{MatchOptions, MatchPlugin, MatchResult, Result, RgbaImage};
 
 pub use gray::rgba_to_gray;
 pub use multiscale::{find_all_with_multiscale, find_with_multiscale};
 pub use ncc::{
-    check_template_size, find_best, find_best_serial, find_single, prepare_needle,
-    MAX_TEMPLATE_DIM,
+    check_template_size, find_best, find_best_serial, find_single, prepare_needle, MAX_TEMPLATE_DIM,
 };
 
 pub struct NccMatcher;
@@ -33,7 +30,12 @@ impl MatchPlugin for NccMatcher {
         "ncc"
     }
 
-    fn find(&self, haystack: &RgbaImage, needle: &RgbaImage, opts: &MatchOptions) -> Result<Region> {
+    fn find(
+        &self,
+        haystack: &RgbaImage,
+        needle: &RgbaImage,
+        opts: &MatchOptions,
+    ) -> Result<MatchResult> {
         find_with_multiscale(haystack, needle, opts)
     }
 
@@ -42,7 +44,7 @@ impl MatchPlugin for NccMatcher {
         haystack: &RgbaImage,
         needle: &RgbaImage,
         opts: &MatchOptions,
-    ) -> Result<Vec<Region>> {
+    ) -> Result<Vec<MatchResult>> {
         find_all_with_multiscale(haystack, needle, opts)
     }
 }

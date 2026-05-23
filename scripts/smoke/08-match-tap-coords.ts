@@ -116,7 +116,7 @@ export async function run(): Promise<void> {
   );
 
   const native = loadNative();
-  const local = native.findTemplateBuffers(
+  const localMatch = native.findTemplateBuffers(
     { data: hayData, width: cap.width, height: cap.height },
     { data: needleData, width: PATCH_W, height: PATCH_H },
     {
@@ -129,8 +129,12 @@ export async function run(): Promise<void> {
       },
     }
   );
+  const local = localMatch.region;
+  if (!Number.isFinite(localMatch.score)) {
+    throw new Error(`findTemplateBuffers returned invalid score: ${localMatch.score}`);
+  }
 
-  info(`matched window-local (${local.left},${local.top}) ${local.width}x${local.height}`);
+  info(`matched window-local (${local.left},${local.top}) ${local.width}x${local.height} score=${localMatch.score.toFixed(4)}`);
 
   const screenRegion = {
     left: fx + local.left,

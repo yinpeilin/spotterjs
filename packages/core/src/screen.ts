@@ -1,8 +1,15 @@
-import { centerOf, type CaptureImage, type MatchOptions, type Region } from "@spotterjs/base";
+import {
+  type CaptureImage,
+  type MatchOptions,
+  type MatchResult,
+  type Region,
+  type TemplateImage,
+} from "@spotterjs/base";
 import {
   captureForMatch,
   findAllNeedle,
   findNeedle,
+  toMatchResult,
   toNativeOpts,
   waitForNeedle,
 } from "./match";
@@ -17,9 +24,8 @@ import { loadNative } from "./native";
  *
  * @example
  * ```ts
- * const region = await screen.find("./button.png", { confidence: 0.9 });
- * const { x, y } = centerOf(region);
- * mouse.tap(x, y);
+ * const match = await screen.find("./button.png", { confidence: 0.9 });
+ * mouse.tap(match.center.x, match.center.y);
  * ```
  */
 export const screen = {
@@ -68,14 +74,14 @@ export const screen = {
    * @returns 匹配到的屏幕区域
    * @throws 未找到模板时抛错
    */
-  tapTemplate(needle: string | Buffer, options?: MatchOptions): Region {
+  tapTemplate(needle: TemplateImage, options?: MatchOptions): MatchResult {
     const native = loadNative();
     const path = typeof needle === "string" ? needle : "";
     const buffer = typeof needle === "string" ? undefined : needle;
-    const region = native.findTemplate(path, buffer, toNativeOpts(options));
-    const { x, y } = centerOf(region);
+    const match = toMatchResult(native.findTemplate(path, buffer, toNativeOpts(options)));
+    const { x, y } = match.center;
     native.tapAt(x, y);
-    return region;
+    return match;
   },
 
   /**
@@ -84,7 +90,7 @@ export const screen = {
    * 内部每次调用会重新截屏再匹配。
    * @throws 未找到时抛错
    */
-  find(needle: string | Buffer, options?: MatchOptions): Promise<Region> {
+  find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
     return findNeedle(needle, options);
   },
 
@@ -93,7 +99,7 @@ export const screen = {
    *
    * 结果顺序与 native 层去重策略一致。
    */
-  findAll(needle: string | Buffer, options?: MatchOptions): Promise<Region[]> {
+  findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]> {
     return findAllNeedle(needle, options);
   },
 
@@ -104,11 +110,11 @@ export const screen = {
    * @param intervalMs 两次尝试间隔；省略则用 native 默认值
    */
   waitFor(
-    needle: string | Buffer,
+    needle: TemplateImage,
     timeoutMs: number,
     options?: MatchOptions,
     intervalMs?: number
-  ): Promise<Region> {
+  ): Promise<MatchResult> {
     return waitForNeedle(needle, timeoutMs, options, intervalMs);
   },
 };

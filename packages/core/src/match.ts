@@ -1,4 +1,11 @@
-import type { CaptureImage, MatchOptions, Region } from "@spotterjs/base";
+import {
+  centerOf,
+  type CaptureImage,
+  type MatchOptions,
+  type MatchResult,
+  type Region,
+  type TemplateImage,
+} from "@spotterjs/base";
 
 import { loadNative } from "./native";
 
@@ -16,7 +23,12 @@ export function toNativeOpts(opts?: MatchOptions) {
   };
 }
 
-function needleArgs(needle: string | Buffer): { path: string; buffer?: Buffer } {
+type NativeMatchResult = {
+  region: Region;
+  score: number;
+};
+
+function needleArgs(needle: TemplateImage): { path: string; buffer?: Buffer } {
   if (typeof needle === "string") {
     return { path: needle };
   }
@@ -24,17 +36,25 @@ function needleArgs(needle: string | Buffer): { path: string; buffer?: Buffer } 
   return { path: "", buffer: needle };
 }
 
+export function toMatchResult(native: NativeMatchResult): MatchResult {
+  return {
+    region: native.region,
+    center: centerOf(native.region),
+    score: native.score,
+  };
+}
+
 /**
  * 全屏模板匹配（单次截屏 + NCC）。
  * @internal 供 `screen` 模块使用；一般请用 `screen.find`。
  */
 export async function findNeedle(
-  needle: string | Buffer,
+  needle: TemplateImage,
   options?: MatchOptions
-): Promise<Region> {
+): Promise<MatchResult> {
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
-  return native.findTemplate(path, buffer, toNativeOpts(options));
+  return toMatchResult(native.findTemplate(path, buffer, toNativeOpts(options)));
 }
 
 /**
@@ -42,12 +62,14 @@ export async function findNeedle(
  * @internal 供 `screen` 模块使用；一般请用 `screen.findAll`。
  */
 export async function findAllNeedle(
-  needle: string | Buffer,
+  needle: TemplateImage,
   options?: MatchOptions
-): Promise<Region[]> {
+): Promise<MatchResult[]> {
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
-  return native.findAllTemplates(path, buffer, toNativeOpts(options));
+  return native
+    .findAllTemplates(path, buffer, toNativeOpts(options))
+    .map(toMatchResult);
 }
 
 /**
@@ -55,19 +77,15 @@ export async function findAllNeedle(
  * @internal 供 `screen` 模块使用；一般请用 `screen.waitFor`。
  */
 export async function waitForNeedle(
-  needle: string | Buffer,
+  needle: TemplateImage,
   timeoutMs: number,
   options?: MatchOptions,
   intervalMs?: number
-): Promise<Region> {
+): Promise<MatchResult> {
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
-  return native.waitForTemplate(
-    path,
-    buffer,
-    timeoutMs,
-    toNativeOpts(options),
-    intervalMs
+  return toMatchResult(
+    native.waitForTemplate(path, buffer, timeoutMs, toNativeOpts(options), intervalMs)
   );
 }
 

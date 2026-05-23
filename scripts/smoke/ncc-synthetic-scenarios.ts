@@ -420,10 +420,11 @@ export async function run(): Promise<void> {
 
   let passed = 0;
   for (const sc of scenarios) {
-    const found = native.findTemplateBuffers(sc.hay, sc.needle, {
+    const match = native.findTemplateBuffers(sc.hay, sc.needle, {
       confidence: CONFIDENCE,
       ...(sc.opts ?? {}),
     });
+    const found = match.region;
     assertNear(sc.name, found, sc.expected, sc.tol);
     writeDebugOverlay(sc, found);
     info(`✓ ${sc.name} → (${found.left},${found.top})`);
@@ -431,11 +432,12 @@ export async function run(): Promise<void> {
   }
 
   const disk = scenarios[0];
-  const foundDisk = native.findTemplateBuffers(
+  const matchDisk = native.findTemplateBuffers(
     native.loadImageFromPath(path.join(FIXTURES, disk.name, "haystack.png")),
     native.loadImageFromPath(path.join(FIXTURES, disk.name, "needle.png")),
     { confidence: CONFIDENCE }
   );
+  const foundDisk = matchDisk.region;
   assertNear(`${disk.name}_png_disk`, foundDisk, disk.expected, disk.tol);
   info(`✓ ${disk.name}_png_disk (loadImageFromPath)`);
   passed++;

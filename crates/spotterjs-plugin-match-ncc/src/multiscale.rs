@@ -1,9 +1,9 @@
-use spotterjs_base::{MatchOptions, Region, Result, RgbaImage, SpotterError};
+use spotterjs_base::{MatchOptions, MatchResult, Region, Result, RgbaImage, SpotterError};
 
 use crate::gray::{resize_gray, rgba_to_gray, scaled_dims};
 use crate::ncc::{find_best, find_single, prepare_needle};
 use crate::pyramid::find_single_pyramid;
-use crate::util::{dedupe_regions, regions_overlap};
+use crate::util::regions_overlap;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -36,7 +36,8 @@ fn try_scale_match(ctx: &ScaleContext<'_>, scale: f64) -> Option<(Region, f64)> 
     let mut local_opts = *ctx.opts;
     local_opts.multi_scale = false;
     let prepared = prepare_needle(needle_gray, nw, nh);
-    let (region, score) = find_best(ctx.haystack, ctx.hay_gray, &prepared, &local_opts, None).ok()?;
+    let (region, score) =
+        find_best(ctx.haystack, ctx.hay_gray, &prepared, &local_opts, None).ok()?;
     if score >= ctx.opts.confidence {
         Some((region, score))
     } else {
@@ -44,12 +45,25 @@ fn try_scale_match(ctx: &ScaleContext<'_>, scale: f64) -> Option<(Region, f64)> 
     }
 }
 
+fn dedupe_match_results(matches: Vec<MatchResult>) -> Vec<MatchResult> {
+    let mut out: Vec<MatchResult> = Vec::new();
+    for found in matches {
+        if !out
+            .iter()
+            .any(|m| regions_overlap(&m.region, &found.region))
+        {
+            out.push(found);
+        }
+    }
+    out
+}
+
 pub fn find_multi_scale(
     haystack: &RgbaImage,
     needle: &RgbaImage,
     opts: &MatchOptions,
     collect_all: bool,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     let hay_gray = rgba_to_gray(haystack)?;
     let needle_gray = rgba_to_gray(needle)?;
     let scales = scale_list(opts);
@@ -75,7 +89,7 @@ pub fn find_multi_scale(
                 confidence: opts.confidence,
             });
         }
-        return Ok(dedupe_regions(all));
+        return Ok(dedupe_match_results(all));
     }
 
     let ctx = ScaleContext {
@@ -107,7 +121,7 @@ pub fn find_multi_scale(
             confidence: opts.confidence,
         });
     }
-    Ok(vec![region])
+    Ok(vec![MatchResult::new(region, score)])
 }
 
 fn find_all_single_scale(
@@ -117,7 +131,7 @@ fn find_all_single_scale(
     nw: u32,
     nh: u32,
     opts: &MatchOptions,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     let prepared = prepare_needle(needle_gray, nw, nh);
     let mut blocked = vec![false; hay_gray.len()];
     let mut local_opts = *opts;
@@ -130,15 +144,16 @@ fn find_all_single_scale(
         });
     }
 
-    let mut all = Vec::new();
+    let mut all: Vec<MatchResult> = Vec::new();
     for _ in 0..10 {
         match find_single(haystack, hay_gray, &prepared, &local_opts, Some(&blocked)) {
-            Ok(region) => {
-                if all.iter().any(|r| regions_overlap(r, &region)) {
+            Ok(found) => {
+                let region = found.region;
+                if all.iter().any(|m| regions_overlap(&m.region, &region)) {
                     break;
                 }
                 crate::util::mark_region_blocked(&mut blocked, haystack.width, &region);
-                all.push(region);
+                all.push(found);
             }
             Err(SpotterError::MatchNotFound { .. }) => break,
             Err(e) => return Err(e),
@@ -151,7 +166,7 @@ pub fn find_with_multiscale(
     haystack: &RgbaImage,
     needle: &RgbaImage,
     opts: &MatchOptions,
-) -> Result<Region> {
+) -> Result<MatchResult> {
     if opts.multi_scale {
         find_multi_scale(haystack, needle, opts, false)?
             .into_iter()
@@ -171,7 +186,7 @@ pub fn find_all_with_multiscale(
     haystack: &RgbaImage,
     needle: &RgbaImage,
     opts: &MatchOptions,
-) -> Result<Vec<Region>> {
+) -> Result<Vec<MatchResult>> {
     if opts.multi_scale {
         find_multi_scale(haystack, needle, opts, true)
     } else {
