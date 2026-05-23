@@ -4,10 +4,22 @@ import { configureHost } from "@spotterjs/core";
 import { registerDesktopTools } from "./tools/desktop.js";
 import { registerHostTools } from "./tools/host.js";
 
+export async function registerOptionalAndroidTools(
+  server: McpServer,
+  enabled: boolean
+): Promise<void> {
+  if (!enabled) return;
+  const { registerAndroidTools } = await import("./tools/android.js");
+  registerAndroidTools(server);
+}
+
 export async function runSpotterMcp(): Promise<void> {
   const a11yEnabled =
     process.env.SPOTTERJS_A11Y === "1" ||
     process.env.SPOTTERJS_A11Y?.toLowerCase() === "true";
+  const androidEnabled =
+    process.env.SPOTTERJS_ANDROID_ADB === "1" ||
+    process.env.SPOTTERJS_ANDROID_ADB?.toLowerCase() === "true";
 
   if (process.env.SPOTTERJS_WORKSPACE_ROOT) {
     configureHost({
@@ -25,6 +37,7 @@ export async function runSpotterMcp(): Promise<void> {
 
   registerHostTools(server);
   registerDesktopTools(server, a11yEnabled);
+  await registerOptionalAndroidTools(server, androidEnabled);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

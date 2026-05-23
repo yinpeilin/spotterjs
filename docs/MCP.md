@@ -44,6 +44,7 @@ npm run build -w @spotterjs/mcp
 | `SPOTTERJS_EXEC_TIMEOUT_MS` | `60000` | Shell command timeout |
 | `SPOTTERJS_SHELL` | *(auto)* | Override shell executable |
 | `SPOTTERJS_A11Y` | off | Set to `1` to register accessibility tools |
+| `SPOTTERJS_ANDROID_ADB` | off | Set to `1` to register Android ADB tools |
 
 ### Shell platform policy
 
@@ -74,6 +75,41 @@ Use `host_shell_info` to query the active shell and syntax hint.
 | `desktop_clipboard_get` / `desktop_clipboard_set` | Clipboard |
 | `desktop_find_template` | Template match on screen |
 
+`desktop_find_template` accepts either a template file path or encoded image bytes:
+
+```json
+{
+  "image": { "path": "C:/path/to/button.png" },
+  "confidence": 0.9,
+  "searchRegion": { "left": 100, "top": 50, "width": 800, "height": 600 },
+  "multiScale": true,
+  "all": true
+}
+```
+
+For in-memory templates, use:
+
+```json
+{
+  "image": { "base64": "<png/jpeg/webp base64>", "mimeType": "image/png" }
+}
+```
+
+The response is JSON text shaped as:
+
+```json
+{
+  "matches": [
+    {
+      "region": { "left": 100, "top": 50, "width": 32, "height": 16 },
+      "center": { "x": 116, "y": 58 },
+      "score": 0.97
+    }
+  ],
+  "coordinateSpace": "screen"
+}
+```
+
 With `SPOTTERJS_A11Y=1`:
 
 | Tool | Description |
@@ -84,6 +120,26 @@ With `SPOTTERJS_A11Y=1`:
 | `desktop_a11y_tap_element` | Click element center |
 | `desktop_a11y_dump_tree` | Dump accessibility tree (`treeView`: auto/raw/control/content) |
 | `desktop_a11y_element_info` | Single element metadata (patterns, runtimeId, etc.) |
+
+### Android (`android_*`)
+
+Enable with `SPOTTERJS_ANDROID_ADB=1`. `adb` must be installed on `PATH` unless
+the tool call provides `adbPath`. Every device operation requires `serial`.
+
+| Tool | Description |
+|------|-------------|
+| `android_list_devices` | Devices from `adb devices -l` |
+| `android_connect_tcp` | Run `adb connect host:port` |
+| `android_capture_screen` | Capture device screen as PNG base64 |
+| `android_tap` / `android_swipe` | Touch input |
+| `android_type_text` | Type text through `adb shell input text` |
+| `android_keyevent` / `android_back` / `android_home` | Android key events |
+| `android_start_app` / `android_stop_app` | Start or force-stop packages |
+| `android_find_template` | Template match on a device screenshot |
+
+`android_find_template` accepts the same `{ "path": "..." }` or base64 image
+input shape as `desktop_find_template`, and returns matches in
+`android-device` coordinate space.
 
 ### Host (`host_*`)
 

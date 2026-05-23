@@ -22,15 +22,26 @@
     "scripts":  {
                     "build":  "tsc",
                     "start":  "node dist/cli.js",
-                    "prepublishOnly":  "npm run build \u0026\u0026 node ../../scripts/sync-license.mjs"
+                    "prepublishOnly":  "npm run build \u0026\u0026 node ../../scripts/sync-license.mjs",
+                    "test":  "vitest run"
                 },
     "dependencies":  {
                          "@modelcontextprotocol/sdk":  "^1.12.0",
                          "@spotterjs/core":  "0.1.0",
                          "zod":  "^3.24.0"
                      },
+    "peerDependencies":  {
+                             "@spotterjs/plugin-android-adb":  "0.1.0"
+                         },
+    "peerDependenciesMeta":  {
+                                 "@spotterjs/plugin-android-adb":  {
+                                                                      "optional":  true
+                                                                  }
+                             },
     "devDependencies":  {
+                            "@spotterjs/plugin-android-adb":  "0.1.0",
                             "@types/node":  "^22.0.0",
-                            "typescript":  "^5.4.0"
+                            "typescript":  "^5.4.0",
+                            "vitest":  "^3.0.0"
                         }
 }

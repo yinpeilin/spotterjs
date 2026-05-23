@@ -26,6 +26,28 @@ const regionSchema = z
   })
   .optional();
 
+const matchOptionsSchema = {
+  confidence: z.number().optional(),
+  searchRegion: regionSchema,
+  multiScale: z.boolean().optional(),
+  scaleMin: z.number().optional(),
+  scaleMax: z.number().optional(),
+  scaleStep: z.number().optional(),
+};
+
+const templateImageSchema = z.union([
+  z.object({ path: z.string() }),
+  z.object({
+    base64: z.string(),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).optional(),
+  }),
+]);
+
+function decodeTemplateImage(image: z.infer<typeof templateImageSchema>): string | Buffer {
+  if ("path" in image) return image.path;
+  return Buffer.from(image.base64, "base64");
+}
+
 export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): void {
   server.registerTool(
     "desktop_list_windows",
@@ -189,13 +211,28 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_find_template",
     {
       inputSchema: z.object({
-        path: z.string(),
-        confidence: z.number().optional(),
+        image: templateImageSchema,
+        ...matchOptionsSchema,
+        all: z.boolean().optional(),
       }),
     },
-    async ({ path, confidence }) => {
-      const region = await screen.find(path, { confidence });
-      return { content: [{ type: "text", text: JSON.stringify(region, null, 2) }] };
+    async ({ image, all, ...options }) => {
+      const needle = decodeTemplateImage(image);
+      const matches = all
+        ? await screen.findAll(needle, options)
+        : [await screen.find(needle, options)];
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              { matches, coordinateSpace: "screen" },
+              null,
+              2
+            ),
+          },
+        ],
+      };
     }
   );
 
