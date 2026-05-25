@@ -78,15 +78,17 @@ impl LinuxX11Platform {
     }
 
     fn client_windows(&self) -> Result<Vec<Window>> {
-        let prop = self.conn.get_property(
-            false,
-            self.root,
-            self.intern_atom("_NET_CLIENT_LIST"),
-            AtomEnum::WINDOW,
-            0,
-            1024,
-        )
-        .map_err(|e| Self::x11_error("get _NET_CLIENT_LIST", e))?;
+        let prop = self
+            .conn
+            .get_property(
+                false,
+                self.root,
+                self.intern_atom("_NET_CLIENT_LIST"),
+                AtomEnum::WINDOW,
+                0,
+                1024,
+            )
+            .map_err(|e| Self::x11_error("get _NET_CLIENT_LIST", e))?;
         let reply = prop
             .reply()
             .map_err(|e| Self::x11_error("reply _NET_CLIENT_LIST", e))?;
@@ -286,15 +288,17 @@ impl PlatformWindow for LinuxX11Platform {
     }
 
     fn active_window(&self) -> Result<WindowInfo> {
-        let prop = self.conn.get_property(
-            false,
-            self.root,
-            self.intern_atom("_NET_ACTIVE_WINDOW"),
-            AtomEnum::WINDOW,
-            0,
-            1,
-        )
-        .map_err(|e| Self::x11_error("get _NET_ACTIVE_WINDOW", e))?;
+        let prop = self
+            .conn
+            .get_property(
+                false,
+                self.root,
+                self.intern_atom("_NET_ACTIVE_WINDOW"),
+                AtomEnum::WINDOW,
+                0,
+                1,
+            )
+            .map_err(|e| Self::x11_error("get _NET_ACTIVE_WINDOW", e))?;
         let reply = prop
             .reply()
             .map_err(|e| Self::x11_error("reply _NET_ACTIVE_WINDOW", e))?;
@@ -316,10 +320,12 @@ impl PlatformWindow for LinuxX11Platform {
     fn focus_window(&self, id: WindowId) -> Result<()> {
         let window = Self::xid(id);
         for attempt in 0..3 {
-            let event =
-                ClientMessageEvent::new(32, window, self.intern_atom("_NET_ACTIVE_WINDOW"), [
-                    1, window, 0, 0, 0,
-                ]);
+            let event = ClientMessageEvent::new(
+                32,
+                window,
+                self.intern_atom("_NET_ACTIVE_WINDOW"),
+                [1, window, 0, 0, 0],
+            );
             let mask = EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT;
             if self.conn.send_event(false, self.root, mask, event).is_ok() {
                 let _ = self.conn.flush();

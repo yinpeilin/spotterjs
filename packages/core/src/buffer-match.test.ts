@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findTemplateBuffers = vi.fn();
 const findAllTemplateBuffers = vi.fn();
-const waitForTemplateBuffers = vi.fn();
 const loadImageFromPath = vi.fn();
 const loadImageFromBuffer = vi.fn();
 
@@ -10,17 +9,12 @@ vi.mock("./native", () => ({
   loadNative: () => ({
     findTemplateBuffers,
     findAllTemplateBuffers,
-    waitForTemplateBuffers,
     loadImageFromPath,
     loadImageFromBuffer,
   }),
 }));
 
-import {
-  findAllInCapture,
-  findInCapture,
-  waitForInCapture,
-} from "./buffer-match";
+import { image } from "./buffer-match";
 import type { CaptureImage } from "@spotterjs/base";
 
 const haystack: CaptureImage = {
@@ -38,7 +32,6 @@ const needleCapture: CaptureImage = {
 beforeEach(() => {
   findTemplateBuffers.mockReset();
   findAllTemplateBuffers.mockReset();
-  waitForTemplateBuffers.mockReset();
   loadImageFromPath.mockReset();
   loadImageFromBuffer.mockReset();
   loadImageFromPath.mockReturnValue(needleCapture);
@@ -50,22 +43,28 @@ beforeEach(() => {
   findAllTemplateBuffers.mockReturnValue([
     { region: { left: 4, top: 8, width: 10, height: 6 }, score: 0.94 },
   ]);
-  waitForTemplateBuffers.mockReturnValue({
-    region: { left: 5, top: 9, width: 10, height: 6 },
-    score: 0.93,
+});
+
+describe("image.decode", () => {
+  it("decodes an encoded image buffer", () => {
+    const encoded = Buffer.from("encoded");
+
+    expect(image.decode(encoded)).toBe(needleCapture);
+    expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
   });
 });
 
-describe("findInCapture", () => {
+describe("image.find", () => {
   it("matches a path needle against a provided capture", async () => {
-    const match = await findInCapture(haystack, "button.png", {
+    const match = await image.find(haystack, "button.png", {
       confidence: 0.9,
+      region: { left: 1, top: 2, width: 30, height: 40 },
     });
 
     expect(loadImageFromPath).toHaveBeenCalledWith("button.png");
     expect(findTemplateBuffers).toHaveBeenCalledWith(haystack, needleCapture, {
       confidence: 0.9,
-      searchRegion: undefined,
+      searchRegion: { left: 1, top: 2, width: 30, height: 40 },
       multiScale: undefined,
       scaleMin: undefined,
       scaleMax: undefined,
@@ -81,7 +80,7 @@ describe("findInCapture", () => {
   it("matches an encoded image buffer needle against a provided capture", async () => {
     const encoded = Buffer.from("encoded");
 
-    await findInCapture(haystack, encoded);
+    await image.find(haystack, encoded);
 
     expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
     expect(findTemplateBuffers).toHaveBeenCalledWith(
@@ -92,9 +91,9 @@ describe("findInCapture", () => {
   });
 });
 
-describe("findAllInCapture", () => {
+describe("image.findAll", () => {
   it("returns all buffer matches with centers", async () => {
-    const matches = await findAllInCapture(haystack, "button.png");
+    const matches = await image.findAll(haystack, "button.png");
 
     expect(findAllTemplateBuffers).toHaveBeenCalledWith(
       haystack,
@@ -108,20 +107,5 @@ describe("findAllInCapture", () => {
         score: 0.94,
       },
     ]);
-  });
-});
-
-describe("waitForInCapture", () => {
-  it("delegates to native waitForTemplateBuffers", async () => {
-    const match = await waitForInCapture(haystack, "button.png", 500, undefined, 25);
-
-    expect(waitForTemplateBuffers).toHaveBeenCalledWith(
-      haystack,
-      needleCapture,
-      500,
-      undefined,
-      25
-    );
-    expect(match.center).toEqual({ x: 10, y: 12 });
   });
 });

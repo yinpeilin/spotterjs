@@ -15,11 +15,11 @@ function loadNeedle(needle: TemplateImage): CaptureImage {
     : native.loadImageFromBuffer(needle);
 }
 
-export function loadImageFromBuffer(bytes: Buffer): CaptureImage {
+function loadImageFromBuffer(bytes: Buffer): CaptureImage {
   return loadNative().loadImageFromBuffer(bytes);
 }
 
-export async function findInCapture(
+async function findInCapture(
   haystack: CaptureImage,
   needle: TemplateImage,
   options?: MatchOptions
@@ -33,7 +33,7 @@ export async function findInCapture(
   );
 }
 
-export async function findAllInCapture(
+async function findAllInCapture(
   haystack: CaptureImage,
   needle: TemplateImage,
   options?: MatchOptions
@@ -43,20 +43,15 @@ export async function findAllInCapture(
     .map(toMatchResult);
 }
 
-export async function waitForInCapture(
-  haystack: CaptureImage,
-  needle: TemplateImage,
-  timeoutMs: number,
-  options?: MatchOptions,
-  intervalMs?: number
-): Promise<MatchResult> {
-  return toMatchResult(
-    loadNative().waitForTemplateBuffers(
-      haystack,
-      loadNeedle(needle),
-      timeoutMs,
-      toNativeOpts(options),
-      intervalMs
-    )
-  );
-}
+export const image = {
+  /** Decode an encoded PNG/JPEG/WebP buffer into a raw RGBA capture. */
+  decode(bytes: Buffer): CaptureImage {
+    return loadImageFromBuffer(bytes);
+  },
+
+  /** Match a template against an already captured RGBA image. */
+  find: findInCapture,
+
+  /** Return all matches in an already captured RGBA image. */
+  findAll: findAllInCapture,
+};

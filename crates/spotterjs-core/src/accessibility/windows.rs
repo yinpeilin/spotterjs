@@ -26,13 +26,13 @@ use windows::Win32::UI::Accessibility::{
     TreeScope_Subtree, UIA_ButtonControlTypeId, UIA_CheckBoxControlTypeId,
     UIA_ComboBoxControlTypeId, UIA_CustomControlTypeId, UIA_DocumentControlTypeId,
     UIA_EditControlTypeId, UIA_ExpandCollapsePatternId, UIA_GroupControlTypeId,
-    UIA_HyperlinkControlTypeId, UIA_ImageControlTypeId, UIA_InvokePatternId,
-    UIA_ListControlTypeId, UIA_ListItemControlTypeId, UIA_MenuControlTypeId,
-    UIA_MenuItemControlTypeId, UIA_PaneControlTypeId, UIA_RadioButtonControlTypeId,
-    UIA_ScrollPatternId, UIA_SelectionPatternId, UIA_SliderControlTypeId,
-    UIA_SpinnerControlTypeId, UIA_TabControlTypeId, UIA_TabItemControlTypeId,
-    UIA_TextControlTypeId, UIA_TextPatternId, UIA_ToolBarControlTypeId, UIA_TreeControlTypeId,
-    UIA_TreeItemControlTypeId, UIA_ValuePatternId, UIA_WindowControlTypeId, UIA_PATTERN_ID,
+    UIA_HyperlinkControlTypeId, UIA_ImageControlTypeId, UIA_InvokePatternId, UIA_ListControlTypeId,
+    UIA_ListItemControlTypeId, UIA_MenuControlTypeId, UIA_MenuItemControlTypeId,
+    UIA_PaneControlTypeId, UIA_RadioButtonControlTypeId, UIA_ScrollPatternId,
+    UIA_SelectionPatternId, UIA_SliderControlTypeId, UIA_SpinnerControlTypeId,
+    UIA_TabControlTypeId, UIA_TabItemControlTypeId, UIA_TextControlTypeId, UIA_TextPatternId,
+    UIA_ToolBarControlTypeId, UIA_TreeControlTypeId, UIA_TreeItemControlTypeId, UIA_ValuePatternId,
+    UIA_WindowControlTypeId, UIA_PATTERN_ID,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, GetClassNameW, GetClientRect, IsWindowVisible,
@@ -1150,6 +1150,9 @@ mod tests {
     #[test]
     fn unknown_control_type_matches_nothing() {
         assert!(control_type_matches(UIA_ButtonControlTypeId.0, "Button"));
-        assert!(!control_type_matches(UIA_ButtonControlTypeId.0, "DefinitelyUnknown"));
+        assert!(!control_type_matches(
+            UIA_ButtonControlTypeId.0,
+            "DefinitelyUnknown"
+        ));
     }
 }

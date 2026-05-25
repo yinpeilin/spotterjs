@@ -2,6 +2,7 @@ import {
   centerOf,
   type CaptureImage,
   type MatchOptions,
+  type MatchWaitOptions,
   type MatchResult,
   type Region,
   type TemplateImage,
@@ -12,14 +13,16 @@ import { loadNative } from "./native";
 /** 将公共 {@link MatchOptions} 转为 native 层结构 */
 export function toNativeOpts(opts?: MatchOptions) {
   if (!opts) return undefined;
+  const scale = opts.scale;
+  const scaleConfig = typeof scale === "object" ? scale : undefined;
 
   return {
     confidence: opts.confidence,
-    searchRegion: opts.searchRegion,
-    multiScale: opts.multiScale,
-    scaleMin: opts.scaleMin,
-    scaleMax: opts.scaleMax,
-    scaleStep: opts.scaleStep,
+    searchRegion: opts.region,
+    multiScale: scale === true || typeof scale === "object" ? true : undefined,
+    scaleMin: scaleConfig?.min,
+    scaleMax: scaleConfig?.max,
+    scaleStep: scaleConfig?.step,
   };
 }
 
@@ -78,14 +81,19 @@ export async function findAllNeedle(
  */
 export async function waitForNeedle(
   needle: TemplateImage,
-  timeoutMs: number,
-  options?: MatchOptions,
-  intervalMs?: number
+  options: MatchWaitOptions
 ): Promise<MatchResult> {
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
+  const { timeoutMs, intervalMs, ...matchOptions } = options;
   return toMatchResult(
-    native.waitForTemplate(path, buffer, timeoutMs, toNativeOpts(options), intervalMs)
+    native.waitForTemplate(
+      path,
+      buffer,
+      timeoutMs,
+      toNativeOpts(matchOptions),
+      intervalMs
+    )
   );
 }
 

@@ -1,6 +1,7 @@
 import {
   type CaptureImage,
   type MatchOptions,
+  type MatchWaitOptions,
   type MatchResult,
   type Region,
   type TemplateImage,
@@ -9,8 +10,6 @@ import {
   captureForMatch,
   findAllNeedle,
   findNeedle,
-  toMatchResult,
-  toNativeOpts,
   waitForNeedle,
 } from "./match";
 import { loadNative } from "./native";
@@ -74,18 +73,16 @@ export const screen = {
    * @returns 匹配到的屏幕区域
    * @throws 未找到模板时抛错
    */
-  tapTemplate(needle: TemplateImage, options?: MatchOptions): MatchResult {
+  async tap(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
     const native = loadNative();
-    const path = typeof needle === "string" ? needle : "";
-    const buffer = typeof needle === "string" ? undefined : needle;
-    const match = toMatchResult(native.findTemplate(path, buffer, toNativeOpts(options)));
+    const match = await findNeedle(needle, options);
     const { x, y } = match.center;
     native.tapAt(x, y);
     return match;
   },
 
   /**
-   * 在全屏（或 `options.searchRegion`）中查找第一个模板匹配。
+   * 在全屏（或 `options.region`）中查找第一个模板匹配。
    *
    * 内部每次调用会重新截屏再匹配。
    * @throws 未找到时抛错
@@ -111,10 +108,8 @@ export const screen = {
    */
   waitFor(
     needle: TemplateImage,
-    timeoutMs: number,
-    options?: MatchOptions,
-    intervalMs?: number
+    options: MatchWaitOptions
   ): Promise<MatchResult> {
-    return waitForNeedle(needle, timeoutMs, options, intervalMs);
+    return waitForNeedle(needle, options);
   },
 };

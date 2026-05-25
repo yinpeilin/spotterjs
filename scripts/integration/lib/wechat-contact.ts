@@ -11,15 +11,9 @@ import * as fs from "fs";
 import * as path from "path";
 
 import type { MatchOptions, Point, Region } from "@spotterjs/base";
+import { loadNative } from "@spotterjs/core/native";
 
 import {
-
-  findAllInWindow,
-
-  findInWindow,
-
-  loadNative,
-
   matchTapScreen,
 
   toLocal,
@@ -28,7 +22,7 @@ import {
 
   toScreen,
 
-  windowApi,
+  windows,
 
   type MatchBox,
 
@@ -234,7 +228,7 @@ export function assertMainWindow(win: WechatWin): void {
 
 export function findWechatWindow(): WechatWin | null {
 
-  const all = windowApi.list().filter((w) => w.title.includes("微信"));
+  const all = windows.list().filter((w) => w.title.includes("微信"));
 
   if (all.length === 0) return null;
 
@@ -252,7 +246,7 @@ export function findWechatWindow(): WechatWin | null {
 
       try {
 
-        loadNative().restoreWindow(w.id);
+        windows.restore(w.id);
 
       } catch {
 
@@ -262,7 +256,7 @@ export function findWechatWindow(): WechatWin | null {
 
     }
 
-    candidates = windowApi
+    candidates = windows
 
       .list()
 
@@ -344,9 +338,9 @@ function matchOpts(region: Region, confidence?: number): MatchOptions {
 
     confidence: conf,
 
-    searchRegion: region,
+    region,
 
-    multiScale: false,
+    scale: false,
 
   };
 
@@ -416,13 +410,13 @@ export function findContactCandidates(
 
       const opts = matchOpts(searchRegion, conf);
 
-      let matches = findAllInWindow(win.id, templatePath, opts);
+      let matches = windows.findAllTemplates(win.id, templatePath, opts);
 
       if (matches.length === 0) {
 
         try {
 
-          matches = [findInWindow(win.id, templatePath, opts)];
+          matches = [windows.findTemplate(win.id, templatePath, opts)];
 
         } catch {
 
@@ -622,7 +616,7 @@ export async function matchContactInList(
 
 ): Promise<MatchBox> {
 
-  windowApi.focus(win.id);
+  windows.focus(win.id);
 
   await sleep(450);
 
@@ -692,7 +686,7 @@ export async function tapContactInList(
     return picked;
   }
 
-  windowApi.focus(win.id);
+  windows.focus(win.id);
   await sleep(450);
   tapMatchBox(syncWinRegion(win), picked);
 
@@ -745,7 +739,7 @@ export function isTargetChatActive(
 
   const header = chatHeaderRegion(win);
 
-  const hits = findAllInWindow(win.id, templatePath, matchOpts(header));
+  const hits = windows.findAllTemplates(win.id, templatePath, matchOpts(header));
 
   return hits.some((h) => {
 

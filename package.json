@@ -5,6 +5,7 @@
     "build": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/node && npm run build -w @spotterjs/core && npm run build -w @spotterjs/mcp && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android-adb",
     "build:ts": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/core && npm run build -w @spotterjs/mcp && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android-adb",
     "build:native": "npm run build -w @spotterjs/node",
+    "docs:check": "node scripts/check-doc-links.mjs",
     "prepare:native-packages": "node scripts/prepare-native-packages.mjs",
     "prepare:ocr-models": "node scripts/prepare-ocr-models.mjs",
     "publish:native:win": "npm run build -w @spotterjs/node && node scripts/prepare-native-package.mjs win32-x64-msvc && npm publish ./crates/spotterjs-node/win32-x64-msvc",
@@ -38,9 +39,11 @@
     "integration:wechat:match": "tsx scripts/integration/wechat-match.ts",
     "integration:wechat:send": "tsx scripts/integration/wechat-send.ts",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "sync:native-versions": "node scripts/sync-native-package-versions.mjs",
+    "version-packages": "changeset version && npm run sync:native-versions",
     "release": "npm run sync-license && changeset publish",
-    "verify-pack": "node scripts/verify-pack.mjs"
+    "verify-pack": "node scripts/verify-pack.mjs",
+    "verify:native-install": "node scripts/verify-local-native-install.mjs"
   },
   "workspaces": [
     "packages/base",

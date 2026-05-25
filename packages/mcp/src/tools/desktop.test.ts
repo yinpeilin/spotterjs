@@ -5,6 +5,12 @@ const core = vi.hoisted(() => ({
   findAll: vi.fn(),
 }));
 
+const artifacts = vi.hoisted(() => ({
+  captureScreenArtifact: vi.fn(),
+  captureWindowArtifact: vi.fn(),
+  captureActiveArtifact: vi.fn(),
+}));
+
 vi.mock("@spotterjs/core", () => ({
   accessibility: {
     debug: {
@@ -41,12 +47,14 @@ vi.mock("@spotterjs/core", () => ({
     find: core.find,
     findAll: core.findAll,
   },
-  windowApi: {
+  windows: {
+    active: vi.fn(),
     focus: vi.fn(),
-    getActive: vi.fn(),
     list: vi.fn(),
   },
 }));
+
+vi.mock("../adapters/capture.js", () => artifacts);
 
 import { registerDesktopTools } from "./desktop.js";
 
@@ -73,6 +81,9 @@ function parseToolJson(result: Awaited<ReturnType<ToolHandler>>) {
 beforeEach(() => {
   core.find.mockReset();
   core.findAll.mockReset();
+  artifacts.captureScreenArtifact.mockReset();
+  artifacts.captureWindowArtifact.mockReset();
+  artifacts.captureActiveArtifact.mockReset();
 });
 
 describe("desktop_find_template", () => {
@@ -90,17 +101,14 @@ describe("desktop_find_template", () => {
       await handler!({
         image: { path: "button.png" },
         confidence: 0.9,
-        searchRegion: { left: 1, top: 2, width: 100, height: 80 },
+        region: { left: 1, top: 2, width: 100, height: 80 },
       })
     );
 
     expect(core.find).toHaveBeenCalledWith("button.png", {
       confidence: 0.9,
-      searchRegion: { left: 1, top: 2, width: 100, height: 80 },
-      multiScale: undefined,
-      scaleMin: undefined,
-      scaleMax: undefined,
-      scaleStep: undefined,
+      region: { left: 1, top: 2, width: 100, height: 80 },
+      scale: undefined,
     });
     expect(json).toEqual({
       matches: [
@@ -130,11 +138,8 @@ describe("desktop_find_template", () => {
 
     expect(core.find).toHaveBeenCalledWith(bytes, {
       confidence: undefined,
-      searchRegion: undefined,
-      multiScale: undefined,
-      scaleMin: undefined,
-      scaleMax: undefined,
-      scaleStep: undefined,
+      region: undefined,
+      scale: undefined,
     });
   });
 
@@ -162,13 +167,36 @@ describe("desktop_find_template", () => {
 
     expect(core.findAll).toHaveBeenCalledWith("button.png", {
       confidence: undefined,
-      searchRegion: undefined,
-      multiScale: undefined,
-      scaleMin: undefined,
-      scaleMax: undefined,
-      scaleStep: undefined,
+      region: undefined,
+      scale: undefined,
     });
     expect(json.coordinateSpace).toBe("screen");
     expect(json.matches).toHaveLength(2);
+  });
+});
+
+describe("desktop_capture_screen", () => {
+  it("returns a workspace artifact instead of inline image content", async () => {
+    artifacts.captureScreenArtifact.mockReturnValue({
+      imagePath: ".spotter/artifacts/desktop-screen.png",
+      width: 1600,
+      height: 800,
+      originalWidth: 2400,
+      originalHeight: 1200,
+      format: "png",
+      isDownscaled: true,
+    });
+    const handler = registerTools().get("desktop_capture_screen");
+    expect(handler).toBeDefined();
+
+    const result = await handler!({});
+    const json = JSON.parse(result.content[0].text!);
+
+    expect(json.format).toBe("png");
+    expect(json.isDownscaled).toBe(true);
+    expect(json.originalWidth).toBe(2400);
+    expect(json.width).toBe(1600);
+    expect(result.content).toHaveLength(1);
+    expect(artifacts.captureScreenArtifact).toHaveBeenCalledWith(undefined);
   });
 });

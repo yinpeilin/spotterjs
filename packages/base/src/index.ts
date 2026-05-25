@@ -34,7 +34,7 @@ export type TemplateImage = string | Buffer;
  * 一次模板匹配结果。
  *
  * 高层 API 返回的 `region` 与 `center` 均为屏幕绝对坐标；它们不相对
- * `searchRegion`，也不相对窗口。
+ * `region`，也不相对窗口。
  */
 export interface MatchResult {
   /** 匹配框（屏幕坐标） */
@@ -75,21 +75,38 @@ export interface MatchOptions {
    * 限定搜索的屏幕子区域。匹配在裁剪后的 haystack 上进行，
    * 返回的 {@link Region} 仍 translated 回**屏幕坐标**。
    */
-  searchRegion?: Region;
-  /** 启用多尺度匹配（对 needle 做缩放后逐一尝试） */
-  multiScale?: boolean;
-  /** 多尺度下限，默认 0.8 */
-  scaleMin?: number;
-  /** 多尺度上限，默认 1.2 */
-  scaleMax?: number;
-  /** 多尺度步长，默认 0.05 */
-  scaleStep?: number;
+  region?: Region;
+  /**
+   * 启用多尺度匹配（对 needle 做缩放后逐一尝试）。
+   *
+   * `true` 使用 native 默认尺度范围；对象形态可覆盖 min/max/step。
+   */
+  scale?:
+    | boolean
+    | {
+        /** 多尺度下限，默认 0.8 */
+        min?: number;
+        /** 多尺度上限，默认 1.2 */
+        max?: number;
+        /** 多尺度步长，默认 0.05 */
+        step?: number;
+      };
+}
+
+/**
+ * 轮询等待模板出现的参数。
+ */
+export interface MatchWaitOptions extends MatchOptions {
+  /** 超时毫秒数，超时则抛错 */
+  timeoutMs: number;
+  /** 轮询间隔，省略则使用 native 默认值 */
+  intervalMs?: number;
 }
 
 /**
  * 桌面窗口元信息。
  *
- * `id` 为平台原生句柄的字符串形式，用于 `windowApi`、`findInWindow` 等 API。
+ * `id` 为平台原生句柄的字符串形式，用于 `windows` 等 API。
  */
 export interface WindowInfo {
   /** 窗口 ID（十进制字符串，传给 native API） */
@@ -132,7 +149,7 @@ export interface DesktopApp {
  */
 export interface MatchProvider {
   /**
-   * 在全屏（或 `searchRegion`）中查找第一个匹配。
+   * 在全屏（或 `region`）中查找第一个匹配。
    * @throws 未找到时 native 层抛出错误
    */
   find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult>;
@@ -140,15 +157,8 @@ export interface MatchProvider {
   findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]>;
   /**
    * 轮询等待模板出现。
-   * @param timeoutMs 超时毫秒数，超时则抛错
-   * @param intervalMs 轮询间隔，默认由 native 层决定
    */
-  waitFor(
-    needle: TemplateImage,
-    timeoutMs: number,
-    options?: MatchOptions,
-    intervalMs?: number
-  ): Promise<MatchResult>;
+  waitFor(needle: TemplateImage, options: MatchWaitOptions): Promise<MatchResult>;
 }
 
 /**

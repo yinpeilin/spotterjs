@@ -3,12 +3,8 @@
  * Run with: npm run integration:wechat:probe
  */
 import * as path from "path";
-import {
-  findAllInWindow,
-  findInWindow,
-  loadNative,
-  windowApi,
-} from "@spotterjs/core";
+import { loadNative } from "@spotterjs/core/native";
+import { windows } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { writeRgbaPng } from "../lib/png";
 import {
@@ -21,7 +17,7 @@ export async function run(): Promise<void> {
   const win = findWechatWindow();
   if (!win) throw new Error("WeChat window not found");
 
-  windowApi.focus(win.id);
+  windows.focus(win.id);
   await new Promise((r) => setTimeout(r, 400));
 
   const native = loadNative();
@@ -34,10 +30,10 @@ export async function run(): Promise<void> {
   info(`search region (window-local): ${JSON.stringify(listRegion)}`);
 
   for (const conf of [0.85, 0.75, 0.7, 0.65, 0.55]) {
-    const hits = findAllInWindow(win.id, DEFAULT_CONTACT_TEMPLATE, {
+    const hits = windows.findAllTemplates(win.id, DEFAULT_CONTACT_TEMPLATE, {
       confidence: conf,
-      searchRegion: listRegion,
-      multiScale: false,
+      region: listRegion,
+      scale: false,
     });
     info(`findAll conf=${conf} -> ${hits.length} hits`);
     for (const [i, hit] of hits.slice(0, 5).entries()) {
@@ -49,17 +45,17 @@ export async function run(): Promise<void> {
       );
     }
     try {
-      const one = findInWindow(win.id, DEFAULT_CONTACT_TEMPLATE, {
+      const one = windows.findTemplate(win.id, DEFAULT_CONTACT_TEMPLATE, {
         confidence: conf,
-        searchRegion: listRegion,
-        multiScale: false,
+        region: listRegion,
+        scale: false,
       });
       const r = one.region;
       info(
-        `findInWindow conf=${conf} -> (${r.left - win.region.left},${r.top - win.region.top}) score=${one.score.toFixed(4)}`
+        `windows.findTemplate conf=${conf} -> (${r.left - win.region.left},${r.top - win.region.top}) score=${one.score.toFixed(4)}`
       );
     } catch {
-      info(`findInWindow conf=${conf} -> no hit`);
+      info(`windows.findTemplate conf=${conf} -> no hit`);
     }
   }
 }

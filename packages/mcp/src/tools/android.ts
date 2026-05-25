@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { encodePngBase64 } from "@spotterjs/core";
 import { android } from "@spotterjs/plugin-android-adb";
+import { writeCaptureArtifact } from "../adapters/artifacts.js";
 
 const adbOptionsSchema = {
   adbPath: z.string().optional(),
@@ -29,11 +29,40 @@ const regionSchema = z
 
 const matchOptionsSchema = {
   confidence: z.number().optional(),
-  searchRegion: regionSchema,
-  multiScale: z.boolean().optional(),
-  scaleMin: z.number().optional(),
-  scaleMax: z.number().optional(),
-  scaleStep: z.number().optional(),
+  region: regionSchema,
+  scale: z
+    .union([
+      z.boolean(),
+      z.object({
+        min: z.number().optional(),
+        max: z.number().optional(),
+        step: z.number().optional(),
+      }),
+    ])
+    .optional(),
+};
+
+const elementQuerySchema = {
+  text: z.string().optional(),
+  textContains: z.string().optional(),
+  resourceId: z.string().optional(),
+  resourceIdContains: z.string().optional(),
+  className: z.string().optional(),
+  classNameContains: z.string().optional(),
+  contentDescription: z.string().optional(),
+  contentDescriptionContains: z.string().optional(),
+  packageName: z.string().optional(),
+  clickable: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+  checked: z.boolean().optional(),
+  selected: z.boolean().optional(),
+  scrollable: z.boolean().optional(),
+  focusable: z.boolean().optional(),
+};
+
+const elementOptionsSchema = {
+  maxDepth: z.number().optional(),
+  remotePath: z.string().optional(),
 };
 
 const templateImageSchema = z.union([
@@ -63,12 +92,33 @@ async function device(args: { serial: string; adbPath?: string; timeoutMs?: numb
   });
 }
 
+function elementQuery(args: Record<string, unknown>) {
+  const query: Record<string, unknown> = {};
+  for (const key of Object.keys(elementQuerySchema)) {
+    if (args[key] !== undefined) query[key] = args[key];
+  }
+  return query;
+}
+
+function elementOptions(args: Record<string, unknown>) {
+  const options: Record<string, unknown> = {};
+  for (const key of Object.keys(elementOptionsSchema)) {
+    if (args[key] !== undefined) options[key] = args[key];
+  }
+  if (args.pollMs !== undefined) options.pollMs = args.pollMs;
+  return options;
+}
+
 function ok(text = "ok") {
   return { content: [{ type: "text" as const, text }] };
 }
 
 function json(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+function serialJson(device: { serial: string }) {
+  return json({ serial: device.serial });
 }
 
 function errorResult(error: unknown) {
@@ -84,10 +134,7 @@ function errorResult(error: unknown) {
 }
 
 type ToolResult = {
-  content: Array<
-    | { type: "text"; text: string }
-    | { type: "image"; data: string; mimeType: "image/png" }
-  >;
+  content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 };
 
@@ -109,25 +156,87 @@ function registerSafeTool<T>(
 export function registerAndroidTools(server: McpServer): void {
   registerSafeTool(
     server,
-    "android_list_devices",
+    "android_discover_devices",
     {
-      description: "List Android devices visible to adb",
+      description: "Discover Android devices currently visible to adb",
       inputSchema: z.object(adbOptionsSchema).shape,
     },
     async (args: { adbPath?: string; timeoutMs?: number }) =>
-      json(await android.listDevices(adbOptions(args)))
+      json(await android.discover(adbOptions(args)))
   );
 
   registerSafeTool(
     server,
-    "android_connect_tcp",
+    "android_pair_tcp",
     {
-      description: "Connect to a network Android device with adb connect host:port",
-      inputSchema: z.object({ address: z.string(), ...adbOptionsSchema }).shape,
+      description: "Pair an Android 11+ wireless debugging device with adb pair",
+      inputSchema: z
+        .object({
+          host: z.string(),
+          port: z.number(),
+          code: z.string(),
+          ...adbOptionsSchema,
+        })
+        .shape,
     },
-    async (args: { address: string; adbPath?: string; timeoutMs?: number }) => {
-      const d = await android.connectTcp(args.address, adbOptions(args));
-      return json({ serial: d.serial });
+    async (args: {
+      host: string;
+      port: number;
+      code: string;
+      adbPath?: string;
+      timeoutMs?: number;
+    }) => {
+      await android.pairTcp({
+        host: args.host,
+        port: args.port,
+        code: args.code,
+        ...adbOptions(args),
+      });
+      return json({ ok: true });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_connect_network",
+    {
+      description: "Connect a paired wireless Android device with adb connect",
+      inputSchema: z.object({ host: z.string(), port: z.number(), ...adbOptionsSchema }).shape,
+    },
+    async (args: { host: string; port: number; adbPath?: string; timeoutMs?: number }) =>
+      serialJson(
+        await android.connectNetwork({
+          host: args.host,
+          port: args.port,
+          ...adbOptions(args),
+        })
+      )
+  );
+
+  registerSafeTool(
+    server,
+    "android_connect_default",
+    {
+      description: "Connect the only available Android device discovered by adb",
+      inputSchema: z.object(adbOptionsSchema).shape,
+    },
+    async (args: { adbPath?: string; timeoutMs?: number }) =>
+      serialJson(await android.connectDefault(adbOptions(args)))
+  );
+
+  registerSafeTool(
+    server,
+    "android_connect_all",
+    {
+      description: "Connect all available Android devices discovered by adb",
+      inputSchema: z.object(adbOptionsSchema).shape,
+    },
+    async (args: { adbPath?: string; timeoutMs?: number }) => {
+      const group = await android.connectAll(adbOptions(args));
+      return json({
+        devices: group.devices.map((d) => ({ serial: d.serial })),
+        skipped: group.skipped,
+      });
     }
   );
 
@@ -135,24 +244,102 @@ export function registerAndroidTools(server: McpServer): void {
     server,
     "android_capture_screen",
     {
-      description: "Capture an Android device screen; returns PNG base64",
+      description:
+        "Capture an Android device screen, downscale long edge to 1600 when needed, and return a workspace PNG file path",
       inputSchema: z.object(serialSchema).shape,
     },
     async (args: { serial: string; adbPath?: string; timeoutMs?: number }) => {
       const cap = await (await device(args)).capture();
-      const base64 = encodePngBase64(cap);
+      const artifact = writeCaptureArtifact(cap, {
+        prefix: `android-${args.serial}`,
+      });
       return {
         content: [
           {
             type: "text" as const,
             text: JSON.stringify({
               serial: args.serial,
-              width: cap.width,
-              height: cap.height,
-            }),
+              ...artifact,
+            }, null, 2),
           },
-          { type: "image" as const, data: base64, mimeType: "image/png" as const },
         ],
+      };
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_batch_tap",
+    {
+      description: "Tap coordinates on every available Android device discovered by adb",
+      inputSchema: z.object({ x: z.number(), y: z.number(), ...adbOptionsSchema }).shape,
+    },
+    async (args: { x: number; y: number; adbPath?: string; timeoutMs?: number }) => {
+      const group = await android.connectAll(adbOptions(args));
+      return json(await group.tapAll(args.x, args.y));
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_batch_swipe",
+    {
+      description: "Swipe coordinates on every available Android device discovered by adb",
+      inputSchema: z
+        .object({
+          from: pointSchema,
+          to: pointSchema,
+          durationMs: z.number().optional(),
+          ...adbOptionsSchema,
+        })
+        .shape,
+    },
+    async (args: {
+      from: { x: number; y: number };
+      to: { x: number; y: number };
+      durationMs?: number;
+      adbPath?: string;
+      timeoutMs?: number;
+    }) => {
+      const group = await android.connectAll(adbOptions(args));
+      return json(
+        await group.swipeAll(args.from, args.to, {
+          durationMs: args.durationMs,
+        })
+      );
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_batch_capture",
+    {
+      description:
+        "Capture every available Android device discovered by adb and return workspace PNG file paths",
+      inputSchema: z.object(adbOptionsSchema).shape,
+    },
+    async (args: { adbPath?: string; timeoutMs?: number }) => {
+      const group = await android.connectAll(adbOptions(args));
+      const results = await group.captureAll();
+      const summary = results.map((result) => {
+        if (!result.ok || !result.value) {
+          return {
+            serial: result.serial,
+            ok: false,
+            error: result.error,
+          };
+        }
+        const artifact = writeCaptureArtifact(result.value, {
+          prefix: `android-${result.serial}`,
+        });
+        return {
+          serial: result.serial,
+          ok: true,
+          ...artifact,
+        };
+      });
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }],
       };
     }
   );
@@ -285,6 +472,209 @@ export function registerAndroidTools(server: McpServer): void {
 
   registerSafeTool(
     server,
+    "android_dump_tree",
+    {
+      description: "Dump the Android UIAutomator element tree",
+      inputSchema: z.object({ ...serialSchema, ...elementOptionsSchema }).shape,
+    },
+    async (args: {
+      serial: string;
+      adbPath?: string;
+      timeoutMs?: number;
+      maxDepth?: number;
+      remotePath?: string;
+    }) => {
+      const { serial, adbPath, timeoutMs, ...options } = args;
+      const tree = await (await device({ serial, adbPath, timeoutMs })).dumpTree(options);
+      return json({ tree, coordinateSpace: "android-device" });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_find_element",
+    {
+      description: "Find the first Android UIAutomator element matching a query",
+      inputSchema: z
+        .object({ ...serialSchema, ...elementQuerySchema, ...elementOptionsSchema })
+        .shape,
+    },
+    async (args: {
+      serial: string;
+      adbPath?: string;
+      timeoutMs?: number;
+      maxDepth?: number;
+      remotePath?: string;
+      [key: string]: unknown;
+    }) => {
+      const d = await device(args);
+      const element = await d.findElement(elementQuery(args), elementOptions(args));
+      return json({ element, coordinateSpace: "android-device" });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_wait_for_element",
+    {
+      description: "Wait for an Android UIAutomator element matching a query",
+      inputSchema: z
+        .object({
+          ...serialSchema,
+          ...elementQuerySchema,
+          ...elementOptionsSchema,
+          timeoutMs: z.number(),
+          pollMs: z.number().optional(),
+        })
+        .shape,
+    },
+    async (args: {
+      serial: string;
+      adbPath?: string;
+      timeoutMs: number;
+      pollMs?: number;
+      maxDepth?: number;
+      remotePath?: string;
+      [key: string]: unknown;
+    }) => {
+      const d = await device(args);
+      const element = await d.waitForElement(
+        elementQuery(args),
+        args.timeoutMs,
+        elementOptions(args)
+      );
+      return json({ element, coordinateSpace: "android-device" });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_tap_element",
+    {
+      description: "Tap the center of the first Android element matching a query",
+      inputSchema: z
+        .object({ ...serialSchema, ...elementQuerySchema, ...elementOptionsSchema })
+        .shape,
+    },
+    async (args: {
+      serial: string;
+      adbPath?: string;
+      timeoutMs?: number;
+      maxDepth?: number;
+      remotePath?: string;
+      [key: string]: unknown;
+    }) => {
+      const d = await device(args);
+      const element = await d.tapElement(elementQuery(args), elementOptions(args));
+      return json({ element, coordinateSpace: "android-device" });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_type_element",
+    {
+      description: "Tap an Android element matching a query and type text",
+      inputSchema: z
+        .object({
+          ...serialSchema,
+          ...elementQuerySchema,
+          ...elementOptionsSchema,
+          textToType: z.string(),
+        })
+        .shape,
+    },
+    async (args: {
+      serial: string;
+      adbPath?: string;
+      timeoutMs?: number;
+      textToType: string;
+      maxDepth?: number;
+      remotePath?: string;
+      [key: string]: unknown;
+    }) => {
+      const d = await device(args);
+      const element = await d.typeElement(
+        elementQuery(args),
+        args.textToType,
+        elementOptions(args)
+      );
+      return json({ element, coordinateSpace: "android-device" });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_shell",
+    {
+      description: "Run a raw adb shell command on an Android device",
+      inputSchema: z.object({ ...serialSchema, command: z.string() }).shape,
+    },
+    async (args: {
+      serial: string;
+      command: string;
+      adbPath?: string;
+      timeoutMs?: number;
+    }) => json({ output: await (await device(args)).shell(args.command) })
+  );
+
+  registerSafeTool(
+    server,
+    "android_get_display_info",
+    {
+      description: "Get Android display size and density from wm",
+      inputSchema: z.object(serialSchema).shape,
+    },
+    async (args: { serial: string; adbPath?: string; timeoutMs?: number }) =>
+      json(await (await device(args)).getDisplayInfo())
+  );
+
+  registerSafeTool(
+    server,
+    "android_wake",
+    { description: "Wake an Android device", inputSchema: z.object(serialSchema).shape },
+    async (args: { serial: string; adbPath?: string; timeoutMs?: number }) => {
+      await (await device(args)).wake();
+      return ok();
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_sleep",
+    { description: "Put an Android device to sleep", inputSchema: z.object(serialSchema).shape },
+    async (args: { serial: string; adbPath?: string; timeoutMs?: number }) => {
+      await (await device(args)).sleep();
+      return ok();
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_current_app",
+    {
+      description: "Get the currently focused Android package/activity",
+      inputSchema: z.object(serialSchema).shape,
+    },
+    async (args: { serial: string; adbPath?: string; timeoutMs?: number }) =>
+      json(await (await device(args)).currentApp())
+  );
+
+  registerSafeTool(
+    server,
+    "android_clear_app",
+    {
+      description: "Clear Android app data with pm clear",
+      inputSchema: z.object({ ...serialSchema, packageName: z.string() }).shape,
+    },
+    async (args: { serial: string; packageName: string; adbPath?: string; timeoutMs?: number }) => {
+      await (await device(args)).clearApp(args.packageName);
+      return ok();
+    }
+  );
+
+  registerSafeTool(
+    server,
     "android_find_template",
     {
       description: "Find an image template on an Android device screenshot",
@@ -304,11 +694,8 @@ export function registerAndroidTools(server: McpServer): void {
       adbPath?: string;
       timeoutMs?: number;
       confidence?: number;
-      searchRegion?: { left: number; top: number; width: number; height: number };
-      multiScale?: boolean;
-      scaleMin?: number;
-      scaleMax?: number;
-      scaleStep?: number;
+      region?: { left: number; top: number; width: number; height: number };
+      scale?: boolean | { min?: number; max?: number; step?: number };
     }) => {
       const { image, all, adbPath, timeoutMs, serial, ...options } = args;
       const d = await device({ serial, adbPath, timeoutMs });

@@ -3,10 +3,8 @@ import * as path from "path";
 import { spawn } from "child_process";
 import {
   desktop,
-  findInWindow,
   mouse,
-  tapInWindow,
-  windowApi,
+  windows,
   type MatchOptions,
   type MatchResult,
   type WindowInfo,
@@ -29,11 +27,11 @@ const TOOLBAR_SEARCH_REGION = {
 };
 export const MATCH_OPTIONS: MatchOptions = {
   confidence: Number(process.env.SPOTTERJS_PAINT_CONFIDENCE ?? "0.85"),
-  searchRegion: TOOLBAR_SEARCH_REGION,
-  multiScale: process.env.SPOTTERJS_PAINT_MULTISCALE === "1",
-  scaleMin: 0.8,
-  scaleMax: 1.25,
-  scaleStep: 0.05,
+  region: TOOLBAR_SEARCH_REGION,
+  scale:
+    process.env.SPOTTERJS_PAINT_MULTISCALE === "1"
+      ? { min: 0.8, max: 1.25, step: 0.05 }
+      : undefined,
 };
 
 const PAINT_PROCESS_HINTS = ["mspaint", "paintstudio", "paint"];
@@ -129,13 +127,13 @@ export async function ensurePaintWindow(): Promise<WindowInfo> {
 
 export async function focusPaintWindow(win: WindowInfo): Promise<WindowInfo> {
   if (win.isMinimized) {
-    windowApi.restore(win.id);
+    windows.restore(win.id);
     await sleep(350);
   }
 
-  windowApi.move(win.id, 40, 40);
+  windows.move(win.id, 40, 40);
   await sleep(150);
-  windowApi.focus(win.id);
+  windows.focus(win.id);
   await sleep(500);
 
   const current = findPaintWindow() ?? win;
@@ -146,7 +144,7 @@ export async function focusPaintWindow(win: WindowInfo): Promise<WindowInfo> {
 }
 
 export function capturePaintWindow(win: WindowInfo, fileName: string): string {
-  const cap = windowApi.capture(win.id);
+  const cap = windows.capture(win.id);
   const outPath = paintOutputPath(fileName);
   writeRgbaPng(outPath, cap.width, cap.height, Buffer.from(cap.data));
   info(`wrote ${outPath}`);
@@ -159,7 +157,7 @@ export function matchPaintTool(win: WindowInfo): MatchResult {
   }
 
   try {
-    return findInWindow(win.id, TEMPLATE_PATH, MATCH_OPTIONS);
+    return windows.findTemplate(win.id, TEMPLATE_PATH, MATCH_OPTIONS);
   } catch (err) {
     capturePaintWindow(win, "paint-match-failed.png");
     const message = err instanceof Error ? err.message : String(err);
@@ -174,7 +172,7 @@ export function tapPaintTool(win: WindowInfo): MatchResult {
     throw new Error(`missing Paint tool template: ${TEMPLATE_PATH}`);
   }
 
-  return tapInWindow(win.id, TEMPLATE_PATH, MATCH_OPTIONS);
+  return windows.tapTemplate(win.id, TEMPLATE_PATH, MATCH_OPTIONS);
 }
 
 export function moveMouseToWindowCenter(win: WindowInfo): { x: number; y: number } {

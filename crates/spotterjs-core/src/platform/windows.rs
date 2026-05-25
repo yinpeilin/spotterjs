@@ -432,7 +432,7 @@ fn capture_hdc_region(
             ));
         }
 
-        let mut bmi = BITMAPINFO {
+        let bmi = BITMAPINFO {
             bmiHeader: BITMAPINFOHEADER {
                 biSize: size_of::<BITMAPINFOHEADER>() as u32,
                 biWidth: w,

@@ -1,6 +1,5 @@
 import { loadNative } from "./native";
-import type { NativeWindow } from "./native";
-import { centerOf, type CaptureImage, type Region } from "@spotterjs/base";
+import { centerOf, type CaptureImage } from "@spotterjs/base";
 import { encodePngBase64 } from "./capture";
 
 type LetterKey =
@@ -164,20 +163,6 @@ function normalizeKeyName(key: string): string {
   };
   if (/^f([1-9]|1[0-2])$/.test(lower)) return lower.toUpperCase();
   return aliases[lower] ?? trimmed;
-}
-
-function mapWindow(w: NativeWindow) {
-  return {
-    id: w.id,
-    idHex: w.idHex,
-    title: w.title,
-    region: w.region,
-    processId: w.processId,
-    processName: w.processName,
-    exePath: w.exePath,
-    isMinimized: w.isMinimized,
-    isForeground: w.isForeground,
-  };
 }
 
 /**
@@ -354,67 +339,6 @@ export const clipboard = {
   },
 };
 
-/**
- * 顶层窗口管理（枚举、聚焦、移动、截图等）。
- *
- * 窗口 ID 来自 {@link desktop} 或 `list()`，为十进制字符串。
- */
-export const windowApi = {
-  /** 列出所有顶层窗口 */
-  list() {
-    return loadNative().listWindows().map(mapWindow);
-  },
-
-  /** 当前前台窗口 */
-  getActive() {
-    return mapWindow(loadNative().getActiveWindow());
-  },
-
-  /**
-   * 将窗口置于前台。
-   * @returns native 层是否成功
-   */
-  focus(id: string) {
-    return loadNative().focusWindow(id);
-  },
-
-  /** 窗口外框屏幕区域 */
-  getRegion(id: string) {
-    return loadNative().getWindowRegion(id);
-  },
-
-  /** 外框区域，裁剪到可见屏幕范围 */
-  getRegionClamped(id: string) {
-    return loadNative().getWindowRegionClamped(id);
-  },
-
-  /** 客户区左上角在屏幕上的坐标 */
-  getClientOrigin(id: string) {
-    return loadNative().getWindowClientOrigin(id);
-  },
-
-  move(id: string, x: number, y: number) {
-    loadNative().moveWindow(id, x, y);
-  },
-
-  resize(id: string, width: number, height: number) {
-    loadNative().resizeWindow(id, width, height);
-  },
-
-  minimize(id: string) {
-    loadNative().minimizeWindow(id);
-  },
-
-  restore(id: string) {
-    loadNative().restoreWindow(id);
-  },
-
-  /** 截取窗口内容为 RGBA {@link CaptureImage} */
-  capture(id: string): CaptureImage {
-    return loadNative().captureWindow(id);
-  },
-};
-
 export { centerOf };
 
 /**
@@ -428,16 +352,7 @@ export function captureToBase64(capture: CaptureImage): string {
 
 export * from "@spotterjs/base";
 export { screen } from "./screen";
-export { findInWindow, findAllInWindow, tapInWindow } from "./template";
-export { loadNative } from "./native";
-export type {
-  SpotterNative,
-  NativeSpotter,
-  NativeWindow,
-  NativeDesktopApp,
-  NativeCapture,
-  NativeMatchOptions,
-} from "./native";
+export { windows } from "./windows";
 export { accessibility } from "./accessibility";
 export type {
   A11yQuery,
@@ -455,12 +370,7 @@ export { desktop } from "./desktop";
 export { host, configureHost, HostPathError } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";
 export { encodePng, encodePngBase64 } from "./capture";
-export {
-  findAllInCapture,
-  findInCapture,
-  loadImageFromBuffer,
-  waitForInCapture,
-} from "./buffer-match";
+export { image } from "./buffer-match";
 export {
   matchTapScreen,
   toLocal,

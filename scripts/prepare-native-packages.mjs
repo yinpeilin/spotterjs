@@ -9,11 +9,13 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const nativeRoot = join(root, "crates", "spotterjs-node");
 const license = join(root, "LICENSE");
+const releaseRoot = join(root, "target", "release");
 
 const packages = [
   {
     triple: "win32-x64-msvc",
     binary: "index.win32-x64-msvc.node",
+    releaseBinary: "spotterjs_node.dll",
   },
   {
     triple: "linux-x64-gnu",
@@ -24,8 +26,12 @@ const packages = [
 let copied = 0;
 
 for (const pkg of packages) {
-  const source = join(nativeRoot, pkg.binary);
-  if (!existsSync(source)) {
+  const sourceCandidates = [
+    pkg.releaseBinary ? join(releaseRoot, pkg.releaseBinary) : undefined,
+    join(nativeRoot, pkg.binary),
+  ].filter(Boolean);
+  const source = sourceCandidates.find((candidate) => existsSync(candidate));
+  if (!source) {
     console.log(`prepare-native-packages: skip ${pkg.triple} (missing ${pkg.binary})`);
     continue;
   }

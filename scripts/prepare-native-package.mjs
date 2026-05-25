@@ -18,11 +18,20 @@ if (!triple || !binaries[triple]) {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const nativeRoot = join(root, "crates", "spotterjs-node");
-const source = join(nativeRoot, binaries[triple]);
+const releaseDlls = {
+  "win32-x64-msvc": "spotterjs_node.dll",
+};
+const sourceCandidates = [
+  releaseDlls[triple] ? join(root, "target", "release", releaseDlls[triple]) : undefined,
+  join(nativeRoot, binaries[triple]),
+].filter(Boolean);
 const targetDir = join(nativeRoot, triple);
+const source = sourceCandidates.find((candidate) => existsSync(candidate));
 
-if (!existsSync(source)) {
-  throw new Error(`Missing ${binaries[triple]}. Run npm run build -w @spotterjs/node on ${triple} before publishing.`);
+if (!source) {
+  throw new Error(
+    `Missing ${binaries[triple]}. Run npm run build -w @spotterjs/node on ${triple} before publishing.`,
+  );
 }
 
 mkdirSync(targetDir, { recursive: true });

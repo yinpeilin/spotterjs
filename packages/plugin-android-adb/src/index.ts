@@ -1,9 +1,4 @@
-import { execFile, type ExecFileException } from "node:child_process";
-import {
-  findAllInCapture,
-  findInCapture,
-  loadImageFromBuffer,
-} from "@spotterjs/core";
+import { image } from "@spotterjs/core";
 import type {
   CaptureImage,
   MatchOptions,
@@ -11,167 +6,59 @@ import type {
   Point,
   TemplateImage,
 } from "@spotterjs/base";
+import { AdbError, normalizeOptions, resolveAdbPath, runAdb } from "./adb";
+import type { RunOptions } from "./adb";
+import { discoverDevices } from "./discovery";
+import { AdbDeviceGroup } from "./group";
+import { escapeAdbText } from "./input";
+import { connectNetworkRaw, pairTcp } from "./pairing";
+import {
+  findAndroidElements,
+  isAndroidElementNode,
+  parseUiautomatorXml,
+} from "./uiautomator";
+import type {
+  AndroidConnectOptions,
+  AndroidCurrentApp,
+  AndroidDevice,
+  AndroidDeviceInfo,
+  AndroidDisplayInfo,
+  AndroidElementNode,
+  AndroidElementQuery,
+  AndroidElementQueryOptions,
+  AndroidElementTarget,
+  AndroidNetworkOptions,
+  AndroidOptions,
+  AndroidPairTcpOptions,
+  AndroidTreeOptions,
+} from "./types";
 
-export type AndroidDeviceState = "device" | "offline" | "unauthorized";
+export { AdbError, resolveAdbPath };
+export type {
+  AdbErrorCode,
+  RunOptions,
+} from "./adb";
+export type {
+  AndroidBatchResult,
+  AndroidConnectOptions,
+  AndroidCurrentApp,
+  AndroidDevice,
+  AndroidDeviceConnection,
+  AndroidDeviceGroup,
+  AndroidDeviceInfo,
+  AndroidDeviceState,
+  AndroidDisplayInfo,
+  AndroidElementNode,
+  AndroidElementQuery,
+  AndroidElementQueryOptions,
+  AndroidElementTarget,
+  AndroidNetworkOptions,
+  AndroidOptions,
+  AndroidPairTcpOptions,
+  AndroidTreeOptions,
+} from "./types";
 
-export interface AndroidDeviceInfo {
-  serial: string;
-  state: AndroidDeviceState;
-  model?: string;
-  product?: string;
-  transportId?: string;
-}
-
-export interface AndroidConnectOptions {
-  serial: string;
-  adbPath?: string;
-  timeoutMs?: number;
-}
-
-export interface AndroidOptions {
-  adbPath?: string;
-  timeoutMs?: number;
-}
-
-export interface AndroidDevice {
-  serial: string;
-  getInfo(): Promise<AndroidDeviceInfo>;
-  capture(): Promise<CaptureImage>;
-  tap(x: number, y: number): Promise<void>;
-  swipe(
-    from: Point,
-    to: Point,
-    options?: { durationMs?: number }
-  ): Promise<void>;
-  text(text: string): Promise<void>;
-  keyevent(key: string | number): Promise<void>;
-  back(): Promise<void>;
-  home(): Promise<void>;
-  startApp(packageName: string, activity?: string): Promise<void>;
-  stopApp(packageName: string): Promise<void>;
-  find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult>;
-  findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]>;
-  waitFor(
-    needle: TemplateImage,
-    timeoutMs: number,
-    options?: MatchOptions,
-    intervalMs?: number
-  ): Promise<MatchResult>;
-}
-
-export type AdbErrorCode =
-  | "ADB_NOT_FOUND"
-  | "ADB_TIMEOUT"
-  | "ADB_COMMAND_FAILED"
-  | "ADB_DEVICE_NOT_FOUND"
-  | "ADB_DEVICE_OFFLINE"
-  | "ADB_DEVICE_UNAUTHORIZED";
-
-export class AdbError extends Error {
-  readonly code: AdbErrorCode;
-  readonly stderr?: string;
-
-  constructor(code: AdbErrorCode, message: string, stderr?: string) {
-    super(message);
-    this.name = "AdbError";
-    this.code = code;
-    this.stderr = stderr;
-  }
-}
-
-type RunOptions = Required<Pick<AndroidOptions, "adbPath" | "timeoutMs">>;
-
-const DEFAULT_ADB_PATH = "adb";
-const DEFAULT_TIMEOUT_MS = 30_000;
-
-function normalizeOptions(options?: AndroidOptions): RunOptions {
-  return {
-    adbPath: options?.adbPath ?? DEFAULT_ADB_PATH,
-    timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  };
-}
-
-function runAdb(
-  args: string[],
-  options?: AndroidOptions & { encoding?: BufferEncoding | "buffer" }
-): Promise<string | Buffer> {
-  const normalized = normalizeOptions(options);
-  const encoding = options?.encoding ?? "utf8";
-
-  return new Promise((resolve, reject) => {
-    execFile(
-      normalized.adbPath,
-      args,
-      {
-        timeout: normalized.timeoutMs,
-        encoding: encoding === "buffer" ? "buffer" : encoding,
-        windowsHide: true,
-        maxBuffer: 64 * 1024 * 1024,
-      },
-      (error, stdout, stderr) => {
-        if (error) {
-          reject(toAdbError(error, String(stderr ?? "")));
-          return;
-        }
-        resolve(stdout);
-      }
-    );
-  });
-}
-
-function toAdbError(error: ExecFileException, stderr: string): AdbError {
-  if (error.code === "ENOENT") {
-    return new AdbError(
-      "ADB_NOT_FOUND",
-      "adb executable not found; install Android platform-tools or pass adbPath",
-      stderr
-    );
-  }
-  if (error.killed || error.signal === "SIGTERM") {
-    return new AdbError("ADB_TIMEOUT", "adb command timed out", stderr);
-  }
-  const message = stderr || error.message || "adb command failed";
-  if (/device offline/i.test(message)) {
-    return new AdbError("ADB_DEVICE_OFFLINE", message, stderr);
-  }
-  if (/unauthorized/i.test(message)) {
-    return new AdbError("ADB_DEVICE_UNAUTHORIZED", message, stderr);
-  }
-  if (/device .*not found|no devices/i.test(message)) {
-    return new AdbError("ADB_DEVICE_NOT_FOUND", message, stderr);
-  }
-  return new AdbError("ADB_COMMAND_FAILED", message, stderr);
-}
-
-export function parseAdbDevices(output: string): AndroidDeviceInfo[] {
-  return output
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("List of devices"))
-    .map((line) => {
-      const parts = line.split(/\s+/);
-      const serial = parts[0];
-      const state = parts[1] as AndroidDeviceState;
-      const info: AndroidDeviceInfo = { serial, state };
-
-      for (const part of parts.slice(2)) {
-        const [key, value] = part.split(":", 2);
-        if (!value) continue;
-        if (key === "model") info.model = value;
-        if (key === "product") info.product = value;
-        if (key === "transport_id") info.transportId = value;
-      }
-
-      return info;
-    });
-}
-
-export function escapeAdbText(text: string): string {
-  return text
-    .replace(/[&|;<>()$`\\"]/g, " ")
-    .trim()
-    .replace(/\s+/g, "%s");
-}
+export { findAndroidElements, parseUiautomatorXml };
 
 function componentName(packageName: string, activity?: string): string {
   if (!activity) return packageName;
@@ -190,7 +77,7 @@ class AdbDevice implements AndroidDevice {
   }
 
   async getInfo(): Promise<AndroidDeviceInfo> {
-    const devices = await android.listDevices(this.options);
+    const devices = await discoverDevices(this.options);
     const device = devices.find((d) => d.serial === this.serial);
     if (!device) {
       throw new AdbError(
@@ -216,7 +103,7 @@ class AdbDevice implements AndroidDevice {
         ["exec-out", "screencap", "-p"],
         { encoding: "buffer" }
       )) as Buffer;
-      return loadImageFromBuffer(bytes);
+      return image.decode(bytes);
     });
   }
 
@@ -282,18 +169,141 @@ class AdbDevice implements AndroidDevice {
     );
   }
 
+  dumpTree(options?: AndroidTreeOptions): Promise<AndroidElementNode> {
+    const remotePath = options?.remotePath ?? "/sdcard/window.xml";
+    return this.enqueue(async () => {
+      try {
+        await this.runDevice(["shell", "uiautomator", "dump", remotePath]);
+        const xml = (await this.runDevice([
+          "exec-out",
+          "cat",
+          remotePath,
+        ])) as string;
+        const tree = parseUiautomatorXml(xml);
+        return options?.maxDepth === undefined
+          ? tree
+          : limitTreeDepth(tree, options.maxDepth);
+      } finally {
+        try {
+          await this.runDevice(["shell", "rm", "-f", remotePath]);
+        } catch {
+          // Best-effort cleanup should never mask the dump/read failure.
+        }
+      }
+    });
+  }
+
+  async findElement(
+    query: AndroidElementQuery,
+    options?: AndroidElementQueryOptions
+  ): Promise<AndroidElementNode> {
+    const matches = await this.findElements(query, options);
+    const first = matches[0];
+    if (!first) {
+      throw new Error(`Android element not found: ${JSON.stringify(query)}`);
+    }
+    return first;
+  }
+
+  async findElements(
+    query: AndroidElementQuery,
+    options?: AndroidElementQueryOptions
+  ): Promise<AndroidElementNode[]> {
+    const tree = await this.dumpTree(options);
+    return findAndroidElements(tree, query, options);
+  }
+
+  async waitForElement(
+    query: AndroidElementQuery,
+    timeoutMs: number,
+    options?: AndroidElementQueryOptions
+  ): Promise<AndroidElementNode> {
+    const deadline = Date.now() + timeoutMs;
+    const pollMs = options?.pollMs ?? 250;
+    let lastError: unknown;
+
+    while (Date.now() <= deadline) {
+      try {
+        return await this.findElement(query, options);
+      } catch (error) {
+        lastError = error;
+        if (Date.now() > deadline) break;
+        if (pollMs > 0) await sleep(pollMs);
+      }
+    }
+
+    if (lastError instanceof Error) {
+      throw new Error(`Timed out waiting for Android element: ${lastError.message}`);
+    }
+    throw new Error("Timed out waiting for Android element");
+  }
+
+  async tapElement(
+    target: AndroidElementTarget,
+    options?: AndroidElementQueryOptions
+  ): Promise<AndroidElementNode> {
+    const element = await this.resolveElement(target, options);
+    await this.tap(element.center.x, element.center.y);
+    return element;
+  }
+
+  async typeElement(
+    target: AndroidElementTarget,
+    text: string,
+    options?: AndroidElementQueryOptions
+  ): Promise<AndroidElementNode> {
+    const element = await this.tapElement(target, options);
+    await this.text(text);
+    return element;
+  }
+
+  shell(command: string): Promise<string> {
+    return this.enqueue(() =>
+      this.runDevice(["shell", command]).then((output) => output as string)
+    );
+  }
+
+  getDisplayInfo(): Promise<AndroidDisplayInfo> {
+    return this.enqueue(async () => {
+      const size = (await this.runDevice(["shell", "wm", "size"])) as string;
+      const density = (await this.runDevice(["shell", "wm", "density"])) as string;
+      return parseDisplayInfo(size, density);
+    });
+  }
+
+  wake(): Promise<void> {
+    return this.keyevent("WAKEUP");
+  }
+
+  sleep(): Promise<void> {
+    return this.keyevent("SLEEP");
+  }
+
+  currentApp(): Promise<AndroidCurrentApp> {
+    return this.enqueue(async () => {
+      const raw = (await this.runDevice(["shell", "dumpsys", "window"])) as string;
+      return parseCurrentApp(raw);
+    });
+  }
+
+  clearApp(packageName: string): Promise<void> {
+    return this.enqueue(() =>
+      this.runDevice(["shell", "pm", "clear", packageName]).then(noop)
+    );
+  }
+
   async find(
     needle: TemplateImage,
     options?: MatchOptions
   ): Promise<MatchResult> {
-    return findInCapture(await this.capture(), needle, options);
+    return image.find(await this.capture(), needle, options);
   }
 
   async findAll(
     needle: TemplateImage,
     options?: MatchOptions
   ): Promise<MatchResult[]> {
-    return findAllInCapture(await this.capture(), needle, options);
+    return image.findAll(await this.capture(), needle, options);
   }
 
   async waitFor(
@@ -308,7 +318,7 @@ class AdbDevice implements AndroidDevice {
 
     while (Date.now() <= deadline) {
       try {
-        return await findInCapture(await this.capture(), needle, options);
+        return await image.find(await this.capture(), needle, options);
       } catch (error) {
         lastError = error;
         if (Date.now() > deadline) break;
@@ -337,6 +347,14 @@ class AdbDevice implements AndroidDevice {
     this.queue = next.then(noop, noop);
     return next;
   }
+
+  private resolveElement(
+    target: AndroidElementTarget,
+    options?: AndroidElementQueryOptions
+  ): Promise<AndroidElementNode> {
+    if (isAndroidElementNode(target)) return Promise.resolve(target);
+    return this.findElement(target, options);
+  }
 }
 
 function noop(): void {
@@ -347,22 +365,107 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseDisplayInfo(sizeOutput: string, densityOutput: string): AndroidDisplayInfo {
+  const overrideSize = /Override size:\s*(\d+)x(\d+)/i.exec(sizeOutput);
+  const physicalSize = /Physical size:\s*(\d+)x(\d+)/i.exec(sizeOutput);
+  const size = overrideSize ?? physicalSize;
+  if (!size) throw new Error(`Unable to parse Android display size: ${sizeOutput}`);
+  const overrideDensity = /Override density:\s*(\d+)/i.exec(densityOutput);
+  const physicalDensity = /Physical density:\s*(\d+)/i.exec(densityOutput);
+  const density = overrideDensity ?? physicalDensity;
+  return {
+    width: Number(size[1]),
+    height: Number(size[2]),
+    density: density ? Number(density[1]) : undefined,
+  };
+}
+
+function parseCurrentApp(raw: string): AndroidCurrentApp {
+  const focus =
+    /mCurrentFocus=.*?\s([A-Za-z0-9_.]+)\/([^\s}]+)/.exec(raw) ??
+    /mFocusedApp=.*?\s([A-Za-z0-9_.]+)\/([^\s}]+)/.exec(raw);
+  return {
+    packageName: focus?.[1],
+    activity: focus?.[2],
+    raw,
+  };
+}
+
+function limitTreeDepth(
+  node: AndroidElementNode,
+  maxDepth: number
+): AndroidElementNode {
+  return {
+    ...node,
+    children:
+      node.depth >= maxDepth
+        ? []
+        : node.children.map((child) => limitTreeDepth(child, maxDepth)),
+  };
+}
+
 export const android = {
-  async listDevices(options?: AndroidOptions): Promise<AndroidDeviceInfo[]> {
-    const stdout = (await runAdb(["devices", "-l"], options)) as string;
-    return parseAdbDevices(stdout);
+  resolveAdbPath,
+
+  discover(options?: AndroidOptions): Promise<AndroidDeviceInfo[]> {
+    return discoverDevices(options);
   },
 
   async connect(options: AndroidConnectOptions): Promise<AndroidDevice> {
     return new AdbDevice(options);
   },
 
-  async connectTcp(
-    address: string,
-    options?: AndroidOptions
-  ): Promise<AndroidDevice> {
-    const normalized = normalizeOptions(options);
-    await runAdb(["connect", address], normalized);
-    return new AdbDevice({ serial: address, ...normalized });
+  async connectDefault(options?: AndroidOptions): Promise<AndroidDevice> {
+    const devices = await discoverDevices(options);
+    const available = devices.filter((device) => device.state === "device");
+    if (available.length === 1) {
+      return new AdbDevice({ serial: available[0].serial, ...options });
+    }
+    if (available.length === 0) {
+      throw new AdbError(
+        "ADB_DEVICE_NOT_FOUND",
+        "no available Android device; connect USB debugging or use wireless adb connect",
+        undefined,
+        devices
+      );
+    }
+    throw new AdbError(
+      "ADB_MULTIPLE_DEVICES",
+      "multiple Android devices are available; use connectAll or pass a serial",
+      undefined,
+      available
+    );
   },
+
+  async connectAll(options?: AndroidOptions): Promise<AdbDeviceGroup> {
+    const devices = await discoverDevices(options);
+    const available = devices.filter((device) => device.state === "device");
+    const skipped = devices.filter((device) => device.state !== "device");
+    return new AdbDeviceGroup(
+      available.map((device) => new AdbDevice({ serial: device.serial, ...options })),
+      skipped
+    );
+  },
+
+  pairTcp(options: AndroidPairTcpOptions): Promise<void> {
+    return pairTcp(options);
+  },
+
+  async connectNetwork(options: AndroidNetworkOptions): Promise<AndroidDevice> {
+    const serial = await connectNetworkRaw(options);
+    const devices = await discoverDevices(options);
+    const device = devices.find(
+      (candidate) => candidate.serial === serial && candidate.state === "device"
+    );
+    if (!device) {
+      throw new AdbError(
+        "ADB_DEVICE_NOT_FOUND",
+        `wireless Android device connected but not visible to adb: ${serial}`,
+        undefined,
+        devices
+      );
+    }
+    return new AdbDevice({ serial: device.serial, ...options });
+  },
+
 };

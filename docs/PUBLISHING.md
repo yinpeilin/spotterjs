@@ -1,9 +1,24 @@
-# spotterjs 发布手册（维护者）
+# spotterjs 发布手册
 
-源码托管：[Gitee ypl0lpy/spotterjs](https://gitee.com/ypl0lpy/spotterjs)  
-npm 包：`@spotterjs/*`（公开 registry，按需发布）。
+这份手册面向维护者，覆盖 changeset、license 同步、native optional package 和 npm 发布顺序。
 
-> 首版 npm 发布、CI 密钥由维护者在需要时自行配置；仓库已具备 monorepo 结构与脚本。
+## 发布前检查
+
+```bash
+npm ci
+npm run docs:check
+npm run build:ts
+npm test
+npm run sync-license
+npm run verify-pack
+```
+
+如果改动涉及 native 能力，还需要在对应平台运行 native 构建和 Smoke：
+
+```bash
+npm run build:native
+npm run smoke
+```
 
 ## Git 远程
 
@@ -12,47 +27,102 @@ git remote add origin git@gitee.com:ypl0lpy/spotterjs.git
 git push -u origin master
 ```
 
-HTTPS 克隆：`git clone https://gitee.com/ypl0lpy/spotterjs.git`
-
-## 日常开发
+HTTPS clone：
 
 ```bash
-npm ci
-npm run build:ts
-npm test
-npm run sync-license   # 发布前同步 LICENSE 到各包
+git clone https://gitee.com/ypl0lpy/spotterjs.git
 ```
 
-## Changesets 发版（npm，可选）
+## Changesets 流程
 
-1. `npm run changeset`
-2. `npm run version-packages`
-3. 打 tag 后：`npm run release`（需 `NPM_TOKEN`）
+用户可见变更需要 changeset：
+
+```bash
+npm run changeset
+npm run version-packages
+```
+
+检查生成的版本号、CHANGELOG 和 package 依赖范围后再发布。
+
+## License 同步
+
+发布前运行：
+
+```bash
+npm run sync-license
+```
+
+该命令把根许可证同步到各 npm 包。同步后检查 diff，确认没有覆盖包内必须保留的文件。
 
 ## Native platform packages
 
-`@spotterjs/node` is the JS loader package. Platform binaries are published as optional packages:
+`@spotterjs/node` 是 JS loader。平台二进制作为 optional package 发布：
 
 - `@spotterjs/node-win32-x64-msvc`
 - `@spotterjs/node-linux-x64-gnu`
 
-Publish platform packages before `@spotterjs/node`:
+必须先发布平台包，再发布 `@spotterjs/node`，最后发布依赖它的 TypeScript 包。
+
+### Windows x64
 
 ```bash
-# Windows x64 runner
 npm run build -w @spotterjs/node
 node scripts/prepare-native-package.mjs win32-x64-msvc
 npm publish ./crates/spotterjs-node/win32-x64-msvc
+```
 
-# Linux x64 glibc runner
+### Linux x64 glibc
+
+```bash
 npm run build:linux -w @spotterjs/node
 node scripts/prepare-native-package.mjs linux-x64-gnu
 npm publish ./crates/spotterjs-node/linux-x64-gnu
+```
 
-# After platform packages are published
+### JS loader
+
+平台包发布后：
+
+```bash
 npm publish -w @spotterjs/node
 ```
 
-## 许可证
+## TypeScript packages
 
-商用授权：`ypl123698745@qq.com` 或 [Issues](https://gitee.com/ypl0lpy/spotterjs/issues)
+按依赖顺序发布：
+
+```bash
+npm publish -w @spotterjs/base
+npm publish -w @spotterjs/core
+npm publish -w @spotterjs/mcp
+npm publish -w @spotterjs/plugin-ocr
+npm publish -w @spotterjs/plugin-android-adb
+```
+
+如果使用 changesets publish：
+
+```bash
+npm run release
+```
+
+发布前确认 `NPM_TOKEN` 可用，并且 npm registry 指向公开 registry。
+
+## 发布后验证
+
+在一个干净目录安装并验证：
+
+```bash
+npm init -y
+npm install @spotterjs/core
+node -e "const s=require('@spotterjs/core'); console.log(Object.keys(s).slice(0, 5))"
+```
+
+MCP 包验证：
+
+```bash
+npx @modelcontextprotocol/inspector npx @spotterjs/mcp
+```
+
+## 授权说明
+
+商用授权请联系 `ypl123698745@qq.com` 或通过 [Gitee Issues](https://gitee.com/ypl0lpy/spotterjs/issues) 处理。

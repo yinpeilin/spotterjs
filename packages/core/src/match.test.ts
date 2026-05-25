@@ -32,26 +32,27 @@ beforeEach(() => {
 });
 
 describe("findNeedle", () => {
-  it("maps confidence and searchRegion to native findTemplate", async () => {
+  it("maps confidence, region, and scale to native findTemplate", async () => {
     await findNeedle("needle.png", {
       confidence: 0.85,
-      searchRegion: { left: 1, top: 2, width: 3, height: 4 },
+      region: { left: 1, top: 2, width: 3, height: 4 },
+      scale: { min: 0.8, max: 1.2, step: 0.05 },
     });
 
     expect(findTemplate).toHaveBeenCalledWith("needle.png", undefined, {
       confidence: 0.85,
       searchRegion: { left: 1, top: 2, width: 3, height: 4 },
-      multiScale: undefined,
-      scaleMin: undefined,
-      scaleMax: undefined,
-      scaleStep: undefined,
+      multiScale: true,
+      scaleMin: 0.8,
+      scaleMax: 1.2,
+      scaleStep: 0.05,
     });
   });
 
   it("passes Buffer as encoded image bytes to findTemplate", async () => {
     const buf = Buffer.from("x");
 
-    await findNeedle(buf, { multiScale: true });
+    await findNeedle(buf, { scale: true });
 
     expect(findTemplate).toHaveBeenCalledWith("", buf, {
       confidence: undefined,
@@ -111,14 +112,25 @@ describe("findAllNeedle", () => {
 
 describe("waitForNeedle", () => {
   it("returns a MatchResult with screen center and score", async () => {
-    const match = await waitForNeedle("needle.png", 500);
+    const match = await waitForNeedle("needle.png", {
+      timeoutMs: 500,
+      intervalMs: 25,
+      confidence: 0.8,
+    });
 
     expect(waitForTemplate).toHaveBeenCalledWith(
       "needle.png",
       undefined,
       500,
-      undefined,
-      undefined
+      {
+        confidence: 0.8,
+        searchRegion: undefined,
+        multiScale: undefined,
+        scaleMin: undefined,
+        scaleMax: undefined,
+        scaleStep: undefined,
+      },
+      25
     );
     expect(match).toEqual({
       region: { left: 1, top: 2, width: 10, height: 10 },

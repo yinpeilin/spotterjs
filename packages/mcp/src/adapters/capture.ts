@@ -1,33 +1,21 @@
-import { captureToBase64, screen } from "@spotterjs/core";
+import { screen } from "@spotterjs/core";
 import type { Region } from "@spotterjs/base";
+import { writeCaptureArtifact } from "./artifacts.js";
 
-export function captureScreenBase64(region?: Region) {
+export function captureScreenArtifact(region?: Region) {
   const img = screen.capture(region);
-  return {
-    width: img.width,
-    height: img.height,
-    format: "png" as const,
-    base64: captureToBase64(img),
-  };
+  return writeCaptureArtifact(img, { prefix: "desktop-screen" });
 }
 
-export function captureWindowBase64(windowId: string) {
+export function captureWindowArtifact(windowId: string) {
   const img = screen.captureWindow(windowId);
   return {
-    width: img.width,
-    height: img.height,
-    format: "png" as const,
-    base64: captureToBase64(img),
+    ...writeCaptureArtifact(img, { prefix: "desktop-window" }),
     windowId,
   };
 }
 
-export function captureActiveBase64() {
+export function captureActiveArtifact() {
   const img = screen.captureActive();
-  return {
-    width: img.width,
-    height: img.height,
-    format: "png" as const,
-    base64: captureToBase64(img),
-  };
+  return writeCaptureArtifact(img, { prefix: "desktop-active" });
 }

@@ -1,5 +1,24 @@
 # @spotterjs/core
 
+## 1.0.1
+
+### Patch Changes
+
+- Reshape the public automation API around stable namespaces.
+
+  - Replace `windowApi`, `findInWindow`, `findAllInWindow`, and `tapInWindow` with the `windows` namespace.
+  - Replace `searchRegion` with `region`, and `multiScale` / `scaleMin` / `scaleMax` / `scaleStep` with `scale`.
+  - Replace `screen.tapTemplate()` with async `screen.tap()`.
+  - Replace root image helpers with `image.decode()`, `image.find()`, and `image.findAll()`.
+  - Move `loadNative` and native binding types to `@spotterjs/core/native`.
+  - Rebuild native packages in release mode, with the Windows binary statically linking the MSVC CRT.
+
+### Patch Changes
+
+- Updated dependencies
+  - @spotterjs/base@1.0.1
+  - @spotterjs/node@1.0.1
+
 ## 1.0.0
 
 ### Major Changes

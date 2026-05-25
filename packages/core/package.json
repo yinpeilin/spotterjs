@@ -1,9 +1,22 @@
 {
     "name": "@spotterjs/core",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "spotterjs desktop automation - TypeScript API",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "require": "./dist/index.js",
+            "default": "./dist/index.js"
+        },
+        "./native": {
+            "types": "./dist/native.d.ts",
+            "require": "./dist/native.js",
+            "default": "./dist/native.js"
+        },
+        "./package.json": "./package.json"
+    },
     "license": "SEE LICENSE IN LICENSE",
     "repository": {
         "type": "git",
@@ -32,8 +45,8 @@
         "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
     },
     "dependencies": {
-        "@spotterjs/base": "1.0.0",
-        "@spotterjs/node": "1.0.0"
+        "@spotterjs/base": "1.0.1",
+        "@spotterjs/node": "1.0.1"
     },
     "devDependencies": {
         "typescript": "^5.4.0",

@@ -46,7 +46,6 @@ export type {
   OcrImage,
   OcrBuiltInModelProfileName,
   OcrModelProfile,
-  OcrReadOptions as OcrOptions,
   OcrReadOptions,
   OcrSession,
   OcrTextLine,
@@ -88,10 +87,6 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
     },
   };
   return client;
-}
-
-export async function useOcrPlugin(options?: CreateOcrOptions): Promise<OcrClient> {
-  return createOcr(options);
 }
 
 async function prepareImage(

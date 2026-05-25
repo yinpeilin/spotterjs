@@ -5,8 +5,8 @@ use super::types::{A11yBounds, A11yConfig, A11yElementId, A11yQuery, TreeHealth,
 use crate::error::{Result, SpotterError};
 use crate::types::{Region, WindowId};
 use atspi::connection::AccessibilityConnection;
-use atspi::proxy::action::ActionProxy;
 use atspi::proxy::accessible::AccessibleProxy;
+use atspi::proxy::action::ActionProxy;
 use atspi::proxy::component::ComponentProxy;
 use atspi::proxy::editable_text::EditableTextProxy;
 use atspi::{CoordType, ObjectRef, Role};
@@ -73,7 +73,12 @@ fn normalize_control_type_name(s: &str) -> String {
 fn role_aliases_for_control_type(s: &str) -> Option<&'static [&'static str]> {
     match normalize_control_type_name(s).as_str() {
         "listitem" => Some(&["ListItem"]),
-        "menuitem" => Some(&["MenuItem", "CheckMenuItem", "RadioMenuItem", "TearoffMenuItem"]),
+        "menuitem" => Some(&[
+            "MenuItem",
+            "CheckMenuItem",
+            "RadioMenuItem",
+            "TearoffMenuItem",
+        ]),
         "menu" => Some(&["Menu", "PopupMenu", "MenuBar"]),
         "list" => Some(&["List", "ListBox"]),
         "tab" => Some(&["PageTabList", "TabList", "Tab"]),
@@ -223,7 +228,8 @@ async fn find_rec(
         .map_err(|e| SpotterError::Platform(format!("get_children: {e}")))?;
     for child in children {
         let child_stored = stored_from_ref(&child);
-        if let Ok(found) = Box::pin(find_rec(conn, &child_stored, query, depth + 1, max_depth)).await
+        if let Ok(found) =
+            Box::pin(find_rec(conn, &child_stored, query, depth + 1, max_depth)).await
         {
             return Ok(found);
         }
@@ -371,19 +377,18 @@ async fn build_dump(
     let proxy = accessible_proxy(conn, stored).await?;
     let name = proxy.name().await.unwrap_or_default();
     let role = proxy.get_role().await.unwrap_or(Role::Unknown);
-    let bounds = match component_proxy(conn, stored).await {
-        Ok(component) => component
-            .get_extents(CoordType::Screen)
-            .await
-            .ok()
-            .map(|(left, top, width, height)| A11yBounds {
-                left,
-                top,
-                width,
-                height,
-            }),
-        Err(_) => None,
-    };
+    let bounds =
+        match component_proxy(conn, stored).await {
+            Ok(component) => component.get_extents(CoordType::Screen).await.ok().map(
+                |(left, top, width, height)| A11yBounds {
+                    left,
+                    top,
+                    width,
+                    height,
+                },
+            ),
+            Err(_) => None,
+        };
     let mut children = Vec::new();
     if depth < max_depth {
         if let Ok(kids) = proxy.get_children().await {

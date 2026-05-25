@@ -1,4 +1,6 @@
-use crate::error::{Result, SpotterError};
+use crate::error::Result;
+#[cfg(not(windows))]
+use crate::error::SpotterError;
 use crate::types::{MouseButton, Point};
 use std::thread;
 use std::time::Duration;

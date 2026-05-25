@@ -9,12 +9,12 @@ import {
   keyboard,
   mouse,
   screen,
-  windowApi,
+  windows,
 } from "@spotterjs/core";
 import {
-  captureActiveBase64,
-  captureScreenBase64,
-  captureWindowBase64,
+  captureActiveArtifact,
+  captureScreenArtifact,
+  captureWindowArtifact,
 } from "../adapters/capture.js";
 
 const regionSchema = z
@@ -28,11 +28,17 @@ const regionSchema = z
 
 const matchOptionsSchema = {
   confidence: z.number().optional(),
-  searchRegion: regionSchema,
-  multiScale: z.boolean().optional(),
-  scaleMin: z.number().optional(),
-  scaleMax: z.number().optional(),
-  scaleStep: z.number().optional(),
+  region: regionSchema,
+  scale: z
+    .union([
+      z.boolean(),
+      z.object({
+        min: z.number().optional(),
+        max: z.number().optional(),
+        step: z.number().optional(),
+      }),
+    ])
+    .optional(),
 };
 
 const templateImageSchema = z.union([
@@ -55,7 +61,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       description: "List visible top-level windows with process metadata",
     },
     async () => ({
-      content: [{ type: "text", text: JSON.stringify(windowApi.list(), null, 2) }],
+      content: [{ type: "text", text: JSON.stringify(windows.list(), null, 2) }],
     })
   );
 
@@ -74,7 +80,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     { description: "Get the foreground window" },
     async () => ({
       content: [
-        { type: "text", text: JSON.stringify(windowApi.getActive(), null, 2) },
+        { type: "text", text: JSON.stringify(windows.active(), null, 2) },
       ],
     })
   );
@@ -82,20 +88,14 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   server.registerTool(
     "desktop_capture_screen",
     {
-      description: "Capture screen or region; returns PNG base64",
+      description:
+        "Capture screen or region, downscale long edge to 1600 when needed, and return a workspace PNG file path",
       inputSchema: z.object({ region: regionSchema }),
     },
     async ({ region }) => {
-      const cap = captureScreenBase64(region);
+      const cap = captureScreenArtifact(region);
       return {
-        content: [
-          { type: "text", text: JSON.stringify({ ...cap, base64: `[${cap.base64.length} chars]` }) },
-          {
-            type: "image",
-            data: cap.base64,
-            mimeType: "image/png",
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(cap, null, 2) }],
       };
     }
   );
@@ -103,16 +103,14 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   server.registerTool(
     "desktop_capture_window",
     {
-      description: "Capture a window by id; returns PNG base64",
+      description:
+        "Capture a window by id, downscale long edge to 1600 when needed, and return a workspace PNG file path",
       inputSchema: z.object({ windowId: z.string() }),
     },
     async ({ windowId }) => {
-      const cap = captureWindowBase64(windowId);
+      const cap = captureWindowArtifact(windowId);
       return {
-        content: [
-          { type: "text", text: JSON.stringify({ width: cap.width, height: cap.height, windowId }) },
-          { type: "image", data: cap.base64, mimeType: "image/png" },
-        ],
+        content: [{ type: "text", text: JSON.stringify(cap, null, 2) }],
       };
     }
   );
@@ -120,15 +118,13 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   server.registerTool(
     "desktop_capture_active",
     {
-      description: "Capture the foreground window; returns PNG base64",
+      description:
+        "Capture the foreground window, downscale long edge to 1600 when needed, and return a workspace PNG file path",
     },
     async () => {
-      const cap = captureActiveBase64();
+      const cap = captureActiveArtifact();
       return {
-        content: [
-          { type: "text", text: JSON.stringify({ width: cap.width, height: cap.height }) },
-          { type: "image", data: cap.base64, mimeType: "image/png" },
-        ],
+        content: [{ type: "text", text: JSON.stringify(cap, null, 2) }],
       };
     }
   );
@@ -139,7 +135,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       inputSchema: z.object({ windowId: z.string() }),
     },
     async ({ windowId }) => {
-      windowApi.focus(windowId);
+      windows.focus(windowId);
       return { content: [{ type: "text", text: "ok" }] };
     }
   );

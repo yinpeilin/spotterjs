@@ -1,7 +1,7 @@
 import { centerOf, type Point, type Region } from "@spotterjs/base";
 
 /**
- * 窗口外框（与 `windowApi.getRegion` / `captureWindow` 一致）。
+ * 窗口外框（与 `windows.region` / `windows.capture` 一致）。
  *
  * 用于屏幕坐标与窗口局部坐标互转。
  */

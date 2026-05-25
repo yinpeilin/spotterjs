@@ -1,4 +1,6 @@
-use crate::error::{Result, SpotterError};
+use crate::error::Result;
+#[cfg(not(any(windows, all(target_os = "linux", feature = "linux-x11"))))]
+use crate::error::SpotterError;
 use crate::types::{Region, RgbaImage, WindowId, WindowInfo};
 
 pub(crate) trait PlatformScreen: Send + Sync {

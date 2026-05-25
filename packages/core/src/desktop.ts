@@ -29,7 +29,7 @@ function mapApp(a: NativeDesktopApp): DesktopApp {
  * 桌面应用与窗口 discovery（按进程聚合）。
  *
  * 适合「按进程名找窗口」「等待某标题窗口出现」等场景。
- * 窗口 ID 可用于 {@link windowApi}、`findInWindow` 等。
+ * 窗口 ID 可用于 `windows`、`windows.findTemplate` 等。
  */
 export const desktop = {
   /**

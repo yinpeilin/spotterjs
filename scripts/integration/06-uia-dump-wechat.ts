@@ -4,7 +4,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import { accessibility, windowApi } from "@spotterjs/core";
+import { accessibility, windows } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
@@ -19,7 +19,7 @@ export async function run(): Promise<void> {
 
   const win = findWechatWindow();
   info(`WeChat: "${win.title}" id=${win.id}`);
-  windowApi.focus(win.id);
+  windows.focus(win.id);
   await sleep(800);
 
   const report = accessibility.debug.attachWindowReport(win.id, depth);
@@ -75,8 +75,8 @@ export async function run(): Promise<void> {
 }
 
 function findWechatWindow() {
-  const windows = windowApi.list();
-  const matches = windows.filter((w) => w.title.includes("微信"));
+  const allWindows = windows.list();
+  const matches = allWindows.filter((w) => w.title.includes("微信"));
   if (matches.length === 0) {
     throw new Error('未找到标题含「微信」的窗口');
   }

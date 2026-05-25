@@ -8,7 +8,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import { loadNative } from "@spotterjs/core";
+import { loadNative } from "@spotterjs/core/native";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { drawRectOutline, writeRgbaPng } from "../lib/png";
 

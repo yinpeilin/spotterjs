@@ -1,8 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { configureHost } from "@spotterjs/core";
+import { accessibility, configureHost } from "@spotterjs/core";
 import { registerDesktopTools } from "./tools/desktop.js";
 import { registerHostTools } from "./tools/host.js";
+import { registerOcrTools } from "./tools/ocr.js";
 
 export async function registerOptionalAndroidTools(
   server: McpServer,
@@ -36,6 +37,10 @@ export async function runSpotterMcp(): Promise<void> {
   });
 
   registerHostTools(server);
+  registerOcrTools(server);
+  if (a11yEnabled) {
+    accessibility.quick.enable();
+  }
   registerDesktopTools(server, a11yEnabled);
   await registerOptionalAndroidTools(server, androidEnabled);
 

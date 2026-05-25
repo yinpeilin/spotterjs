@@ -14,9 +14,7 @@ import type { Region } from "@spotterjs/base";
 import {
   clipboard,
   keyboard,
-  loadNative,
-  tapInWindow,
-  windowApi,
+  windows,
 } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import {
@@ -47,8 +45,8 @@ function matchOpts(region: Region) {
   const c = Number(process.env.WECHAT_MATCH_CONFIDENCE ?? "0.72");
   return {
     confidence: Number.isFinite(c) ? c : 0.72,
-    searchRegion: region,
-    multiScale: false as const,
+    region,
+    scale: false as const,
   };
 }
 
@@ -63,9 +61,9 @@ function chatInputRegion(win: WechatWin): Region {
 }
 
 async function ensureWechatFocused(win: WechatWin, step: string): Promise<void> {
-  windowApi.focus(win.id);
+  windows.focus(win.id);
   await sleep(450);
-  const active = windowApi.getActive();
+  const active = windows.active();
   if (!active?.title.includes("微信")) {
     throw new Error(
       `${step}: 微信未在前台（当前: "${active?.title ?? "无"}"）。` +
@@ -75,7 +73,7 @@ async function ensureWechatFocused(win: WechatWin, step: string): Promise<void> 
 }
 
 function refreshWin(win: WechatWin): WechatWin {
-  const latest = windowApi.list().find((w) => w.id === win.id);
+  const latest = windows.list().find((w) => w.id === win.id);
   if (!latest) throw new Error("微信窗口已关闭");
   return syncWinRegion({
     id: latest.id,
@@ -159,7 +157,7 @@ export async function run(): Promise<void> {
   const sendTpl = process.env.WECHAT_SEND_TEMPLATE?.trim();
   if (sendTpl && fs.existsSync(sendTpl)) {
     const { width: w, height: h } = refreshed.region;
-    tapInWindow(
+    windows.tapTemplate(
       refreshed.id,
       sendTpl,
       matchOpts({

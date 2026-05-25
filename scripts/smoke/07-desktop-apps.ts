@@ -1,13 +1,13 @@
 /**
  * Smoke: desktop app discovery (process metadata on windows).
  */
-import { desktop, windowApi } from "@spotterjs/core";
+import { desktop, windows } from "@spotterjs/core";
 
 function main() {
-  const windows = windowApi.list();
-  console.log(`windows: ${windows.length}`);
-  if (windows.length > 0) {
-    const w = windows[0];
+  const allWindows = windows.list();
+  console.log(`windows: ${allWindows.length}`);
+  if (allWindows.length > 0) {
+    const w = allWindows[0];
     console.log(
       `sample: title=${w.title} pid=${w.processId} process=${w.processName}`
     );

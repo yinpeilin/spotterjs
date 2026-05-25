@@ -1,4 +1,4 @@
-import { accessibility, windowApi } from "@spotterjs/core";
+import { accessibility, windows } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 /**
@@ -8,10 +8,10 @@ import { info, runSmokeScript } from "../lib/log";
 export async function run(): Promise<void> {
   accessibility.quick.enable({ attachDelayMs: 300 });
 
-  const windows = windowApi.list();
+  const allWindows = windows.list();
   const target =
-    windows.find((w) => /记事本|Notepad/i.test(w.title)) ??
-    windows.find((w) => /计算器|Calculator/i.test(w.title));
+    allWindows.find((w) => /记事本|Notepad/i.test(w.title)) ??
+    allWindows.find((w) => /计算器|Calculator/i.test(w.title));
 
   if (!target) {
     throw new Error(
@@ -20,7 +20,7 @@ export async function run(): Promise<void> {
   }
 
   info(`target window: "${target.title}" id=${target.id}`);
-  windowApi.focus(target.id);
+  windows.focus(target.id);
   await sleep(400);
 
   const report = accessibility.debug.attachWindowReport(target.id, 8);

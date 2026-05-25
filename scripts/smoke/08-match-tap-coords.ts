@@ -7,13 +7,13 @@
  * moves the mouse to matchTapScreen, and asserts getPosition is within tolerance.
  */
 import * as path from "path";
+import { loadNative } from "@spotterjs/core/native";
 import {
-  loadNative,
   matchTapScreen,
   mouse,
   screen,
   toMatchBox,
-  windowApi,
+  windows,
 } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { cropRgba, writeRgbaPng } from "../lib/png";
@@ -70,7 +70,7 @@ function syncFrame(win: { id: string; title: string; region: { left: number; top
 }
 
 export async function run(): Promise<void> {
-  const active = windowApi.getActive();
+  const active = windows.active();
   const frame = syncFrame(active);
   const { width: w, height: h, left: fx, top: fy } = frame.region;
 
@@ -87,7 +87,7 @@ export async function run(): Promise<void> {
     info("window on secondary monitor (frame.left >= primary width)");
   }
 
-  const cap = windowApi.capture(active.id);
+  const cap = windows.capture(active.id);
   const hayData = Buffer.from(cap.data);
   paintPatch(hayData, cap.width, cap.height, PATCH_LEFT, PATCH_TOP, PATCH_W, PATCH_H);
 

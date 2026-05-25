@@ -4,7 +4,7 @@
  *
  *   SPOTTERJS_ACCESSIBILITY=1 tsx scripts/smoke/06-accessibility-gtk.ts
  */
-import { accessibility, windowApi } from "@spotterjs/core";
+import { accessibility, windows } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
@@ -15,17 +15,17 @@ export async function run(): Promise<void> {
 
   accessibility.quick.enable({ attachDelayMs: 500 });
 
-  const windows = windowApi.list();
+  const allWindows = windows.list();
   const target =
-    windows.find((w) => /gedit|文本编辑器/i.test(w.title)) ??
-    windows.find((w) => /Calculator|计算器/i.test(w.title));
+    allWindows.find((w) => /gedit|文本编辑器/i.test(w.title)) ??
+    allWindows.find((w) => /Calculator|计算器/i.test(w.title));
 
   if (!target) {
     throw new Error("Open gedit or Calculator before running this smoke");
   }
 
   info(`target: "${target.title}"`);
-  windowApi.focus(target.id);
+  windows.focus(target.id);
   await sleep(500);
 
   const root = accessibility.quick.attach(target.id);

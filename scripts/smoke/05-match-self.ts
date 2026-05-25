@@ -1,5 +1,6 @@
 import * as path from "path";
-import { loadNative, screen } from "@spotterjs/core";
+import { loadNative } from "@spotterjs/core/native";
+import { screen } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { cropRgba, drawRectOutline, writeRgbaPng } from "../lib/png";
 

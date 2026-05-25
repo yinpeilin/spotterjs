@@ -96,10 +96,7 @@ async function main(): Promise<void> {
   const opts = { confidence: 0.7 };
   const multiOpts = {
     ...opts,
-    multiScale: true,
-    scaleMin: 0.8,
-    scaleMax: 1.2,
-    scaleStep: 0.05,
+    scale: { min: 0.8, max: 1.2, step: 0.05 },
   };
   const needleBytes = fs.readFileSync(needlePath);
   const { width, height } = screen.size();
