@@ -2,8 +2,8 @@
   "name": "spotterjs-workspace",
   "private": true,
   "scripts": {
-    "build": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/node && npm run build -w @spotterjs/core && npm run build -w @spotterjs/mcp && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android-adb",
-    "build:ts": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/core && npm run build -w @spotterjs/mcp && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android-adb",
+    "build": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/node && npm run build -w @spotterjs/core && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android-adb && npm run build -w @spotterjs/mcp",
+    "build:ts": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/core && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android-adb && npm run build -w @spotterjs/mcp",
     "build:native": "npm run build -w @spotterjs/node",
     "docs:check": "node scripts/check-doc-links.mjs",
     "prepare:native-packages": "node scripts/prepare-native-packages.mjs",
