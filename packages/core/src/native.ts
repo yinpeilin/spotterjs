@@ -8,6 +8,7 @@
  * 仅在需要内存 buffer 匹配、脚本级集成或尚未封装的 native 能力时调用 {@link loadNative}。
  */
 import type * as Node from "@spotterjs/node";
+import { createNativeLoadError } from "./native-error";
 
 /** 完整 N-API 模块类型（自动生成绑定） */
 /**
@@ -54,7 +55,11 @@ let _native: SpotterNative | null = null;
  */
 export function loadNative(): SpotterNative {
   if (!_native) {
-    _native = require("@spotterjs/node") as SpotterNative;
+    try {
+      _native = require("@spotterjs/node") as SpotterNative;
+    } catch (error) {
+      throw createNativeLoadError(error);
+    }
   }
   return _native;
 }

@@ -1,6 +1,6 @@
 # @spotterjs/mcp
 
-spotterjs MCP Server，把桌面自动化、可选 Android ADB 自动化、workspace 文件 I/O 和 shell 执行暴露给 MCP 客户端。
+spotterjs MCP Server。它把桌面自动化、工作区文件、OCR、无障碍和 Android ADB 暴露给支持 MCP 的客户端。
 
 ## 安装
 
@@ -8,11 +8,17 @@ spotterjs MCP Server，把桌面自动化、可选 Android ADB 自动化、works
 npm install @spotterjs/mcp @spotterjs/core
 ```
 
-源码开发：
+## 运行
+
+```bash
+npx -y @spotterjs/mcp
+```
+
+从源码开发时：
 
 ```bash
 npm run build -w @spotterjs/mcp
-npx spotterjs-mcp
+npm run start -w @spotterjs/mcp
 ```
 
 ## 最小配置
@@ -31,14 +37,36 @@ npx spotterjs-mcp
 }
 ```
 
-启用 shell 或 Android 工具时，再显式设置：
+常用开关：
 
-```json
-{
-  "SPOTTERJS_ALLOW_SHELL": "1",
-  "SPOTTERJS_ANDROID_ADB": "1",
-  "SPOTTERJS_A11Y": "1"
-}
-```
+- `SPOTTERJS_ALLOW_SHELL=1`
+- `SPOTTERJS_A11Y=1`
+- `SPOTTERJS_ANDROID_ADB=1`
 
-完整配置、工具列表和安全策略见 [docs/MCP.md](../../docs/MCP.md)。
+## 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `SPOTTERJS_WORKSPACE_ROOT` | 工作区根目录 |
+| `SPOTTERJS_ALLOW_SHELL` | 启用 `host_exec` |
+| `SPOTTERJS_A11Y` | 启用无障碍工具 |
+| `SPOTTERJS_ANDROID_ADB` | 启用 Android 工具 |
+| `SPOTTERJS_FS_MAX_BYTES` | 文件读写上限 |
+| `SPOTTERJS_EXEC_TIMEOUT_MS` | shell 超时 |
+
+## 工具
+
+默认暴露：
+
+- `desktop_*`
+- `host_*`
+- `ocr_*`
+
+可选暴露：
+
+- `desktop_a11y_*`
+- `android_*`
+
+## 文档
+
+完整配置、客户端示例和安全策略见 [docs/MCP.md](../../docs/MCP.md)。

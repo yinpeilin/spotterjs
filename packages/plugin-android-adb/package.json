@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/plugin-android-adb",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Android ADB automation plugin for spotterjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -46,8 +46,8 @@
     "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
   },
   "dependencies": {
-    "@spotterjs/base": "1.0.1",
-    "@spotterjs/core": "1.0.1",
+    "@spotterjs/base": "1.0.2",
+    "@spotterjs/core": "1.0.2",
     "fast-xml-parser": "^4.5.0"
   },
   "devDependencies": {
