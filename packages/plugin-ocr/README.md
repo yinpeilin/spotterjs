@@ -1,14 +1,17 @@
 # @spotterjs/plugin-ocr
 
-OCR plugin for spotterjs. It runs PP-OCR style detection and recognition with ONNX Runtime in Node.js, then returns text-line bounding boxes.
+[中文文档](../../docs/zh-CN/guides/ocr.md)
 
-## 安装
+OCR plugin for spotterjs. It runs PP-OCR-style detection and recognition with
+ONNX Runtime in Node.js and returns text-line boxes.
+
+## Install
 
 ```bash
 npm install @spotterjs/plugin-ocr @spotterjs/core
 ```
 
-## 快速开始
+## Quick Start
 
 ```typescript
 import { screen } from "@spotterjs/core";
@@ -19,20 +22,41 @@ const ocr = await createOcr();
 const lines = await ocr.read(cap);
 ```
 
-`createOcr()` 是创建 OCR client 的主入口。第一次使用时会下载默认 ONNX 模型到用户缓存目录。
+`createOcr()` creates the OCR client and downloads the default ONNX models on
+first use unless local models are provided.
 
-## 主要 API
+## Main API
 
-- `createOcr(options?)`：创建 OCR client。
-- `ensureOcrModels(options?)`：下载并校验模型文件。
-- `ocr.read(image, options?)`：返回全部识别文本行。
-- `ocr.findText(image, text, options?)`：返回第一条匹配文本，找不到时抛错。
-- `ocr.findAllText(image, text, options?)`：返回全部匹配文本。
+- `createOcr(options?)`: create an OCR client.
+- `ensureOcrModels(options?)`: download and verify model files.
+- `ocr.read(image, options?)`: return all recognized text lines.
+- `ocr.findText(image, text, options?)`: return the first matching line or throw.
+- `ocr.findAllText(image, text, options?)`: return all matching lines.
 
-`image` 可以是 `CaptureImage`、编码图片 `Buffer` 或图片文件路径。结果包含 `text`、`score`、`region`、`box` 和 `center`。
+`image` can be a `CaptureImage`, encoded image `Buffer`, or image file path.
+Results include `text`, `score`, `region`, `box`, and `center`.
 
-模型缓存、下载源、本地模型、私有分发和集成测试见 [OCR 插件指南](../../docs/guides/ocr.md)。
+GPU acceleration uses the same OCR API by passing ONNX Runtime execution
+providers:
+
+```typescript
+await createOcr({
+  executionProviders: ["dml", "cpu"],
+});
+```
+
+For small or low-contrast text, enable the lightweight preprocessing pipeline:
+
+```typescript
+await createOcr({
+  preprocess: true,
+});
+```
+
+Model cache, download sources, local models, private distribution, coordinates,
+and integration tests are documented in the [OCR guide](../../docs/en/guides/ocr.md).
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires authorization. See [LICENSE](../../LICENSE).
+Learning and non-commercial use are free. Commercial use requires
+authorization. See [LICENSE](../../LICENSE).

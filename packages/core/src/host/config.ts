@@ -1,20 +1,21 @@
 import * as path from "path";
 
 /**
- * Agent / MCP 工作区宿主 I/O 配置。
+ * Workspace host I/O configuration for agent and MCP scenarios.
  *
- * 默认从环境变量读取；可用 {@link configureHost} 覆盖。
+ * Defaults are read from environment variables and can be overridden with
+ * {@link configureHost}.
  */
 export type HostConfig = {
-  /** 工作区根目录，所有相对路径均解析到此目录下 */
+  /** Workspace root. Relative user paths must resolve inside this directory. */
   workspaceRoot: string;
-  /** 是否允许 {@link host.exec} 执行 shell */
+  /** Whether shell execution is enabled. */
   allowShell: boolean;
-  /** 单次读/写最大字节数 */
+  /** Maximum bytes for one file read/write or command output stream. */
   maxBytes: number;
-  /** shell 命令默认超时（毫秒） */
+  /** Default shell command timeout in milliseconds. */
   execTimeoutMs: number;
-  /** 禁止写入的文件名（相对路径 basename 匹配） */
+  /** File basenames that cannot be written. */
   writeDenylist: string[];
 };
 
@@ -33,7 +34,7 @@ function envBool(name: string, defaultValue: boolean): boolean {
   return v === "1" || v === "true" || v === "yes";
 }
 
-/** 获取当前宿主配置（懒初始化） */
+/** Return the current host configuration, initializing it on first use. */
 export function getHostConfig(): HostConfig {
   if (_config) return _config;
   _config = {
@@ -46,7 +47,7 @@ export function getHostConfig(): HostConfig {
   return _config;
 }
 
-/** 合并更新宿主配置（`workspaceRoot` 会 resolve 为绝对路径） */
+/** Merge host configuration overrides and resolve `workspaceRoot` absolutely. */
 export function configureHost(partial: Partial<HostConfig>): void {
   _config = { ...getHostConfig(), ...partial };
   _config.workspaceRoot = path.resolve(_config.workspaceRoot);

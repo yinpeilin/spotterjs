@@ -6,7 +6,7 @@ import type {
   AndroidOptions,
 } from "./types";
 
-/** @internal Test helper for parsing `adb devices -l` output. */
+/** Parse `adb devices -l` output into normalized device metadata. */
 export function parseAdbDevices(output: string): AndroidDeviceInfo[] {
   return output
     .split(/\r?\n/)
@@ -34,6 +34,7 @@ export function parseAdbDevices(output: string): AndroidDeviceInfo[] {
     });
 }
 
+/** Discover Android devices currently visible to adb. */
 export async function discoverDevices(
   options?: AndroidOptions
 ): Promise<AndroidDeviceInfo[]> {

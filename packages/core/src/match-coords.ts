@@ -1,31 +1,31 @@
 import { centerOf, type Point, type Region } from "@spotterjs/base";
 
 /**
- * 窗口外框（与 `windows.region` / `windows.capture` 一致）。
+ * Window frame region.
  *
- * 用于屏幕坐标与窗口局部坐标互转。
+ * Used to convert between screen coordinates and window-local coordinates.
  */
 export type WindowFrame = Region;
 
 /**
- * 一次匹配结果的坐标封装。
+ * Coordinate bundle for a match.
  *
- * - `screen`：屏幕坐标下的匹配框
- * - `local`：相对窗口左上角的匹配框
- * - `localCenter`：窗口局部坐标下的中心点
+ * - `screen`: match box in screen coordinates.
+ * - `local`: match box relative to the window frame's top-left corner.
+ * - `localCenter`: center point in window-local coordinates.
  */
 export type MatchBox = {
   screen: Region;
   local: Region;
-  /** 窗口局部坐标系下的匹配区域中心 */
+  /** Match center in window-local coordinates. */
   localCenter: Point;
 };
 
 /**
- * 窗口局部坐标 → 屏幕坐标。
+ * Convert a window-local point to a screen point.
  *
- * @param frame 窗口外框（`getRegion`）
- * @param local 相对窗口左上角的点
+ * @param frame Window frame in screen coordinates.
+ * @param local Point relative to the window frame's top-left corner.
  */
 export function toScreen(frame: WindowFrame, local: Point): Point {
   return {
@@ -35,10 +35,10 @@ export function toScreen(frame: WindowFrame, local: Point): Point {
 }
 
 /**
- * 屏幕坐标 → 窗口局部坐标。
+ * Convert a screen point to a window-local point.
  *
- * @param frame 窗口外框
- * @param screen 屏幕坐标点
+ * @param frame Window frame in screen coordinates.
+ * @param screen Point in screen coordinates.
  */
 export function toLocal(frame: WindowFrame, screen: Point): Point {
   return {
@@ -48,9 +48,10 @@ export function toLocal(frame: WindowFrame, screen: Point): Point {
 }
 
 /**
- * 将屏幕坐标下的匹配框转换为 {@link MatchBox}。
+ * Convert a screen-space match box to a {@link MatchBox}.
  *
- * 适用于窗口移动后仍想用「局部坐标」描述匹配结果的场景。
+ * Useful when you need to preserve both screen and window-local views of the
+ * same match.
  */
 export function toMatchBox(frame: WindowFrame, screen: Region): MatchBox {
   const local: Region = {
@@ -67,9 +68,10 @@ export function toMatchBox(frame: WindowFrame, screen: Region): MatchBox {
 }
 
 /**
- * 计算点击点：匹配框在**屏幕坐标**下的中心。
+ * Return the click point for a match in screen coordinates.
  *
- * 直接使用 `box.screen`，不依赖可能过期的 `frame`，适合窗口已移动后的点击。
+ * This uses `box.screen` directly and does not depend on a possibly stale
+ * window frame.
  */
 export function matchTapScreen(box: MatchBox): Point {
   return centerOf(box.screen);

@@ -11,7 +11,8 @@ export function decodeCtc(
   dictionary: string[]
 ): { text: string; score: number } {
   const chars: string[] = [];
-  const scores: number[] = [];
+  let scoreSum = 0;
+  let scoreCount = 0;
   let previous = -1;
 
   for (const row of logits) {
@@ -22,14 +23,15 @@ export function decodeCtc(
 
     if (best !== 0 && best !== previous) {
       chars.push(dictionary[best - 1] ?? "");
-      scores.push(row[best]);
+      scoreSum += row[best];
+      scoreCount++;
     }
     previous = best;
   }
 
   return {
     text: chars.join(""),
-    score: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+    score: scoreCount ? scoreSum / scoreCount : 0,
   };
 }
 
@@ -57,6 +59,13 @@ export function boxesFromBitmap(
       const queue: number[] = [start];
       let head = 0;
       visited[start] = 1;
+      const enqueueNeighbor = (nx: number, ny: number): void => {
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) return;
+        const nidx = ny * width + nx;
+        if (visited[nidx] || bitmap[nidx] < threshold) return;
+        visited[nidx] = 1;
+        queue.push(nidx);
+      };
 
       while (head < queue.length) {
         const idx = queue[head++];
@@ -72,18 +81,10 @@ export function boxesFromBitmap(
         count++;
         points.push({ x: px + 0.5, y: py + 0.5 });
 
-        for (const [nx, ny] of [
-          [px - 1, py],
-          [px + 1, py],
-          [px, py - 1],
-          [px, py + 1],
-        ]) {
-          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-          const nidx = ny * width + nx;
-          if (visited[nidx] || bitmap[nidx] < threshold) continue;
-          visited[nidx] = 1;
-          queue.push(nidx);
-        }
+        enqueueNeighbor(px - 1, py);
+        enqueueNeighbor(px + 1, py);
+        enqueueNeighbor(px, py - 1);
+        enqueueNeighbor(px, py + 1);
       }
 
       const region = {

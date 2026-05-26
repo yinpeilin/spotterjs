@@ -60,5 +60,5 @@ pub fn capture_from_js(img: &JsCaptureImage) -> Result<RgbaImage> {
 }
 
 pub fn map_err(e: SpotterError) -> Error {
-    Error::from_reason(e.to_string())
+    Error::new(Status::GenericFailure, format!("[{}] {}", e.code(), e))
 }

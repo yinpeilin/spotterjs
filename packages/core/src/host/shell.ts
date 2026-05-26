@@ -1,10 +1,10 @@
 import { spawn } from "child_process";
 import { getHostConfig } from "./config";
-import { HostPathError } from "./paths";
+import { HostPathError, resolveWorkspacePath } from "./paths";
 
 export type ShellKind = "powershell" | "bash" | "custom";
 
-/** 当前平台 shell 信息（供 Agent 生成正确语法的命令） */
+/** Current shell information for generating platform-correct commands. */
 export type ShellInfo = {
   platform: NodeJS.Platform;
   shell: ShellKind;
@@ -12,7 +12,7 @@ export type ShellInfo = {
   hint: string;
 };
 
-/** 返回默认 shell：Windows 为 PowerShell，Linux 为 bash；可通过 `SPOTTERJS_SHELL` 覆盖 */
+/** Return the default shell, or the `SPOTTERJS_SHELL` override when set. */
 export function getShellInfo(): ShellInfo {
   if (process.env.SPOTTERJS_SHELL?.trim()) {
     return {
@@ -52,7 +52,7 @@ function buildSpawnArgs(command: string): { executable: string; args: string[] }
   return { executable: "/bin/bash", args: ["-lc", command] };
 }
 
-/** shell 命令执行结果 */
+/** Shell command execution result. */
 export type ExecResult = {
   exitCode: number | null;
   stdout: string;
@@ -61,13 +61,14 @@ export type ExecResult = {
 };
 
 /**
- * 在工作区内执行 shell 命令。
+ * Execute a shell command inside the workspace.
  *
- * 需 `SPOTTERJS_ALLOW_SHELL=1` 或 `configureHost({ allowShell: true })`。
- * Windows 使用 PowerShell `-Command`；Linux 使用 `bash -lc`。
+ * Requires `SPOTTERJS_ALLOW_SHELL=1` or
+ * `configureHost({ allowShell: true })`. Windows uses PowerShell `-Command`;
+ * Linux uses `bash -lc`.
  *
- * @param opts.cwd 工作目录，默认 workspaceRoot
- * @param opts.timeoutMs 超时，默认 HostConfig.execTimeoutMs
+ * @param opts.cwd Working directory relative to the workspace. Defaults to the workspace root.
+ * @param opts.timeoutMs Timeout in milliseconds. Defaults to `HostConfig.execTimeoutMs`.
  */
 export function execCommand(
   command: string,
@@ -77,18 +78,24 @@ export function execCommand(
   if (!allowShell) {
     return Promise.reject(
       new HostPathError(
-        "shell execution disabled; set SPOTTERJS_ALLOW_SHELL=1 to enable host.exec"
+        "shell execution disabled; set SPOTTERJS_ALLOW_SHELL=1 to enable host.exec",
+        "HOST_SHELL_DISABLED"
       )
     );
   }
   const info = getShellInfo();
   const { executable, args } = buildSpawnArgs(command);
-  const cwd = opts?.cwd
-    ? opts.cwd
-    : workspaceRoot;
+  let cwd: string;
+  try {
+    cwd = opts?.cwd ? resolveWorkspacePath(opts.cwd) : workspaceRoot;
+  } catch (error) {
+    return Promise.reject(error);
+  }
   const timeout = opts?.timeoutMs ?? execTimeoutMs;
+  const maxBytes = getHostConfig().maxBytes;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
     const child = spawn(executable, args, {
       cwd,
       windowsHide: true,
@@ -96,21 +103,43 @@ export function execCommand(
     });
     let stdout = "";
     let stderr = "";
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill();
+      reject(error);
+    };
+    const append = (stream: "stdout" | "stderr", chunk: unknown) => {
+      const text = chunk?.toString() ?? "";
+      const nextBytes = Buffer.byteLength(stream === "stdout" ? stdout + text : stderr + text);
+      if (nextBytes > maxBytes) {
+        fail(new HostPathError(`command ${stream} output exceeds limit ${maxBytes}`, "HOST_SHELL_OUTPUT_LIMIT", {
+          stream,
+          maxBytes,
+        }));
+        return;
+      }
+      if (stream === "stdout") stdout += text;
+      else stderr += text;
+    };
     child.stdout?.on("data", (d) => {
-      stdout += d.toString();
+      append("stdout", d);
     });
     child.stderr?.on("data", (d) => {
-      stderr += d.toString();
+      append("stderr", d);
     });
     const timer = setTimeout(() => {
-      child.kill();
-      reject(new HostPathError(`command timed out after ${timeout}ms`));
+      fail(new HostPathError(`command timed out after ${timeout}ms`, "HOST_SHELL_TIMEOUT", {
+        timeoutMs: timeout,
+      }));
     }, timeout);
     child.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
+      fail(err);
     });
     child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       resolve({
         exitCode: code,

@@ -9,14 +9,18 @@ import {
   ocrModelBaseUrl,
   ocrModelMirrorBaseUrl,
   PPOCRV5_MOBILE_PROFILE,
+  PPOCRV4_SERVER_PROFILE,
   PPOCRV5_SERVER_PROFILE,
   resolveLocalOcrModels,
   resolveOcrModelProfile,
+  OcrError,
+  isOcrError,
   type OcrEngine,
   type OcrModelProfile,
   type OcrSession,
   type OcrTextLine,
 } from "./index";
+import { cropImage, loadImage, resizeRgba, validateRegion } from "./image";
 
 const tmpDirs: string[] = [];
 
@@ -83,11 +87,22 @@ describe("model cache", () => {
   it("allows selecting built-in server and mobile profiles by name", () => {
     expect(resolveOcrModelProfile("server")).toBe(PPOCRV5_SERVER_PROFILE);
     expect(resolveOcrModelProfile("ppocrv5-server")).toBe(PPOCRV5_SERVER_PROFILE);
+    expect(resolveOcrModelProfile("large")).toBe(PPOCRV4_SERVER_PROFILE);
+    expect(resolveOcrModelProfile("ppocrv4-server")).toBe(PPOCRV4_SERVER_PROFILE);
     expect(resolveOcrModelProfile("mobile")).toBe(PPOCRV5_MOBILE_PROFILE);
     expect(resolveOcrModelProfile("ppocrv5-mobile")).toBe(PPOCRV5_MOBILE_PROFILE);
     expect(() =>
       resolveOcrModelProfile("unknown" as Parameters<typeof resolveOcrModelProfile>[0])
-    ).toThrow(/unknown OCR model profile/i);
+    ).toThrow(OcrError);
+    try {
+      resolveOcrModelProfile("unknown" as Parameters<typeof resolveOcrModelProfile>[0]);
+    } catch (error) {
+      expect(isOcrError(error)).toBe(true);
+      expect(error).toMatchObject({
+        code: "OCR_MODEL_PROFILE_UNKNOWN",
+        context: { profile: "unknown" },
+      });
+    }
   });
 
   it("downloads the selected built-in mobile profile", async () => {
@@ -156,7 +171,10 @@ describe("model cache", () => {
         profile,
         fetchFile: async () => Buffer.from("wrong"),
       })
-    ).rejects.toThrow(/sha256/i);
+    ).rejects.toMatchObject({
+      name: "OcrError",
+      code: "OCR_MODEL_SHA256_MISMATCH",
+    });
   });
 
   it("can skip sha256 verification for development mirrors", async () => {
@@ -220,6 +238,23 @@ describe("model cache", () => {
     expect(resolved.files["det.onnx"]).toBe(path.join(modelDir, "det.onnx"));
     expect(resolved.files["rec.onnx"]).toBe(path.join(modelDir, "rec.onnx"));
     expect(resolved.files["dict.txt"]).toBe(path.join(modelDir, "dict.txt"));
+  });
+
+  it("writes downloaded model files atomically without leaving temp files", async () => {
+    const modelDir = tmpDir();
+    const bytes = Buffer.from("model-bytes");
+    const profile = testProfile({ "det.onnx": "skip" });
+
+    const resolved = await ensureOcrModels({
+      modelDir,
+      profile,
+      fetchFile: async () => bytes,
+    });
+
+    expect(fs.readFileSync(resolved.files["det.onnx"])).toEqual(bytes);
+    expect(fs.readdirSync(path.dirname(resolved.files["det.onnx"]))).toEqual([
+      "det.onnx",
+    ]);
   });
 });
 
@@ -296,7 +331,11 @@ describe("OCR engine", () => {
     await expect(ocr.findText(image, "消息")).resolves.toMatchObject({
       text: "发送消息",
     });
-    await expect(ocr.findText(image, "missing")).rejects.toThrow(/text not found/i);
+    await expect(ocr.findText(image, "missing")).rejects.toMatchObject({
+      name: "OcrError",
+      code: "OCR_TEXT_NOT_FOUND",
+      context: { text: "missing" },
+    });
   });
 
   it("findAllText supports exact and case sensitive matching", async () => {
@@ -335,6 +374,148 @@ describe("OCR engine", () => {
     await expect(
       ocr.findAllText(image, "OK", { exact: true, caseSensitive: false })
     ).resolves.toHaveLength(2);
+  });
+
+  it("findAllText supports similarity threshold matching", async () => {
+    const ocr = await createOcr({
+      engine: fakeEngine([
+        {
+          text: "Setting",
+          score: 0.8,
+          region: { left: 0, top: 0, width: 1, height: 1 },
+          box: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 1, y: 1 },
+            { x: 0, y: 1 },
+          ],
+          center: { x: 0, y: 0 },
+        },
+      ]),
+    });
+
+    await expect(
+      ocr.findAllText(image, "Settings", { minSimilarity: 0.85 })
+    ).resolves.toHaveLength(1);
+    await expect(
+      ocr.findAllText(image, "Settings", { minSimilarity: 0.95 })
+    ).resolves.toHaveLength(0);
+  });
+
+  it("rejects malformed CaptureImage input before OCR", async () => {
+    const ocr = await createOcr({ engine: fakeEngine([]) });
+
+    await expect(
+      ocr.read({ data: Buffer.alloc(3), width: 2, height: 2 })
+    ).rejects.toMatchObject({
+      name: "OcrError",
+      code: "OCR_IMAGE_INVALID",
+    });
+  });
+
+  it("passes valid CaptureImage Buffer input through without copying", async () => {
+    const source = {
+      data: Buffer.alloc(4 * 4 * 4, 255),
+      width: 4,
+      height: 4,
+    };
+    const engine = fakeEngine([]);
+    const ocr = await createOcr({ engine });
+
+    await ocr.read(source);
+
+    expect(vi.mocked(engine.read).mock.calls[0][0].data).toBe(source.data);
+  });
+
+  it("rejects empty searchRegion before OCR", async () => {
+    const ocr = await createOcr({ engine: fakeEngine([]) });
+
+    await expect(
+      ocr.read(image, { searchRegion: { left: 0, top: 0, width: 0, height: 10 } })
+    ).rejects.toThrow(/searchRegion/i);
+  });
+
+  it("applies OCR preprocessing before engine reads the image", async () => {
+    const engine = fakeEngine([]);
+    const ocr = await createOcr({
+      engine,
+      preprocess: {
+        scale: 2,
+        grayscale: true,
+        normalize: true,
+        sharpen: true,
+      },
+    });
+
+    await ocr.read({
+      data: Buffer.from([
+        10, 20, 30, 255,
+        200, 210, 220, 255,
+        40, 50, 60, 255,
+        240, 250, 255, 255,
+      ]),
+      width: 2,
+      height: 2,
+    });
+
+    const prepared = vi.mocked(engine.read).mock.calls[0][0];
+    expect(prepared.width).toBe(4);
+    expect(prepared.height).toBe(4);
+    expect(prepared.data).toHaveLength(4 * 4 * 4);
+    expect(prepared.data[0]).toBe(prepared.data[1]);
+    expect(prepared.data[1]).toBe(prepared.data[2]);
+  });
+});
+
+describe("image helpers", () => {
+  it("rejects invalid CaptureImage dimensions and pixel length", async () => {
+    await expect(loadImage({ data: Buffer.alloc(4), width: 0, height: 1 })).rejects.toThrow(
+      /width/i
+    );
+    await expect(loadImage({ data: Buffer.alloc(4), width: 2, height: 1 })).rejects.toThrow(
+      /rgba/i
+    );
+  });
+
+  it("rejects non-finite and non-positive crop regions", () => {
+    expect(() =>
+      validateRegion(
+        { left: Number.NaN, top: 0, width: 1, height: 1 },
+        "region"
+      )
+    ).toThrow(/finite/i);
+    expect(() =>
+      validateRegion({ left: 0, top: 0, width: -1, height: 1 }, "region")
+    ).toThrow(/width/i);
+  });
+
+  it("clips overlapping crop regions to the source image", () => {
+    const source = {
+      data: Buffer.alloc(4 * 4 * 4, 255),
+      width: 4,
+      height: 4,
+    };
+
+    const cropped = cropImage(source, { left: -2, top: -1, width: 4, height: 3 });
+
+    expect(cropped.width).toBe(2);
+    expect(cropped.height).toBe(2);
+    expect(cropped.data).toHaveLength(2 * 2 * 4);
+  });
+
+  it("rejects crop regions that do not overlap the image", () => {
+    expect(() =>
+      cropImage(
+        { data: Buffer.alloc(4 * 4 * 4), width: 4, height: 4 },
+        { left: 10, top: 10, width: 2, height: 2 }
+      )
+    ).toThrow(/outside image/i);
+  });
+
+  it("rejects malformed images before resize", async () => {
+    await expect(
+      resizeRgba({ data: Buffer.alloc(3), width: 1, height: 1 }, 2, 2)
+    ).rejects.toThrow(/rgba/i);
   });
 });
 

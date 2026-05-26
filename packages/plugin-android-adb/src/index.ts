@@ -38,6 +38,36 @@ export type {
   AdbErrorCode,
   RunOptions,
 } from "./adb";
+
+export type AndroidAutomationErrorCode =
+  | "ANDROID_INVALID_ARGUMENT"
+  | "ANDROID_UNSAFE_REMOTE_PATH"
+  | "ANDROID_ELEMENT_NOT_FOUND"
+  | "ANDROID_ELEMENT_WAIT_TIMEOUT"
+  | "ANDROID_TEMPLATE_WAIT_TIMEOUT"
+  | "ANDROID_DISPLAY_PARSE_FAILED";
+
+/** Error thrown by high-level Android automation helpers. */
+export class AndroidAutomationError extends Error {
+  /** Stable machine-readable automation error code. */
+  readonly code: AndroidAutomationErrorCode;
+  /** Additional diagnostic context such as query, timeout, or path values. */
+  readonly context?: Record<string, unknown>;
+  /** Original lower-level error when this wraps another failure. */
+  readonly cause?: unknown;
+
+  constructor(
+    code: AndroidAutomationErrorCode,
+    message: string,
+    options: { context?: Record<string, unknown>; cause?: unknown } = {}
+  ) {
+    super(message);
+    this.name = "AndroidAutomationError";
+    this.code = code;
+    this.context = options.context;
+    this.cause = options.cause;
+  }
+}
 export type {
   AndroidBatchResult,
   AndroidConnectOptions,
@@ -108,6 +138,12 @@ class AdbDevice implements AndroidDevice {
   }
 
   tap(x: number, y: number): Promise<void> {
+    try {
+      assertFiniteNumber(x, "x");
+      assertFiniteNumber(y, "y");
+    } catch (error) {
+      return Promise.reject(error);
+    }
     return this.enqueue(() =>
       this.runDevice(["shell", "input", "tap", String(x), String(y)]).then(noop)
     );
@@ -118,6 +154,15 @@ class AdbDevice implements AndroidDevice {
     to: Point,
     options?: { durationMs?: number }
   ): Promise<void> {
+    try {
+      assertPoint(from, "from");
+      assertPoint(to, "to");
+      if (options?.durationMs !== undefined) {
+        assertNonNegativeNumber(options.durationMs, "durationMs");
+      }
+    } catch (error) {
+      return Promise.reject(error);
+    }
     const args = [
       "shell",
       "input",
@@ -171,6 +216,11 @@ class AdbDevice implements AndroidDevice {
 
   dumpTree(options?: AndroidTreeOptions): Promise<AndroidElementNode> {
     const remotePath = options?.remotePath ?? "/sdcard/window.xml";
+    try {
+      assertSafeRemotePath(remotePath);
+    } catch (error) {
+      return Promise.reject(error);
+    }
     return this.enqueue(async () => {
       try {
         await this.runDevice(["shell", "uiautomator", "dump", remotePath]);
@@ -200,7 +250,11 @@ class AdbDevice implements AndroidDevice {
     const matches = await this.findElements(query, options);
     const first = matches[0];
     if (!first) {
-      throw new Error(`Android element not found: ${JSON.stringify(query)}`);
+      throw new AndroidAutomationError(
+        "ANDROID_ELEMENT_NOT_FOUND",
+        `Android element not found: ${JSON.stringify(query)}`,
+        { context: { query } }
+      );
     }
     return first;
   }
@@ -218,8 +272,10 @@ class AdbDevice implements AndroidDevice {
     timeoutMs: number,
     options?: AndroidElementQueryOptions
   ): Promise<AndroidElementNode> {
+    assertNonNegativeNumber(timeoutMs, "timeoutMs");
     const deadline = Date.now() + timeoutMs;
     const pollMs = options?.pollMs ?? 250;
+    assertNonNegativeNumber(pollMs, "pollMs");
     let lastError: unknown;
 
     while (Date.now() <= deadline) {
@@ -233,9 +289,17 @@ class AdbDevice implements AndroidDevice {
     }
 
     if (lastError instanceof Error) {
-      throw new Error(`Timed out waiting for Android element: ${lastError.message}`);
+      throw new AndroidAutomationError(
+        "ANDROID_ELEMENT_WAIT_TIMEOUT",
+        `Timed out waiting for Android element: ${lastError.message}`,
+        { context: { query, timeoutMs, pollMs }, cause: lastError }
+      );
     }
-    throw new Error("Timed out waiting for Android element");
+    throw new AndroidAutomationError(
+      "ANDROID_ELEMENT_WAIT_TIMEOUT",
+      "Timed out waiting for Android element",
+      { context: { query, timeoutMs, pollMs } }
+    );
   }
 
   async tapElement(
@@ -312,8 +376,10 @@ class AdbDevice implements AndroidDevice {
     options?: MatchOptions,
     intervalMs?: number
   ): Promise<MatchResult> {
+    assertNonNegativeNumber(timeoutMs, "timeoutMs");
     const deadline = Date.now() + timeoutMs;
     const pollMs = intervalMs ?? 250;
+    assertNonNegativeNumber(pollMs, "intervalMs");
     let lastError: unknown;
 
     while (Date.now() <= deadline) {
@@ -327,9 +393,17 @@ class AdbDevice implements AndroidDevice {
     }
 
     if (lastError instanceof Error) {
-      throw new Error(`Timed out waiting for Android template: ${lastError.message}`);
+      throw new AndroidAutomationError(
+        "ANDROID_TEMPLATE_WAIT_TIMEOUT",
+        `Timed out waiting for Android template: ${lastError.message}`,
+        { context: { timeoutMs, pollMs }, cause: lastError }
+      );
     }
-    throw new Error("Timed out waiting for Android template");
+    throw new AndroidAutomationError(
+      "ANDROID_TEMPLATE_WAIT_TIMEOUT",
+      "Timed out waiting for Android template",
+      { context: { timeoutMs, pollMs } }
+    );
   }
 
   private runDevice(
@@ -361,6 +435,47 @@ function noop(): void {
   return undefined;
 }
 
+function assertFiniteNumber(value: number, label: string): void {
+  if (!Number.isFinite(value)) {
+    throw new AndroidAutomationError(
+      "ANDROID_INVALID_ARGUMENT",
+      `${label} must be a finite number`,
+      { context: { label, value } }
+    );
+  }
+}
+
+function assertNonNegativeNumber(value: number, label: string): void {
+  assertFiniteNumber(value, label);
+  if (value < 0) {
+    throw new AndroidAutomationError(
+      "ANDROID_INVALID_ARGUMENT",
+      `${label} must be >= 0`,
+      { context: { label, value } }
+    );
+  }
+}
+
+function assertPoint(point: Point, label: string): void {
+  assertFiniteNumber(point.x, `${label}.x`);
+  assertFiniteNumber(point.y, `${label}.y`);
+}
+
+function assertSafeRemotePath(remotePath: string): void {
+  if (
+    !remotePath ||
+    !remotePath.startsWith("/sdcard/") ||
+    remotePath.includes("..") ||
+    /[\s;&|`$<>\\]/.test(remotePath)
+  ) {
+    throw new AndroidAutomationError(
+      "ANDROID_UNSAFE_REMOTE_PATH",
+      "remotePath must be an absolute safe path under /sdcard/",
+      { context: { remotePath } }
+    );
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -369,7 +484,13 @@ function parseDisplayInfo(sizeOutput: string, densityOutput: string): AndroidDis
   const overrideSize = /Override size:\s*(\d+)x(\d+)/i.exec(sizeOutput);
   const physicalSize = /Physical size:\s*(\d+)x(\d+)/i.exec(sizeOutput);
   const size = overrideSize ?? physicalSize;
-  if (!size) throw new Error(`Unable to parse Android display size: ${sizeOutput}`);
+  if (!size) {
+    throw new AndroidAutomationError(
+      "ANDROID_DISPLAY_PARSE_FAILED",
+      `Unable to parse Android display size: ${sizeOutput}`,
+      { context: { sizeOutput } }
+    );
+  }
   const overrideDensity = /Override density:\s*(\d+)/i.exec(densityOutput);
   const physicalDensity = /Physical density:\s*(\d+)/i.exec(densityOutput);
   const density = overrideDensity ?? physicalDensity;
@@ -404,17 +525,21 @@ function limitTreeDepth(
   };
 }
 
+/** Convenience namespace for Android ADB discovery, connection, and automation. */
 export const android = {
   resolveAdbPath,
 
+  /** Discover Android devices currently visible to adb. */
   discover(options?: AndroidOptions): Promise<AndroidDeviceInfo[]> {
     return discoverDevices(options);
   },
 
+  /** Connect to a specific adb serial and return a device automation handle. */
   async connect(options: AndroidConnectOptions): Promise<AndroidDevice> {
     return new AdbDevice(options);
   },
 
+  /** Connect to the only available device, or throw when none/multiple are available. */
   async connectDefault(options?: AndroidOptions): Promise<AndroidDevice> {
     const devices = await discoverDevices(options);
     const available = devices.filter((device) => device.state === "device");
@@ -437,6 +562,7 @@ export const android = {
     );
   },
 
+  /** Connect every available device and retain skipped device metadata. */
   async connectAll(options?: AndroidOptions): Promise<AdbDeviceGroup> {
     const devices = await discoverDevices(options);
     const available = devices.filter((device) => device.state === "device");
@@ -447,10 +573,12 @@ export const android = {
     );
   },
 
+  /** Pair an Android 11+ wireless debugging target using `adb pair`. */
   pairTcp(options: AndroidPairTcpOptions): Promise<void> {
     return pairTcp(options);
   },
 
+  /** Connect to a paired wireless adb target and return its device handle. */
   async connectNetwork(options: AndroidNetworkOptions): Promise<AndroidDevice> {
     const serial = await connectNetworkRaw(options);
     const devices = await discoverDevices(options);

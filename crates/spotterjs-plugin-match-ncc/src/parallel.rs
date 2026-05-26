@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use spotterjs_base::{MatchOptions, Region, Result, RgbaImage, SpotterError};
 
 use crate::integral::IntegralImage;
-use crate::ncc::{scan_row_best, search_bounds, PreparedNeedle};
+use crate::ncc::{scan_row_best, search_bounds, validate_search_region, PreparedNeedle};
 
 #[cfg(feature = "parallel")]
 pub fn find_best_parallel(
@@ -13,6 +13,7 @@ pub fn find_best_parallel(
     needle: &PreparedNeedle,
     opts: &MatchOptions,
 ) -> Result<(Region, f64)> {
+    validate_search_region(opts)?;
     let hay_w = haystack.width;
     let hay_h = haystack.height;
     let (x0, y0, x1, y1) = search_bounds(hay_w, hay_h, needle.nw, needle.nh, opts);

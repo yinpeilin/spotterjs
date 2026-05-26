@@ -6,7 +6,7 @@ import {
   type WindowInfo,
 } from "@spotterjs/base";
 import { loadNative, type NativeWindow } from "./native";
-import { toMatchResult, toNativeOpts } from "./match";
+import { findAllNeedleInWindow, findNeedleInWindow } from "./match";
 
 function mapWindow(w: NativeWindow): WindowInfo {
   return {
@@ -20,14 +20,6 @@ function mapWindow(w: NativeWindow): WindowInfo {
     isMinimized: w.isMinimized,
     isForeground: w.isForeground,
   };
-}
-
-function needleArgs(needle: TemplateImage): { path: string; buffer?: Buffer } {
-  if (typeof needle === "string") {
-    return { path: needle };
-  }
-
-  return { path: "", buffer: needle };
 }
 
 export type WindowWaitOptions = {
@@ -103,10 +95,7 @@ export const windows = {
     needle: TemplateImage,
     options?: MatchOptions
   ): MatchResult {
-    const { path, buffer } = needleArgs(needle);
-    return toMatchResult(
-      loadNative().findTemplateInWindow(id, path, buffer, toNativeOpts(options))
-    );
+    return findNeedleInWindow(id, needle, options);
   },
 
   findAllTemplates(
@@ -114,10 +103,7 @@ export const windows = {
     needle: TemplateImage,
     options?: MatchOptions
   ): MatchResult[] {
-    const { path, buffer } = needleArgs(needle);
-    return loadNative()
-      .findAllTemplatesInWindow(id, path, buffer, toNativeOpts(options))
-      .map(toMatchResult);
+    return findAllNeedleInWindow(id, needle, options);
   },
 
   tapTemplate(

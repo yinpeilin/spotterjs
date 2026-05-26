@@ -16,6 +16,7 @@ const parser = new XMLParser({
   isArray: (_name, _jpath, _isLeaf, isAttribute) => !isAttribute && _name === "node",
 });
 
+/** Parse UIAutomator XML into normalized nodes with bounds and center points. */
 export function parseUiautomatorXml(xml: string): AndroidElementNode {
   const parsed = parser.parse(xml) as ParsedNode;
   const hierarchy = parsed.hierarchy as ParsedNode | undefined;
@@ -29,19 +30,21 @@ export function parseUiautomatorXml(xml: string): AndroidElementNode {
   return normalizeSyntheticRoot(nodes);
 }
 
+/** Return all Android UIAutomator nodes that satisfy the provided query fields. */
 export function findAndroidElements(
   root: AndroidElementNode,
   query: AndroidElementQuery,
   options?: Pick<AndroidElementQueryOptions, "maxDepth">
 ): AndroidElementNode[] {
   const matches: AndroidElementNode[] = [];
-  visit(root, (node) => {
-    if (options?.maxDepth !== undefined && node.depth > options.maxDepth) return;
+  const maxDepth = options?.maxDepth;
+  visit(root, maxDepth, (node) => {
     if (matchesQuery(node, query)) matches.push(node);
   });
   return matches;
 }
 
+/** Runtime guard for values that already look like normalized Android nodes. */
 export function isAndroidElementNode(value: unknown): value is AndroidElementNode {
   return (
     typeof value === "object" &&
@@ -127,9 +130,15 @@ function matchesQuery(
   );
 }
 
-function visit(node: AndroidElementNode, fn: (node: AndroidElementNode) => void): void {
+function visit(
+  node: AndroidElementNode,
+  maxDepth: number | undefined,
+  fn: (node: AndroidElementNode) => void
+): void {
+  if (maxDepth !== undefined && node.depth > maxDepth) return;
   fn(node);
-  for (const child of node.children) visit(child, fn);
+  if (maxDepth !== undefined && node.depth >= maxDepth) return;
+  for (const child of node.children) visit(child, maxDepth, fn);
 }
 
 function matchesExact(value: string, expected: string | undefined): boolean {

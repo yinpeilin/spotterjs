@@ -36,7 +36,7 @@
   },
   "scripts": {
     "build": "napi build --platform --release --dts index.d.ts",
-    "build:linux": "napi build --platform --release --features linux-x11 --dts index.d.ts",
+    "build:linux": "napi build --platform --release --target x86_64-unknown-linux-gnu --features linux-x11 --dts index.d.ts",
     "build:debug": "napi build --platform --dts index.d.ts",
     "prepublishOnly": "node ../../scripts/sync-license.mjs"
   },
@@ -44,7 +44,7 @@
     "@napi-rs/cli": "^2.18.0"
   },
   "optionalDependencies": {
-    "@spotterjs/node-linux-x64-gnu": "1.0.0",
+    "@spotterjs/node-linux-x64-gnu": "1.0.1",
     "@spotterjs/node-win32-x64-msvc": "1.0.1"
   }
 }

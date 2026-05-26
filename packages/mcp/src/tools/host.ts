@@ -1,9 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { host } from "@spotterjs/core";
+import { json, ok, registerSafeTool } from "./results.js";
+
+const finiteNumber = z.number().finite();
 
 export function registerHostTools(server: McpServer): void {
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_read_file",
     {
       description: "Read a text file inside SPOTTERJS_WORKSPACE_ROOT",
@@ -11,11 +15,12 @@ export function registerHostTools(server: McpServer): void {
     },
     async ({ path: filePath }) => {
       const text = host.readFile(filePath) as string;
-      return { content: [{ type: "text", text }] };
+      return ok(text);
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_write_file",
     {
       description: "Write a text file inside the workspace sandbox",
@@ -23,31 +28,34 @@ export function registerHostTools(server: McpServer): void {
     },
     async ({ path: filePath, content }) => {
       host.writeFile(filePath, content);
-      return { content: [{ type: "text", text: "ok" }] };
+      return ok();
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_list_dir",
     {
       inputSchema: z.object({ path: z.string().optional() }),
     },
     async ({ path: dirPath }) => {
       const entries = host.listDir(dirPath ?? ".");
-      return { content: [{ type: "text", text: JSON.stringify(entries, null, 2) }] };
+      return json(entries);
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_stat",
     { inputSchema: z.object({ path: z.string() }) },
     async ({ path: filePath }) => {
       const st = host.stat(filePath);
-      return { content: [{ type: "text", text: JSON.stringify(st, null, 2) }] };
+      return json(st);
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_open_file",
     {
       description: "Open a file or folder with the OS default application",
@@ -55,11 +63,12 @@ export function registerHostTools(server: McpServer): void {
     },
     async ({ path: filePath }) => {
       host.openPath(filePath);
-      return { content: [{ type: "text", text: "ok" }] };
+      return ok();
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_shell_info",
     {
       description:
@@ -67,11 +76,12 @@ export function registerHostTools(server: McpServer): void {
     },
     async () => {
       const info = host.getShellInfo();
-      return { content: [{ type: "text", text: JSON.stringify(info, null, 2) }] };
+      return json(info);
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "host_exec",
     {
       description:
@@ -79,19 +89,12 @@ export function registerHostTools(server: McpServer): void {
       inputSchema: z.object({
         command: z.string(),
         cwd: z.string().optional(),
-        timeoutMs: z.number().optional(),
+        timeoutMs: finiteNumber.min(0).max(300_000).optional(),
       }),
     },
     async ({ command, cwd, timeoutMs }) => {
       const result = await host.exec(command, { cwd, timeoutMs });
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
+      return json(result);
     }
   );
 }

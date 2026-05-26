@@ -15,11 +15,11 @@ import {
 import { loadNative } from "./native";
 
 /**
- * 屏幕截图与全屏模板匹配。
+ * Screen capture and full-screen template matching helpers.
  *
- * - 坐标均为**屏幕坐标**
- * - `needle` 可为 PNG/JPEG/WebP 文件路径，或已编码图像的 `Buffer`
- * - 匹配算法为 NCC，详见 `docs/MATCHING.md`
+ * - Coordinates are screen coordinates.
+ * - `needle` can be a PNG/JPEG/WebP path or an encoded image `Buffer`.
+ * - Matching uses NCC; see the template matching guide for details.
  *
  * @example
  * ```ts
@@ -28,50 +28,52 @@ import { loadNative } from "./native";
  * ```
  */
 export const screen = {
-  /** 主显示器宽度（像素） */
+  /** Return the primary screen width in pixels. */
   width(): number {
     return loadNative().getScreenWidth();
   },
 
-  /** 主显示器高度（像素） */
+  /** Return the primary screen height in pixels. */
   height(): number {
     return loadNative().getScreenHeight();
   },
 
-  /** 主显示器尺寸 `{ width, height }` */
+  /** Return the primary screen size. */
   size(): { width: number; height: number } {
     return loadNative().getScreenSize();
   },
 
   /**
-   * 截取屏幕。
-   * @param region 可选子区域；省略则全屏
-   * @returns RGBA {@link CaptureImage}
+   * Capture the full screen or a screen sub-region.
+   * @param region Optional screen region. Omit to capture the full screen.
+   * @returns Raw RGBA {@link CaptureImage}.
    */
   capture(region?: Region): CaptureImage {
     return captureForMatch(region);
   },
 
   /**
-   * 截取指定窗口内容（不含窗口装饰外的区域，由 native 层定义）。
+   * Capture a window by ID.
+   *
+   * The native layer defines whether window decoration is included.
    * @param windowId {@link WindowInfo.id}
    */
   captureWindow(windowId: string): CaptureImage {
     return loadNative().captureWindow(windowId);
   },
 
-  /** 截取当前前台窗口 */
+  /** Capture the current foreground window. */
   captureActive(): CaptureImage {
     const active = loadNative().getActiveWindow();
     return loadNative().captureWindow(active.id);
   },
 
   /**
-   * 同步查找模板并点击其中心（`tapAt`）。
+   * Find a template and click its center.
    *
-   * 与 `find` 不同：此方法**同步**调用 native，且不重新截屏轮询。
-   * @returns 匹配到的屏幕区域
-   * @throws 未找到模板时抛错
+   * The returned match uses screen coordinates.
+   * @returns The clicked match.
+   * @throws When no template match reaches the configured confidence.
    */
   async tap(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
     const native = loadNative();
@@ -82,29 +84,31 @@ export const screen = {
   },
 
   /**
-   * 在全屏（或 `options.region`）中查找第一个模板匹配。
+   * Find the best template match on the screen or inside `options.region`.
    *
-   * 内部每次调用会重新截屏再匹配。
-   * @throws 未找到时抛错
+   * Each call captures the screen before matching. Returned coordinates are
+   * screen coordinates even when `options.region` is set.
+   * @throws When no match reaches the configured confidence.
    */
   find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
     return findNeedle(needle, options);
   },
 
   /**
-   * 查找所有匹配项，返回屏幕坐标下的 {@link Region} 数组。
+   * Find all template matches on the screen.
    *
-   * 结果顺序与 native 层去重策略一致。
+   * Returned coordinates are screen coordinates. Ordering follows native
+   * de-duplication and sorting.
    */
   findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]> {
     return findAllNeedle(needle, options);
   },
 
   /**
-   * 轮询等待模板出现。
+   * Poll until a template appears.
    *
-   * @param timeoutMs 超时毫秒；超时抛错
-   * @param intervalMs 两次尝试间隔；省略则用 native 默认值
+   * @param timeoutMs Timeout in milliseconds. The call throws on timeout.
+   * @param intervalMs Delay between attempts. Native defaults are used when omitted.
    */
   waitFor(
     needle: TemplateImage,

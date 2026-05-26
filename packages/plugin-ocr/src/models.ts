@@ -2,6 +2,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { OcrError } from "./errors";
 import type {
   OcrBuiltInModelProfileName,
   EnsureOcrModelsOptions,
@@ -21,7 +22,10 @@ const MOBILE_MODEL_BASE_URL =
   "https://huggingface.co/ilaylow/PP_OCRv5_mobile_onnx/resolve/main";
 const MOBILE_MODEL_MIRROR_BASE_URL =
   "https://hf-mirror.com/ilaylow/PP_OCRv5_mobile_onnx/resolve/main";
+const V4_MODEL_BASE_URL =
+  "https://huggingface.co/deepghs/paddleocr/resolve/main";
 
+/** Return the origin base URL for built-in OCR model downloads. */
 export function ocrModelBaseUrl(): string {
   return (
     process.env.SPOTTERJS_OCR_MODEL_BASE_URL?.trim().replace(/\/$/, "") ||
@@ -29,6 +33,7 @@ export function ocrModelBaseUrl(): string {
   );
 }
 
+/** Return the mirror base URL for built-in OCR model downloads. */
 export function ocrModelMirrorBaseUrl(): string {
   return (
     process.env.SPOTTERJS_OCR_MODEL_MIRROR_BASE_URL?.trim().replace(/\/$/, "") ||
@@ -36,6 +41,7 @@ export function ocrModelMirrorBaseUrl(): string {
   );
 }
 
+/** Default higher-accuracy PP-OCRv5 server profile. */
 export const PPOCRV5_SERVER_PROFILE: OcrModelProfile = {
   name: "ppocrv5-server",
   version: "0.1.0",
@@ -74,6 +80,46 @@ export const PPOCRV5_SERVER_PROFILE: OcrModelProfile = {
   },
 };
 
+/** Larger PP-OCRv4 server profile for explicit high-capacity use. */
+export const PPOCRV4_SERVER_PROFILE: OcrModelProfile = {
+  name: "ppocrv4-server",
+  version: "0.1.0",
+  files: [
+    {
+      name: "det.onnx",
+      url: `${V4_MODEL_BASE_URL}/det/ch_PP-OCRv4_server_det/model.onnx`,
+      sha256: "skip",
+    },
+    {
+      name: "rec.onnx",
+      url: `${V4_MODEL_BASE_URL}/rec/ch_PP-OCRv4_server_rec/model.onnx`,
+      sha256: "skip",
+    },
+    {
+      name: "dict.txt",
+      url: `${V4_MODEL_BASE_URL}/rec/ch_PP-OCRv4_server_rec/dict.txt`,
+      sha256: "skip",
+    },
+  ],
+  detection: {
+    modelFile: "det.onnx",
+    inputWidth: 960,
+    inputHeight: 960,
+    mean: [0.485, 0.456, 0.406],
+    std: [0.229, 0.224, 0.225],
+    boxThreshold: 0.3,
+  },
+  recognition: {
+    modelFile: "rec.onnx",
+    dictionaryFile: "dict.txt",
+    inputWidth: 320,
+    inputHeight: 48,
+    mean: [0.5, 0.5, 0.5],
+    std: [0.5, 0.5, 0.5],
+  },
+};
+
+/** Smaller PP-OCRv5 mobile profile. */
 export const PPOCRV5_MOBILE_PROFILE: OcrModelProfile = {
   name: "ppocrv5-mobile",
   version: "0.1.0",
@@ -114,18 +160,25 @@ export const PPOCRV5_MOBILE_PROFILE: OcrModelProfile = {
   },
 };
 
+/** Resolve a built-in OCR model profile alias to a full profile object. */
 export function resolveOcrModelProfile(
   profile?: OcrBuiltInModelProfileName
 ): OcrModelProfile {
   if (!profile || profile === "server" || profile === "ppocrv5-server") {
     return PPOCRV5_SERVER_PROFILE;
   }
+  if (profile === "large" || profile === "ppocrv4-server") {
+    return PPOCRV4_SERVER_PROFILE;
+  }
   if (profile === "mobile" || profile === "ppocrv5-mobile") {
     return PPOCRV5_MOBILE_PROFILE;
   }
-  throw new Error(`unknown OCR model profile: ${profile}`);
+  throw new OcrError("OCR_MODEL_PROFILE_UNKNOWN", `unknown OCR model profile: ${profile}`, {
+    context: { profile },
+  });
 }
 
+/** Return the default model cache directory for the current platform. */
 export function defaultModelDir(): string {
   const env = process.env.SPOTTERJS_OCR_MODEL_DIR?.trim();
   if (env) return path.resolve(env);
@@ -139,6 +192,11 @@ export function defaultModelDir(): string {
   return path.join(cache, "spotterjs", "ocr");
 }
 
+/**
+ * Ensure OCR model files exist locally and pass checksum validation.
+ *
+ * Missing files are downloaded according to the selected model source.
+ */
 export async function ensureOcrModels(
   options: EnsureOcrModelsOptions = {}
 ): Promise<ResolvedOcrModels> {
@@ -165,12 +223,31 @@ export async function ensureOcrModels(
       options.modelSource ?? envModelSource()
     );
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, bytes);
+    writeFileAtomic(target, bytes);
   }
 
   return { profile, rootDir, files };
 }
 
+function writeFileAtomic(target: string, bytes: Buffer): void {
+  const tmp = path.join(
+    path.dirname(target),
+    `.${path.basename(target)}.${process.pid}.${Date.now()}.tmp`
+  );
+  try {
+    fs.writeFileSync(tmp, bytes, { flag: "wx" });
+    fs.renameSync(tmp, target);
+  } catch (error) {
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      // Ignore cleanup errors and surface the original failure.
+    }
+    throw error;
+  }
+}
+
+/** Options for resolving a directory of already-downloaded local OCR models. */
 export type ResolveLocalOcrModelsOptions = {
   modelDir: string;
   detFile?: string;
@@ -184,6 +261,11 @@ export type ResolveLocalOcrModelsOptions = {
   recInputName?: string;
 };
 
+/**
+ * Resolve local OCR model files without downloading anything.
+ *
+ * The directory must contain detection, recognition, and dictionary files.
+ */
 export function resolveLocalOcrModels(
   options: ResolveLocalOcrModelsOptions
 ): ResolvedOcrModels {
@@ -199,7 +281,11 @@ export function resolveLocalOcrModels(
 
   for (const file of Object.values(files)) {
     if (!fs.existsSync(file)) {
-      throw new Error(`OCR local model file does not exist: ${file}`);
+      throw new OcrError(
+        "OCR_MODEL_FILE_MISSING",
+        `OCR local model file does not exist: ${file}`,
+        { context: { file } }
+      );
     }
   }
 
@@ -235,7 +321,11 @@ export function resolveLocalOcrModels(
 async function defaultFetchFile(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`failed to download OCR model: ${url} (${response.status})`);
+    throw new OcrError(
+      "OCR_MODEL_DOWNLOAD_FAILED",
+      `failed to download OCR model: ${url} (${response.status})`,
+      { context: { url, status: response.status } }
+    );
   }
   return Buffer.from(await response.arrayBuffer());
 }
@@ -248,6 +338,7 @@ async function downloadModelFile(
 ): Promise<{ bytes: Buffer; url: string }> {
   const urls = modelDownloadUrls(file, source);
   const errors: string[] = [];
+  const attempts: Array<{ url: string; error: string; code?: string }> = [];
 
   for (const url of urls) {
     try {
@@ -257,10 +348,36 @@ async function downloadModelFile(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`${url}: ${msg}`);
+      attempts.push({
+        url,
+        error: msg,
+        code:
+          e instanceof OcrError
+            ? e.code
+            : typeof e === "object" && e !== null && "code" in e
+              ? String((e as { code?: unknown }).code)
+              : undefined,
+      });
     }
   }
 
-  throw new Error(`failed to download OCR model from ${source} source(s): ${errors.join("; ")}`);
+  const shaError = attempts.find((attempt) =>
+    attempt.code === "OCR_MODEL_SHA256_MISMATCH" ||
+    attempt.code === "OCR_MODEL_MANIFEST_INVALID"
+  );
+  if (shaError) {
+    throw new OcrError(
+      shaError.code as "OCR_MODEL_SHA256_MISMATCH" | "OCR_MODEL_MANIFEST_INVALID",
+      shaError.error,
+      { context: { source, attempts } }
+    );
+  }
+
+  throw new OcrError(
+    "OCR_MODEL_DOWNLOAD_FAILED",
+    `failed to download OCR model from ${source} source(s): ${errors.join("; ")}`,
+    { context: { source, attempts } }
+  );
 }
 
 function modelDownloadUrls(
@@ -295,13 +412,19 @@ function verifySha256(bytes: Buffer, expected: string, label: string): void {
   if (expected === "skip") return;
 
   if (/^0+$/.test(expected)) {
-    throw new Error(
-      `OCR model manifest for ${label} has placeholder sha256; provide a real profile or update the manifest`
+    throw new OcrError(
+      "OCR_MODEL_SHA256_MISMATCH",
+      `OCR model sha256 mismatch for ${label}: expected ${expected}`,
+      { context: { label, expected } }
     );
   }
 
   const actual = crypto.createHash("sha256").update(bytes).digest("hex");
   if (actual.toLowerCase() !== expected.toLowerCase()) {
-    throw new Error(`OCR model sha256 mismatch for ${label}: expected ${expected}, got ${actual}`);
+    throw new OcrError(
+      "OCR_MODEL_SHA256_MISMATCH",
+      `OCR model sha256 mismatch for ${label}: expected ${expected}, got ${actual}`,
+      { context: { label, expected, actual } }
+    );
   }
 }

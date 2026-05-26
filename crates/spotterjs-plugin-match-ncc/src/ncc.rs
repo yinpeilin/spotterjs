@@ -162,6 +162,17 @@ pub fn search_bounds(
     (x0, y0, x1, y1)
 }
 
+pub(crate) fn validate_search_region(opts: &MatchOptions) -> Result<()> {
+    if let Some(region) = opts.search_region {
+        if region.width <= 0 || region.height <= 0 {
+            return Err(SpotterError::Plugin(
+                "search_region width and height must be positive".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn scan_row_best_from_dot(
     hay: &[f32],
     hay_w: u32,
@@ -214,6 +225,7 @@ fn find_best_fast(
     opts: &MatchOptions,
 ) -> Result<(Region, f64)> {
     check_template_size(needle.nw, needle.nh)?;
+    validate_search_region(opts)?;
     let hay_w = haystack.width;
     let hay_h = haystack.height;
     let (x0, y0, x1, y1) = search_bounds(hay_w, hay_h, needle.nw, needle.nh, opts);
@@ -266,6 +278,7 @@ pub fn find_best_serial(
     }
 
     check_template_size(needle.nw, needle.nh)?;
+    validate_search_region(opts)?;
     let hay_w = haystack.width;
     let hay_h = haystack.height;
     let (x0, y0, x1, y1) = search_bounds(hay_w, hay_h, needle.nw, needle.nh, opts);
@@ -355,6 +368,7 @@ pub(crate) fn find_top_k(
     k: usize,
 ) -> Result<Vec<(Region, f64)>> {
     check_template_size(needle.nw, needle.nh)?;
+    validate_search_region(opts)?;
     let hay_w = haystack.width;
     let hay_h = haystack.height;
     let (x0, y0, x1, y1) = search_bounds(hay_w, hay_h, needle.nw, needle.nh, opts);
@@ -504,5 +518,59 @@ mod tests {
                 "ox={ox} oy={oy} fast={fast} naive={naive}"
             );
         }
+    }
+
+    #[test]
+    fn invalid_search_region_returns_plugin_error() {
+        let haystack = RgbaImage {
+            width: 16,
+            height: 16,
+            data: vec![255; 16 * 16 * 4],
+        };
+        let hay = vec![1.0f32; 16 * 16];
+        let needle = prepare_needle(vec![1.0; 4 * 4], 4, 4);
+        let mut opts = MatchOptions::default();
+        opts.search_region = Some(Region {
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 4,
+        });
+
+        let err = find_best(&haystack, &hay, &needle, &opts, None).unwrap_err();
+        assert!(format!("{err:?}").contains("search_region"));
+    }
+
+    #[test]
+    fn oversized_template_is_rejected() {
+        let err = check_template_size(MAX_TEMPLATE_DIM + 1, 8).unwrap_err();
+
+        assert!(format!("{err}").contains("too large"));
+    }
+
+    #[test]
+    fn top_k_results_are_sorted_by_score_and_limited() {
+        let w = 32u32;
+        let h = 20u32;
+        let mut hay = vec![0.0f32; (w * h) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                hay[(y * w + x) as usize] = ((x * 7 + y * 11) % 255) as f32;
+            }
+        }
+        let needle = needle_from_patch(&hay, w, 5, 6, 5, 4);
+        let haystack = RgbaImage {
+            width: w,
+            height: h,
+            data: vec![255; (w * h * 4) as usize],
+        };
+
+        let top = find_top_k(&haystack, &hay, &needle, &MatchOptions::default(), 3).unwrap();
+
+        assert_eq!(top.len(), 3);
+        assert!(top.windows(2).all(|pair| pair[0].1 >= pair[1].1));
+        assert!(top
+            .iter()
+            .any(|(region, _)| region.width == 5 && region.height == 4));
     }
 }

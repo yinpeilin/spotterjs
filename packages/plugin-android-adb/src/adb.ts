@@ -13,30 +13,43 @@ export type AdbErrorCode =
   | "ADB_DEVICE_UNAUTHORIZED"
   | "ADB_MULTIPLE_DEVICES";
 
+/** Error thrown when adb discovery, connection, or command execution fails. */
 export class AdbError extends Error {
+  /** Stable machine-readable adb error code. */
   readonly code: AdbErrorCode;
+  /** stderr captured from adb when available. */
   readonly stderr?: string;
+  /** Device list attached to discovery/selection errors. */
   readonly devices?: AndroidDeviceInfo[];
+  /** Additional diagnostic context such as adb path, args, and timeout. */
+  readonly context?: Record<string, unknown>;
+  /** Original process error when this wraps a lower-level failure. */
+  readonly cause?: unknown;
 
   constructor(
     code: AdbErrorCode,
     message: string,
     stderr?: string,
-    devices?: AndroidDeviceInfo[]
+    devices?: AndroidDeviceInfo[],
+    options: { context?: Record<string, unknown>; cause?: unknown } = {}
   ) {
     super(message);
     this.name = "AdbError";
     this.code = code;
     this.stderr = stderr;
     this.devices = devices;
+    this.context = options.context;
+    this.cause = options.cause;
   }
 }
 
+/** Fully resolved adb execution options used internally by command helpers. */
 export type RunOptions = Required<Pick<AndroidOptions, "adbPath" | "timeoutMs">>;
 
 const DEFAULT_ADB_PATH = "adb";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/** Resolve the adb executable path from explicit options, environment, PATH, or common SDK locations. */
 export function resolveAdbPath(options?: AndroidOptions): string {
   const explicit = options?.adbPath?.trim();
   if (explicit) return explicit;
@@ -51,6 +64,7 @@ export function resolveAdbPath(options?: AndroidOptions): string {
   return common ?? DEFAULT_ADB_PATH;
 }
 
+/** Normalize partial Android options into concrete adb execution settings. */
 export function normalizeOptions(options?: AndroidOptions): RunOptions {
   return {
     adbPath: resolveAdbPath(options),
@@ -58,6 +72,7 @@ export function normalizeOptions(options?: AndroidOptions): RunOptions {
   };
 }
 
+/** Run an adb command and return stdout as text or bytes. */
 export function runAdb(
   args: string[],
   options?: AndroidOptions & { encoding?: BufferEncoding | "buffer" }
@@ -77,7 +92,11 @@ export function runAdb(
       },
       (error, stdout, stderr) => {
         if (error) {
-          reject(toAdbError(error, String(stderr ?? "")));
+          reject(toAdbError(error, String(stderr ?? ""), {
+            adbPath: normalized.adbPath,
+            args,
+            timeoutMs: normalized.timeoutMs,
+          }));
           return;
         }
         resolve(stdout);
@@ -86,28 +105,49 @@ export function runAdb(
   });
 }
 
-function toAdbError(error: ExecFileException, stderr: string): AdbError {
+function toAdbError(
+  error: ExecFileException,
+  stderr: string,
+  context: Record<string, unknown>
+): AdbError {
   if (error.code === "ENOENT") {
     return new AdbError(
       "ADB_NOT_FOUND",
       "adb executable not found; install Android platform-tools or pass adbPath",
-      stderr
+      stderr,
+      undefined,
+      { context, cause: error }
     );
   }
   if (error.killed || error.signal === "SIGTERM") {
-    return new AdbError("ADB_TIMEOUT", "adb command timed out", stderr);
+    return new AdbError("ADB_TIMEOUT", "adb command timed out", stderr, undefined, {
+      context,
+      cause: error,
+    });
   }
   const message = stderr || error.message || "adb command failed";
   if (/device offline/i.test(message)) {
-    return new AdbError("ADB_DEVICE_OFFLINE", message, stderr);
+    return new AdbError("ADB_DEVICE_OFFLINE", message, stderr, undefined, {
+      context,
+      cause: error,
+    });
   }
   if (/unauthorized/i.test(message)) {
-    return new AdbError("ADB_DEVICE_UNAUTHORIZED", message, stderr);
+    return new AdbError("ADB_DEVICE_UNAUTHORIZED", message, stderr, undefined, {
+      context,
+      cause: error,
+    });
   }
   if (/device .*not found|no devices/i.test(message)) {
-    return new AdbError("ADB_DEVICE_NOT_FOUND", message, stderr);
+    return new AdbError("ADB_DEVICE_NOT_FOUND", message, stderr, undefined, {
+      context,
+      cause: error,
+    });
   }
-  return new AdbError("ADB_COMMAND_FAILED", message, stderr);
+  return new AdbError("ADB_COMMAND_FAILED", message, stderr, undefined, {
+    context,
+    cause: error,
+  });
 }
 
 function findExecutableOnPath(name: string): string | undefined {

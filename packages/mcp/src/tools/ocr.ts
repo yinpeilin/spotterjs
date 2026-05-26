@@ -1,16 +1,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { errorResult, json } from "./results.js";
+
+const finiteNumber = z.number().finite();
+const positiveNumber = finiteNumber.positive();
 
 const regionSchema = z.object({
-  left: z.number(),
-  top: z.number(),
-  width: z.number(),
-  height: z.number(),
+  left: finiteNumber,
+  top: finiteNumber,
+  width: positiveNumber,
+  height: positiveNumber,
 });
 
 const readOptionsSchema = {
   searchRegion: regionSchema.optional(),
-  origin: z.object({ x: z.number(), y: z.number() }).optional(),
+  origin: z.object({ x: finiteNumber, y: finiteNumber }).optional(),
 };
 
 const modelOptionsSchema = {
@@ -18,20 +22,28 @@ const modelOptionsSchema = {
   modelProfile: z.enum(["server", "mobile", "ppocrv5-server", "ppocrv5-mobile"]).optional(),
 };
 
-function errorResult(error: unknown) {
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: error instanceof Error ? error.message : String(error),
-      },
-    ],
-    isError: true,
-  };
-}
+const ocrClients = new Map<string, Promise<import("@spotterjs/plugin-ocr").OcrClient>>();
+let createOcrIdentity: unknown;
 
-function json(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+async function getOcr(args: { modelDir?: string; modelProfile?: "server" | "mobile" | "ppocrv5-server" | "ppocrv5-mobile" }) {
+  const { createOcr } = await import("@spotterjs/plugin-ocr");
+  if (createOcrIdentity !== createOcr) {
+    ocrClients.clear();
+    createOcrIdentity = createOcr;
+  }
+  const key = JSON.stringify({
+    modelDir: args.modelDir,
+    modelProfile: args.modelProfile,
+  });
+  let client = ocrClients.get(key);
+  if (!client) {
+    client = createOcr({
+      modelDir: args.modelDir,
+      modelProfile: args.modelProfile,
+    });
+    ocrClients.set(key, client);
+  }
+  return client;
 }
 
 export function registerOcrTools(server: McpServer): void {
@@ -50,11 +62,7 @@ export function registerOcrTools(server: McpServer): void {
     },
     async (args) => {
       try {
-        const { createOcr } = await import("@spotterjs/plugin-ocr");
-        const ocr = await createOcr({
-          modelDir: args.modelDir,
-          modelProfile: args.modelProfile,
-        });
+        const ocr = await getOcr(args);
         return json({
           imagePath: args.imagePath,
           lines: await ocr.read(args.imagePath, {
@@ -63,7 +71,7 @@ export function registerOcrTools(server: McpServer): void {
           }),
         });
       } catch (error) {
-        return errorResult(error);
+        return errorResult("ocr_read_image", error);
       }
     }
   );
@@ -86,11 +94,7 @@ export function registerOcrTools(server: McpServer): void {
     },
     async (args) => {
       try {
-        const { createOcr } = await import("@spotterjs/plugin-ocr");
-        const ocr = await createOcr({
-          modelDir: args.modelDir,
-          modelProfile: args.modelProfile,
-        });
+        const ocr = await getOcr(args);
         return json({
           imagePath: args.imagePath,
           matches: await ocr.findAllText(args.imagePath, args.text, {
@@ -101,7 +105,7 @@ export function registerOcrTools(server: McpServer): void {
           }),
         });
       } catch (error) {
-        return errorResult(error);
+        return errorResult("ocr_find_text", error);
       }
     }
   );

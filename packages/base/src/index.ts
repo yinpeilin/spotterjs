@@ -1,21 +1,22 @@
 /**
- * 屏幕或窗口上的矩形区域，坐标系为**屏幕坐标**（左上角为原点，单位：像素）。
+ * Rectangular area on a screen, window, capture, or device image.
  *
- * 模板匹配、截图、窗口边界等 API 均使用此结构。
+ * High-level desktop APIs use screen coordinates unless the API explicitly
+ * says otherwise. Width and height are measured in pixels.
  */
 export interface Region {
-  /** 矩形左边缘的 X 坐标（屏幕坐标） */
+  /** X coordinate of the rectangle's left edge. */
   left: number;
-  /** 矩形上边缘的 Y 坐标（屏幕坐标） */
+  /** Y coordinate of the rectangle's top edge. */
   top: number;
-  /** 矩形宽度（像素，必须 > 0） */
+  /** Rectangle width in pixels. Must be greater than zero for API inputs. */
   width: number;
-  /** 矩形高度（像素，必须 > 0） */
+  /** Rectangle height in pixels. Must be greater than zero for API inputs. */
   height: number;
 }
 
 /**
- * 屏幕坐标系中的点（像素）。
+ * Point in a two-dimensional coordinate space, measured in pixels.
  */
 export interface Point {
   x: number;
@@ -23,146 +24,156 @@ export interface Point {
 }
 
 /**
- * 模板图片输入。
+ * Template image input for NCC matching.
  *
- * - `string` 始终表示图片文件路径
- * - `Buffer` 始终表示已编码的图片字节（PNG/JPEG/WebP），不表示 raw RGBA
+ * - `string` always means an image file path.
+ * - `Buffer` always means encoded image bytes (PNG/JPEG/WebP), not raw RGBA.
  */
 export type TemplateImage = string | Buffer;
 
 /**
- * 一次模板匹配结果。
+ * Result from one template match.
  *
- * 高层 API 返回的 `region` 与 `center` 均为屏幕绝对坐标；它们不相对
- * `region`，也不相对窗口。
+ * Desktop `screen` and `windows` APIs return screen coordinates. Android
+ * plugin APIs return Android device screenshot coordinates. `image.find`
+ * returns coordinates relative to the provided capture.
  */
 export interface MatchResult {
-  /** 匹配框（屏幕坐标） */
+  /** Matched bounding box in the API's documented coordinate space. */
   region: Region;
-  /** 匹配框中心点（屏幕坐标） */
+  /** Center point of {@link region}. */
   center: Point;
-  /** NCC 匹配分数 */
+  /** NCC score. Higher values are stronger matches. */
   score: number;
 }
 
 /**
- * RGBA 原始像素截图。
+ * Raw RGBA image capture.
  *
- * - `data` 为行优先排列的 RGBA 字节（每像素 4 字节，无 stride padding）
- * - 尺寸与 `width * height * 4` 一致
+ * `data` is row-major RGBA bytes with 4 bytes per pixel and no stride padding.
+ * Its byte length should equal `width * height * 4`.
  *
- * 可用 {@link encodePng}（`@spotterjs/core`）编码为 PNG。
+ * Use `encodePng` from `@spotterjs/core` to encode it as PNG bytes.
  */
 export interface CaptureImage {
-  /** RGBA 像素 buffer */
+  /** Row-major RGBA pixel buffer. */
   data: Buffer;
   width: number;
   height: number;
 }
 
 /**
- * 模板匹配（NCC）的可选参数。
+ * Options for NCC template matching.
  *
- * 详见 `@spotterjs/core` 文档与 `docs/MATCHING.md`。
+ * See the template matching guide for path buffers, encoded buffers, search
+ * regions, scale search, and coordinate behavior.
  */
 export interface MatchOptions {
   /**
-   * 匹配置信度阈值，范围 0–1，默认由 native 层决定（通常 0.8）。
-   * 值越高要求越严格，漏匹配风险上升；值越低误匹配风险上升。
+   * Minimum match confidence, from 0 to 1.
+   *
+   * Higher values reduce false positives but may miss weak matches. Lower
+   * values find more candidates but increase false-positive risk. The native
+   * default is used when omitted.
    */
   confidence?: number;
   /**
-   * 限定搜索的屏幕子区域。匹配在裁剪后的 haystack 上进行，
-   * 返回的 {@link Region} 仍 translated 回**屏幕坐标**。
+   * Limit matching to a sub-region.
+   *
+   * Desktop `screen` APIs translate returned regions back to screen
+   * coordinates. `image.find` treats this as a crop inside the provided
+   * capture.
    */
   region?: Region;
   /**
-   * 启用多尺度匹配（对 needle 做缩放后逐一尝试）。
+   * Enable multi-scale matching by resizing the needle across a range.
    *
-   * `true` 使用 native 默认尺度范围；对象形态可覆盖 min/max/step。
+   * `true` uses native defaults. Object form overrides the range and step.
    */
   scale?:
     | boolean
     | {
-        /** 多尺度下限，默认 0.8 */
+        /** Minimum scale factor. Native default is typically `0.8`. */
         min?: number;
-        /** 多尺度上限，默认 1.2 */
+        /** Maximum scale factor. Native default is typically `1.2`. */
         max?: number;
-        /** 多尺度步长，默认 0.05 */
+        /** Scale step. Native default is typically `0.05`. */
         step?: number;
       };
 }
 
 /**
- * 轮询等待模板出现的参数。
+ * Options for polling until a template appears.
  */
 export interface MatchWaitOptions extends MatchOptions {
-  /** 超时毫秒数，超时则抛错 */
+  /** Timeout in milliseconds. The wait API throws when the deadline passes. */
   timeoutMs: number;
-  /** 轮询间隔，省略则使用 native 默认值 */
+  /** Delay between attempts. Native defaults are used when omitted. */
   intervalMs?: number;
 }
 
 /**
- * 桌面窗口元信息。
+ * Desktop window metadata.
  *
- * `id` 为平台原生句柄的字符串形式，用于 `windows` 等 API。
+ * `id` is a string representation of the native window handle and is accepted
+ * by `windows` APIs.
  */
 export interface WindowInfo {
-  /** 窗口 ID（十进制字符串，传给 native API） */
+  /** Native window ID as a decimal string. */
   id: string;
-  /** 窗口 ID 的十六进制表示（便于日志） */
+  /** Native window ID as a hexadecimal string for logs and diagnostics. */
   idHex: string;
-  /** 窗口标题 */
+  /** Window title. */
   title: string;
-  /** 窗口外框在屏幕上的位置与尺寸 */
+  /** Window outer-frame region in screen coordinates. */
   region: Region;
-  /** 所属进程 ID */
+  /** Owning process ID. */
   processId: number;
-  /** 进程名（如 `notepad.exe`） */
+  /** Process name, such as `notepad.exe`. */
   processName: string;
-  /** 可执行文件完整路径（若平台可获取） */
+  /** Full executable path when the platform can provide it. */
   exePath?: string;
-  /** 是否最小化 */
+  /** Whether the window is minimized. */
   isMinimized: boolean;
-  /** 是否为当前前台窗口 */
+  /** Whether this is the current foreground window. */
   isForeground: boolean;
 }
 
 /**
- * 按进程聚合的桌面应用信息。
+ * Desktop application metadata grouped by process.
  *
- * 一个进程可能对应多个 {@link WindowInfo}（多窗口应用）。
+ * A process can own multiple top-level windows.
  */
 export interface DesktopApp {
   processId: number;
   processName: string;
   exePath?: string;
-  /** 该进程下的所有顶层窗口 */
+  /** Top-level windows owned by this process. */
   windows: WindowInfo[];
-  /** 该进程是否拥有前台窗口 */
+  /** Whether this process owns the foreground window. */
   isForeground: boolean;
 }
 
 /**
- * 模板匹配能力接口（由 `screen` 等模块实现）。
+ * Template matching provider implemented by high-level modules such as
+ * `screen`.
  */
 export interface MatchProvider {
   /**
-   * 在全屏（或 `region`）中查找第一个匹配。
-   * @throws 未找到时 native 层抛出错误
+   * Find the best match.
+   * @throws When no match reaches the configured confidence threshold.
    */
   find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult>;
-  /** 查找所有匹配（按 native 去重/排序规则返回） */
+  /** Find all matches after native de-duplication and sorting. */
   findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]>;
   /**
-   * 轮询等待模板出现。
+   * Poll until a template appears or the timeout expires.
    */
   waitFor(needle: TemplateImage, options: MatchWaitOptions): Promise<MatchResult>;
 }
 
 /**
- * 计算 {@link Region} 的几何中心点（整数像素，向下取整）。
+ * Return the integer center point of a region, rounded down.
  *
  * @example
  * ```ts

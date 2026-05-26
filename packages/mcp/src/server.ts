@@ -14,6 +14,7 @@ export async function registerOptionalAndroidTools(
   registerAndroidTools(server);
 }
 
+/** Start the Spotter MCP server on stdio with tools enabled from environment flags. */
 export async function runSpotterMcp(): Promise<void> {
   const a11yEnabled =
     process.env.SPOTTERJS_A11Y === "1" ||

@@ -2,18 +2,18 @@ import type { CaptureImage } from "@spotterjs/base";
 import { loadNative } from "./native";
 
 /**
- * 将 RGBA {@link CaptureImage} 编码为 PNG 字节。
+ * Encode an RGBA {@link CaptureImage} as PNG bytes.
  *
- * 使用 Rust `image` crate，适合落盘或 HTTP 上传。
+ * Uses the Rust image pipeline. Suitable for saving to disk or uploading.
  */
 export function encodePng(capture: CaptureImage): Buffer {
   return loadNative().encodeCapturePng(capture);
 }
 
 /**
- * 将截图编码为 Base64 PNG 字符串。
+ * Encode an RGBA {@link CaptureImage} as a Base64 PNG string.
  *
- * 常用于 MCP 工具返回或 JSON API。
+ * Useful for JSON APIs and MCP payloads.
  */
 export function encodePngBase64(capture: CaptureImage): string {
   return loadNative().encodeCapturePngBase64(capture);

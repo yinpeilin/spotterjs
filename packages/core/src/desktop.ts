@@ -26,43 +26,44 @@ function mapApp(a: NativeDesktopApp): DesktopApp {
 }
 
 /**
- * 桌面应用与窗口 discovery（按进程聚合）。
+ * Desktop application and window discovery grouped by process.
  *
- * 适合「按进程名找窗口」「等待某标题窗口出现」等场景。
- * 窗口 ID 可用于 `windows`、`windows.findTemplate` 等。
+ * Use this for process-name discovery and title-based window waits. Window IDs
+ * returned here can be passed to `windows` APIs.
  */
 export const desktop = {
   /**
-   * 列出当前所有桌面应用（含各进程下的窗口列表）。
-   * 数据为调用时刻的快照。
+   * List current desktop applications and their top-level windows.
+   *
+   * The result is a snapshot at call time.
    */
   listApps(): DesktopApp[] {
     return loadNative().listDesktopApps().map(mapApp);
   },
 
   /**
-   * 按进程名或 exe 路径子串过滤应用（大小写策略由 native 层决定）。
-   * @param substring 进程名 / 路径片段，如 `"notepad"` 或 `"WeChat"`
+   * Find applications by process name or executable path substring.
+   * @param substring Process name or path fragment, such as `"notepad"`.
    */
   findApps(substring: string): DesktopApp[] {
     return loadNative().findDesktopApps(substring).map(mapApp);
   },
 
   /**
-   * 按窗口标题子串搜索顶层窗口。
-   * @param substring 标题片段
+   * Find top-level windows by title substring.
+   * @param substring Title fragment.
    */
   findWindows(substring: string): WindowInfo[] {
     return loadNative().findWindowsByTitle(substring).map(mapWindow);
   },
 
   /**
-   * 轮询直到标题包含 `substring` 的窗口出现。
+   * Poll until a top-level window title contains `substring`.
    *
-   * @param substring 标题子串
-   * @param timeoutMs 超时毫秒
-   * @param pollMs 轮询间隔；省略则用 native 默认
-   * @throws 超时未找到
+   * @param substring Title fragment.
+   * @param timeoutMs Timeout in milliseconds.
+   * @param pollMs Poll interval. Native defaults are used when omitted.
+   * @throws When no matching window appears before the timeout.
    */
   waitForWindow(
     substring: string,
@@ -74,7 +75,7 @@ export const desktop = {
     );
   },
 
-  /** 返回当前拥有前台窗口的应用 */
+  /** Return the application that owns the current foreground window. */
   getForegroundApp(): DesktopApp {
     return mapApp(loadNative().getForegroundApp());
   },

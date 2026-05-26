@@ -1,11 +1,24 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { android } from "@spotterjs/plugin-android-adb";
-import { writeCaptureArtifact } from "../adapters/artifacts.js";
+import {
+  type CaptureArtifactDetail,
+  writeCaptureArtifact,
+} from "../adapters/artifacts.js";
+import { json, ok, registerSafeTool } from "./results.js";
+
+const finiteNumberSchema = z.number().finite();
+const coordinateSchema = finiteNumberSchema.min(0);
+const timeoutMsSchema = finiteNumberSchema.min(0);
+const positiveDurationMsSchema = finiteNumberSchema.min(0);
+const portSchema = z.number().int().min(1).max(65535);
+const confidenceSchema = finiteNumberSchema.min(0).max(1);
+const maxDepthSchema = z.number().int().min(0).max(100);
+const captureDetailSchema = z.enum(["high", "original"]).optional();
 
 const adbOptionsSchema = {
   adbPath: z.string().optional(),
-  timeoutMs: z.number().optional(),
+  timeoutMs: timeoutMsSchema.optional(),
 };
 
 const serialSchema = {
@@ -14,29 +27,29 @@ const serialSchema = {
 };
 
 const pointSchema = z.object({
-  x: z.number(),
-  y: z.number(),
+  x: coordinateSchema,
+  y: coordinateSchema,
 });
 
 const regionSchema = z
   .object({
-    left: z.number(),
-    top: z.number(),
-    width: z.number(),
-    height: z.number(),
+    left: coordinateSchema,
+    top: coordinateSchema,
+    width: finiteNumberSchema.positive(),
+    height: finiteNumberSchema.positive(),
   })
   .optional();
 
 const matchOptionsSchema = {
-  confidence: z.number().optional(),
+  confidence: confidenceSchema.optional(),
   region: regionSchema,
   scale: z
     .union([
       z.boolean(),
       z.object({
-        min: z.number().optional(),
-        max: z.number().optional(),
-        step: z.number().optional(),
+        min: finiteNumberSchema.positive().optional(),
+        max: finiteNumberSchema.positive().optional(),
+        step: finiteNumberSchema.positive().optional(),
       }),
     ])
     .optional(),
@@ -61,7 +74,7 @@ const elementQuerySchema = {
 };
 
 const elementOptionsSchema = {
-  maxDepth: z.number().optional(),
+  maxDepth: maxDepthSchema.optional(),
   remotePath: z.string().optional(),
 };
 
@@ -109,48 +122,35 @@ function elementOptions(args: Record<string, unknown>) {
   return options;
 }
 
-function ok(text = "ok") {
-  return { content: [{ type: "text" as const, text }] };
-}
-
-function json(data: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+function withAndroidCoordinateSpace<T extends Record<string, unknown>>(payload: T) {
+  return {
+    ...payload,
+    coordinateSpace: "android-device",
+  };
 }
 
 function serialJson(device: { serial: string }) {
   return json({ serial: device.serial });
 }
 
-function errorResult(error: unknown) {
+function captureArtifactJson(
+  serial: string,
+  capture: Parameters<typeof writeCaptureArtifact>[0],
+  extra: Record<string, unknown> = {},
+  options: { detail?: CaptureArtifactDetail } = {}
+) {
   return {
-    content: [
-      {
-        type: "text" as const,
-        text: error instanceof Error ? error.message : String(error),
-      },
-    ],
-    isError: true,
+    serial,
+    ...extra,
+    ...writeCaptureArtifact(capture, {
+      prefix: `android-${serial}`,
+      detail: options.detail,
+    }),
   };
 }
 
-type ToolResult = {
-  content: Array<{ type: "text"; text: string }>;
-  isError?: boolean;
-};
-
-function registerSafeTool<T>(
-  server: McpServer,
-  name: string,
-  config: { description?: string; inputSchema?: z.ZodRawShape },
-  handler: (args: T) => Promise<ToolResult>
-) {
-  server.registerTool(name, config, async (args) => {
-    try {
-      return await handler(args as T);
-    } catch (error) {
-      return errorResult(error);
-    }
-  });
+async function connectAllDevices(args: { adbPath?: string; timeoutMs?: number }) {
+  return android.connectAll(adbOptions(args));
 }
 
 export function registerAndroidTools(server: McpServer): void {
@@ -173,7 +173,7 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z
         .object({
           host: z.string(),
-          port: z.number(),
+          port: portSchema,
           code: z.string(),
           ...adbOptionsSchema,
         })
@@ -201,7 +201,7 @@ export function registerAndroidTools(server: McpServer): void {
     "android_connect_network",
     {
       description: "Connect a paired wireless Android device with adb connect",
-      inputSchema: z.object({ host: z.string(), port: z.number(), ...adbOptionsSchema }).shape,
+      inputSchema: z.object({ host: z.string(), port: portSchema, ...adbOptionsSchema }).shape,
     },
     async (args: { host: string; port: number; adbPath?: string; timeoutMs?: number }) =>
       serialJson(
@@ -232,7 +232,7 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(adbOptionsSchema).shape,
     },
     async (args: { adbPath?: string; timeoutMs?: number }) => {
-      const group = await android.connectAll(adbOptions(args));
+      const group = await connectAllDevices(args);
       return json({
         devices: group.devices.map((d) => ({ serial: d.serial })),
         skipped: group.skipped,
@@ -245,25 +245,17 @@ export function registerAndroidTools(server: McpServer): void {
     "android_capture_screen",
     {
       description:
-        "Capture an Android device screen, downscale long edge to 1600 when needed, and return a workspace PNG file path",
-      inputSchema: z.object(serialSchema).shape,
+        "Capture an Android device screen, downscale long edge to 1600 by default, and return a workspace PNG file path",
+      inputSchema: z.object({ ...serialSchema, detail: captureDetailSchema }).shape,
     },
-    async (args: { serial: string; adbPath?: string; timeoutMs?: number }) => {
+    async (args: {
+      serial: string;
+      adbPath?: string;
+      timeoutMs?: number;
+      detail?: CaptureArtifactDetail;
+    }) => {
       const cap = await (await device(args)).capture();
-      const artifact = writeCaptureArtifact(cap, {
-        prefix: `android-${args.serial}`,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              serial: args.serial,
-              ...artifact,
-            }, null, 2),
-          },
-        ],
-      };
+      return json(captureArtifactJson(args.serial, cap, {}, { detail: args.detail }));
     }
   );
 
@@ -272,10 +264,10 @@ export function registerAndroidTools(server: McpServer): void {
     "android_batch_tap",
     {
       description: "Tap coordinates on every available Android device discovered by adb",
-      inputSchema: z.object({ x: z.number(), y: z.number(), ...adbOptionsSchema }).shape,
+      inputSchema: z.object({ x: coordinateSchema, y: coordinateSchema, ...adbOptionsSchema }).shape,
     },
     async (args: { x: number; y: number; adbPath?: string; timeoutMs?: number }) => {
-      const group = await android.connectAll(adbOptions(args));
+      const group = await connectAllDevices(args);
       return json(await group.tapAll(args.x, args.y));
     }
   );
@@ -289,7 +281,7 @@ export function registerAndroidTools(server: McpServer): void {
         .object({
           from: pointSchema,
           to: pointSchema,
-          durationMs: z.number().optional(),
+          durationMs: positiveDurationMsSchema.optional(),
           ...adbOptionsSchema,
         })
         .shape,
@@ -301,7 +293,7 @@ export function registerAndroidTools(server: McpServer): void {
       adbPath?: string;
       timeoutMs?: number;
     }) => {
-      const group = await android.connectAll(adbOptions(args));
+      const group = await connectAllDevices(args);
       return json(
         await group.swipeAll(args.from, args.to, {
           durationMs: args.durationMs,
@@ -316,10 +308,14 @@ export function registerAndroidTools(server: McpServer): void {
     {
       description:
         "Capture every available Android device discovered by adb and return workspace PNG file paths",
-      inputSchema: z.object(adbOptionsSchema).shape,
+      inputSchema: z.object({ ...adbOptionsSchema, detail: captureDetailSchema }).shape,
     },
-    async (args: { adbPath?: string; timeoutMs?: number }) => {
-      const group = await android.connectAll(adbOptions(args));
+    async (args: {
+      adbPath?: string;
+      timeoutMs?: number;
+      detail?: CaptureArtifactDetail;
+    }) => {
+      const group = await connectAllDevices(args);
       const results = await group.captureAll();
       const summary = results.map((result) => {
         if (!result.ok || !result.value) {
@@ -329,18 +325,14 @@ export function registerAndroidTools(server: McpServer): void {
             error: result.error,
           };
         }
-        const artifact = writeCaptureArtifact(result.value, {
-          prefix: `android-${result.serial}`,
-        });
-        return {
-          serial: result.serial,
-          ok: true,
-          ...artifact,
-        };
+        return captureArtifactJson(
+          result.serial,
+          result.value,
+          { ok: true },
+          { detail: args.detail }
+        );
       });
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }],
-      };
+      return json(summary);
     }
   );
 
@@ -349,7 +341,7 @@ export function registerAndroidTools(server: McpServer): void {
     "android_tap",
     {
       description: "Tap Android device coordinates",
-      inputSchema: z.object({ ...serialSchema, x: z.number(), y: z.number() }).shape,
+      inputSchema: z.object({ ...serialSchema, x: coordinateSchema, y: coordinateSchema }).shape,
     },
     async (args: { serial: string; x: number; y: number; adbPath?: string; timeoutMs?: number }) => {
       await (await device(args)).tap(args.x, args.y);
@@ -367,7 +359,7 @@ export function registerAndroidTools(server: McpServer): void {
           ...serialSchema,
           from: pointSchema,
           to: pointSchema,
-          durationMs: z.number().optional(),
+          durationMs: positiveDurationMsSchema.optional(),
         })
         .shape,
     },
@@ -404,7 +396,7 @@ export function registerAndroidTools(server: McpServer): void {
     "android_keyevent",
     {
       description: "Send adb input keyevent to an Android device",
-      inputSchema: z.object({ ...serialSchema, key: z.union([z.string(), z.number()]) }).shape,
+      inputSchema: z.object({ ...serialSchema, key: z.union([z.string(), finiteNumberSchema]) }).shape,
     },
     async (args: { serial: string; key: string | number; adbPath?: string; timeoutMs?: number }) => {
       await (await device(args)).keyevent(args.key);
@@ -486,7 +478,7 @@ export function registerAndroidTools(server: McpServer): void {
     }) => {
       const { serial, adbPath, timeoutMs, ...options } = args;
       const tree = await (await device({ serial, adbPath, timeoutMs })).dumpTree(options);
-      return json({ tree, coordinateSpace: "android-device" });
+      return json(withAndroidCoordinateSpace({ tree }));
     }
   );
 
@@ -509,7 +501,7 @@ export function registerAndroidTools(server: McpServer): void {
     }) => {
       const d = await device(args);
       const element = await d.findElement(elementQuery(args), elementOptions(args));
-      return json({ element, coordinateSpace: "android-device" });
+      return json(withAndroidCoordinateSpace({ element }));
     }
   );
 
@@ -523,27 +515,32 @@ export function registerAndroidTools(server: McpServer): void {
           ...serialSchema,
           ...elementQuerySchema,
           ...elementOptionsSchema,
-          timeoutMs: z.number(),
-          pollMs: z.number().optional(),
+          waitTimeoutMs: timeoutMsSchema,
+          pollMs: timeoutMsSchema.optional(),
         })
         .shape,
     },
     async (args: {
       serial: string;
       adbPath?: string;
-      timeoutMs: number;
+      timeoutMs?: number;
+      waitTimeoutMs: number;
       pollMs?: number;
       maxDepth?: number;
       remotePath?: string;
       [key: string]: unknown;
     }) => {
-      const d = await device(args);
+      const d = await device({
+        serial: args.serial,
+        adbPath: args.adbPath,
+        timeoutMs: args.timeoutMs,
+      });
       const element = await d.waitForElement(
         elementQuery(args),
-        args.timeoutMs,
+        args.waitTimeoutMs,
         elementOptions(args)
       );
-      return json({ element, coordinateSpace: "android-device" });
+      return json(withAndroidCoordinateSpace({ element }));
     }
   );
 
@@ -566,7 +563,7 @@ export function registerAndroidTools(server: McpServer): void {
     }) => {
       const d = await device(args);
       const element = await d.tapElement(elementQuery(args), elementOptions(args));
-      return json({ element, coordinateSpace: "android-device" });
+      return json(withAndroidCoordinateSpace({ element }));
     }
   );
 
@@ -599,7 +596,7 @@ export function registerAndroidTools(server: McpServer): void {
         args.textToType,
         elementOptions(args)
       );
-      return json({ element, coordinateSpace: "android-device" });
+      return json(withAndroidCoordinateSpace({ element }));
     }
   );
 
@@ -703,7 +700,7 @@ export function registerAndroidTools(server: McpServer): void {
       const matches = all
         ? await d.findAll(needle, options)
         : [await d.find(needle, options)];
-      return json({ matches, coordinateSpace: "android-device" });
+      return json(withAndroidCoordinateSpace({ matches }));
     }
   );
 }

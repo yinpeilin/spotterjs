@@ -1,16 +1,22 @@
 # @spotterjs/core
 
-spotterjs 桌面自动化主入口，提供截图、模板匹配、鼠标、键盘、窗口、无障碍和受控 host I/O API。
+[中文文档](../../README.zh-CN.md)
 
-## 安装
+Main TypeScript entrypoint for spotterjs desktop automation. It provides screen
+capture, template matching, mouse and keyboard input, window discovery,
+accessibility automation, clipboard access, PNG encoding, coordinate helpers,
+and sandboxed host I/O for agent workflows.
+
+## Install
 
 ```bash
 npm install @spotterjs/core
 ```
 
-需要对应平台的 `@spotterjs/node` 预编译二进制。当前支持 Windows x64 (MSVC) 和 Linux x64 (glibc)。
+The package loads a matching `@spotterjs/node` native binary. Current prebuilt
+targets are Windows x64 (MSVC) and Linux x64 (glibc).
 
-## 快速开始
+## Quick Start
 
 ```typescript
 import { keyboard, mouse, screen } from "@spotterjs/core";
@@ -24,7 +30,7 @@ mouse.tap(match.center.x, match.center.y);
 keyboard.write("hello");
 ```
 
-窗口内匹配：
+Window-scoped matching:
 
 ```typescript
 import { desktop, windows } from "@spotterjs/core";
@@ -33,31 +39,34 @@ const win = desktop.waitForWindow("Notepad", 10_000);
 windows.tapTemplate(win.id, "./assets/save-btn.png", { confidence: 0.9 });
 ```
 
-## 模块概览
+## Modules
 
-| 导出 | 用途 |
-|------|------|
-| `screen` | 屏幕尺寸、截图、全屏 NCC 匹配：`find` / `findAll` / `waitFor` / `tap` |
-| `windows` | 枚举、聚焦、移动、调整大小、窗口截图和窗口内模板匹配 |
-| `mouse` / `keyboard` / `clipboard` | 输入模拟和剪贴板 |
-| `desktop` | 按进程列出应用、按标题找窗口、`waitForWindow` |
-| `accessibility` | UIA / AT-SPI：`quick.attach`、`quick.find`、`quick.click` 等 |
-| `host` | 沙箱文件读写与 shell，主要用于 Agent 场景 |
-| `encodePng` / `encodePngBase64` | 截图 PNG 编码；`captureToBase64` 是兼容别名 |
-| `toMatchBox` / `matchTapScreen` | 屏幕坐标与窗口局部坐标转换 |
-| `image` | 已截图 RGBA 图像上的模板匹配和 encoded image buffer 解码 |
-| `@spotterjs/core/native` | 不稳定的底层 N-API 逃生舱 |
+| Export | Purpose |
+|--------|---------|
+| `screen` | Screen size, capture, full-screen NCC matching, `find`, `findAll`, `waitFor`, and `tap` |
+| `windows` | List, focus, move, resize, capture, and window-scoped template matching |
+| `mouse` / `keyboard` / `clipboard` | Input simulation and clipboard text |
+| `desktop` | List apps by process, find windows by title, and wait for windows |
+| `accessibility` | UIA / AT-SPI quick actions and diagnostics |
+| `host` | Sandboxed workspace file I/O and optional shell execution for agent scenarios |
+| `encodePng` / `encodePngBase64` | Encode `CaptureImage` to PNG bytes or base64 |
+| `toMatchBox` / `matchTapScreen` | Coordinate conversion helpers |
+| `image` | Match templates against an existing raw RGBA capture; decode encoded image buffers |
+| `@spotterjs/core/native` | Unstable low-level N-API escape hatch |
 
-各 API 在源码与 `.d.ts` 中带有 JSDoc，IDE 悬停可查看参数含义与行为说明。
+Public APIs include English TSDoc in the generated declarations, so IDE hover
+text explains parameters, coordinate spaces, errors, and side effects.
 
-## 深入阅读
+## Documentation
 
-- [快速开始](../../docs/getting-started.md)
-- [桌面自动化指南](../../docs/guides/desktop-automation.md)
-- [模板匹配](../../docs/MATCHING.md)
-- [无障碍自动化](../../docs/guides/accessibility.md)
-- [排障指南](../../docs/troubleshooting.md)
+- [Getting started](../../docs/en/getting-started.md)
+- [Desktop automation](../../docs/en/guides/desktop-automation.md)
+- [Template matching](../../docs/en/MATCHING.md)
+- [Accessibility automation](../../docs/en/guides/accessibility.md)
+- [Troubleshooting](../../docs/en/troubleshooting.md)
+- [中文文档](../../docs/zh-CN/README.md)
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires authorization. See [LICENSE](../../LICENSE).
+Learning and non-commercial use are free. Commercial use requires
+authorization. See [LICENSE](../../LICENSE).

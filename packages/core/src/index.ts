@@ -104,10 +104,10 @@ type NamedKey =
   | "RightSuper";
 
 /**
- * 键盘按键名称。
+ * Keyboard key name accepted by high-level keyboard helpers.
  *
- * 推荐使用 `Enter`、`Ctrl`、`V` 这类首字母大写/大写字母写法。
- * 常见小写别名（如 `enter`、`ctrl`、`esc`）由 native 层兼容解析。
+ * Prefer canonical names such as `Enter`, `Ctrl`, and `V`. Common lowercase
+ * aliases such as `enter`, `ctrl`, and `esc` are kept for compatibility.
  */
 export type KeyName =
   | LetterKey
@@ -166,60 +166,61 @@ function normalizeKeyName(key: string): string {
 }
 
 /**
- * 鼠标输入模拟。
+ * Mouse input helpers.
  *
- * 坐标均为屏幕像素。可通过 {@link mouse.setConfig} 调整移动速度与操作间隔。
+ * Coordinates are screen pixels. Use {@link mouse.setConfig} to tune movement
+ * speed and automatic delays.
  */
 export const mouse = {
-  /** 当前光标位置（屏幕坐标） */
+  /** Return the current cursor position in screen coordinates. */
   getPosition() {
     return loadNative().getPosition();
   },
 
-  /** 移动光标到 `(x, y)`（带轨迹/延迟，由 native 配置决定） */
+  /** Move the cursor to `(x, y)` using native movement settings. */
   move(x: number, y: number) {
     loadNative().mouseMove(x, y);
   },
 
-  /** 沿路径逐点移动 */
+  /** Move the cursor through each point in order. */
   movePath(points: Array<{ x: number; y: number }>) {
     loadNative().mouseMovePath(points);
   },
 
-  /** 直线移动到 `(x, y)`（比 `move` 更直接） */
+  /** Move directly to `(x, y)` with a straight-line native movement. */
   moveStraight(x: number, y: number) {
     loadNative().mouseMoveStraight(x, y);
   },
 
-  /** 单击；默认左键 */
+  /** Click a mouse button. Defaults to the left button. */
   click(button?: "left" | "right" | "middle") {
     loadNative().mouseClick(button);
   },
 
-  /** 双击；默认左键 */
+  /** Double-click a mouse button. Defaults to the left button. */
   doubleClick(button?: "left" | "right" | "middle") {
     loadNative().mouseDoubleClick(button);
   },
 
-  /** 按下按键（不释放） */
+  /** Press and hold a mouse button. */
   press(button?: "left" | "right" | "middle") {
     loadNative().mousePress(button);
   },
 
-  /** 释放按键 */
+  /** Release a mouse button. */
   release(button?: "left" | "right" | "middle") {
     loadNative().mouseRelease(button);
   },
 
-  /** 按住按键拖拽到 `(x, y)` */
+  /** Drag to `(x, y)` while holding a mouse button. */
   drag(x: number, y: number, button?: "left" | "right" | "middle") {
     loadNative().mouseDrag(x, y, button);
   },
 
   /**
-   * 滚轮。
-   * @param direction 滚动方向
-   * @param amount 滚动量，默认 1
+   * Scroll the mouse wheel.
+   * @param direction Scroll direction.
+   * @param amount Scroll amount. Defaults to `1`.
    */
   scroll(direction: "up" | "down" | "left" | "right", amount = 1) {
     const n = loadNative();
@@ -239,15 +240,15 @@ export const mouse = {
     }
   },
 
-  /** 移动并单击 `(x, y)` */
+  /** Move to `(x, y)` and click. */
   tap(x: number, y: number, button?: "left" | "right" | "middle") {
     loadNative().tapAt(x, y, button);
   },
 
   /**
-   * 鼠标行为配置。
-   * @param config.autoDelayMs 各步操作间延迟
-   * @param config.mouseSpeed 移动速度（native 语义）
+   * Configure native mouse behavior.
+   * @param config.autoDelayMs Delay between native input steps.
+   * @param config.mouseSpeed Native mouse movement speed.
    */
   setConfig(config: { autoDelayMs?: number; mouseSpeed?: number }) {
     loadNative().setMouseConfig({
@@ -258,23 +259,23 @@ export const mouse = {
 };
 
 /**
- * 键盘输入模拟。
+ * Keyboard input helpers.
  *
- * 推荐键名写法：`"Enter"`、`"Ctrl"`、`"V"`。小写常见别名由 native 层兼容。
- * `up()` 只释放由 `down()` 记录的按键；需要强制发送 key-up 时使用 `rawUp()`。
+ * `up()` releases only keys tracked by `down()`. Use `rawUp()` only when you
+ * intentionally need to send a native key-up event without local state checks.
  */
 export const keyboard = {
-  /** 输入 Unicode 文本。 */
+  /** Type Unicode text. */
   write(text: string) {
     loadNative().keyboardTypeText(text);
   },
 
-  /** 按下并释放单个按键。 */
+  /** Press and release a single key. */
   tap(key: KeyName) {
     loadNative().keyboardTypeKey(String(key));
   },
 
-  /** 按住一个或多个按键，并记录按下状态。 */
+  /** Press one or more keys and track them as held. */
   down(keys: KeyInput) {
     const names = keyList(keys);
     loadNative().keyboardPressKeys(names);
@@ -283,7 +284,7 @@ export const keyboard = {
     }
   },
 
-  /** 释放由 {@link keyboard.down} 记录为按下的按键；未记录的按键会静默跳过。 */
+  /** Release keys recorded by {@link keyboard.down}; unknown keys are skipped. */
   up(keys: KeyInput) {
     const names = keyList(keys);
     const releasable = names
@@ -296,17 +297,17 @@ export const keyboard = {
     }
   },
 
-  /** 直接发送底层 key-down，不记录状态。 */
+  /** Send a native key-down event without recording local state. */
   rawDown(keys: KeyInput) {
     loadNative().keyboardPressKeys(keyList(keys));
   },
 
-  /** 直接发送底层 key-up，不检查状态。 */
+  /** Send a native key-up event without checking local state. */
   rawUp(keys: KeyInput) {
     loadNative().keyboardReleaseKeys(keyList(keys));
   },
 
-  /** 快捷键：按住修饰键，敲击最后一个键，再释放修饰键。 */
+  /** Press modifiers, tap the final key, then release the modifiers. */
   hotkey(keys: KeyName[]) {
     if (keys.length === 0) return;
     if (keys.length === 1) {
@@ -323,13 +324,13 @@ export const keyboard = {
     }
   },
 
-  /** @param config.autoDelayMs 按键间隔 */
+  /** @param config.autoDelayMs Delay between key events. */
   setConfig(config: { autoDelayMs?: number }) {
     loadNative().setKeyboardConfig({ autoDelayMs: config.autoDelayMs });
   },
 };
 
-/** 系统剪贴板读写（文本） */
+/** System clipboard text helpers. */
 export const clipboard = {
   set(text: string) {
     loadNative().clipboardSet(text);
@@ -342,9 +343,9 @@ export const clipboard = {
 export { centerOf };
 
 /**
- * 将 {@link CaptureImage} 编码为 Base64 PNG。
+ * Encode a {@link CaptureImage} as a Base64 PNG string.
  *
- * 等价于 `encodePngBase64(capture)`，便于 MCP / JSON 场景。
+ * Equivalent to `encodePngBase64(capture)`. Useful for MCP and JSON payloads.
  */
 export function captureToBase64(capture: CaptureImage): string {
   return encodePngBase64(capture);
@@ -369,6 +370,8 @@ export type {
 export { desktop } from "./desktop";
 export { host, configureHost, HostPathError } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";
+export { SpotterJsError, NativeSpotterError, isSpotterJsError } from "./errors";
+export type { SpotterErrorContext } from "./errors";
 export { encodePng, encodePngBase64 } from "./capture";
 export { image } from "./buffer-match";
 export {

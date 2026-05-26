@@ -9,15 +9,15 @@ import {
 } from "./paths";
 
 export type ReadFileOptions = {
-  /** 文本编码；`null` 表示返回原始 Buffer */
+  /** Text encoding. Use `null` to return a raw Buffer. */
   encoding?: BufferEncoding | null;
-  /** 覆盖全局 maxBytes 限制 */
+  /** Override the global max byte limit for this read. */
   maxBytes?: number;
 };
 
 /**
- * 读取工作区内文件（路径相对于 {@link HostConfig.workspaceRoot}）。
- * @throws 路径逃逸、非文件、超大文件
+ * Read a file inside the configured workspace root.
+ * @throws For path escape, non-file targets, or files over the byte limit.
  */
 export function readFile(filePath: string, opts?: ReadFileOptions): string | Buffer {
   const resolved = resolveWorkspacePath(filePath);
@@ -33,8 +33,9 @@ export function readFile(filePath: string, opts?: ReadFileOptions): string | Buf
 }
 
 /**
- * 写入工作区文件（自动创建父目录）。
- * @throws 路径逃逸、denylist、超大内容
+ * Write a file inside the configured workspace root, creating parent
+ * directories as needed.
+ * @throws For path escape, denied filenames, or content over the byte limit.
  */
 export function writeFile(
   filePath: string,
@@ -52,7 +53,7 @@ export function writeFile(
   fs.writeFileSync(resolved, data);
 }
 
-/** 目录项摘要（`path` 为相对工作区的 POSIX 风格路径） */
+/** Directory entry summary. `path` is POSIX-style and relative to the workspace. */
 export type DirEntry = {
   name: string;
   path: string;
@@ -61,7 +62,7 @@ export type DirEntry = {
   size: number;
 };
 
-/** 列出目录内容 */
+/** List entries inside a workspace directory. */
 export function listDir(dirPath = "."): DirEntry[] {
   const resolved = resolveWorkspacePath(dirPath);
   const st = statSafe(resolved);
@@ -82,7 +83,7 @@ export function listDir(dirPath = "."): DirEntry[] {
   });
 }
 
-/** 文件/目录 stat（不含完整 resolved 路径，返回原始相对路径） */
+/** Return file or directory metadata without exposing the resolved absolute path. */
 export function stat(filePath: string) {
   const resolved = resolveWorkspacePath(filePath);
   const st = statSafe(resolved);

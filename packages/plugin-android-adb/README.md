@@ -1,6 +1,11 @@
 # @spotterjs/plugin-android-adb
 
-Android automation plugin for SpotterJS using ADB only.
+[中文文档](../../docs/zh-CN/guides/android-adb.md)
+
+Android automation plugin for spotterjs using ADB only. It supports device
+discovery, USB and wireless connections, capture, touch input, text input, app
+control, UIAutomator element queries, template matching, and multi-device
+helpers.
 
 ## Install
 
@@ -24,38 +29,23 @@ const match = await phone.find("./button.png", { confidence: 0.9 });
 await phone.tap(match.center.x, match.center.y);
 ```
 
-`adb` must be installed and available on `PATH`, installed in a common Android
-SDK platform-tools location, set with `SPOTTERJS_ADB_PATH`, or passed as
+ADB must be available on `PATH`, installed in a common Android SDK
+platform-tools location, configured with `SPOTTERJS_ADB_PATH`, or passed as
 `adbPath`.
 
 ## UIAutomator Elements
 
-The plugin can dump Android's built-in UIAutomator hierarchy and act on
-semantic elements. Bounds and centers use Android device screen coordinates.
-
 ```typescript
-const tree = await phone.dumpTree();
-console.log(tree.children.map((node) => node.text));
-
 const login = await phone.findElement({
   resourceId: "com.example:id/login",
   clickable: true,
 });
+
 await phone.tapElement(login);
-
-await phone.typeElement(
-  { classNameContains: "EditText", textContains: "Search" },
-  "hello"
-);
-
-const done = await phone.waitForElement({ text: "Done" }, 5_000);
-await phone.tap(done.center.x, done.center.y);
+await phone.typeElement({ classNameContains: "EditText" }, "hello");
 ```
 
-Supported element query fields: `text`, `textContains`, `resourceId`,
-`resourceIdContains`, `className`, `classNameContains`, `contentDescription`,
-`contentDescriptionContains`, `packageName`, `clickable`, `enabled`, `checked`,
-`selected`, `scrollable`, and `focusable`.
+Element bounds and template matches use Android device screen coordinates.
 
 ## API
 
@@ -65,15 +55,13 @@ Supported element query fields: `text`, `textContains`, `resourceId`,
 - `android.connectAll(options?)`: connect all authorized devices.
 - `android.pairTcp({ host, port, code, adbPath?, timeoutMs? })`: run `adb pair`.
 - `android.connectNetwork({ host, port, adbPath?, timeoutMs? })`: run `adb connect`.
-- `AndroidDevice`: `capture`, `tap`, `swipe`, `text`, `keyevent`, `back`,
-  `home`, `startApp`, `stopApp`, `find`, `findAll`, `waitFor`, `dumpTree`,
-  `findElement`, `findElements`, `waitForElement`, `tapElement`, `typeElement`,
-  `shell`, `getDisplayInfo`, `wake`, `sleep`, `currentApp`, and `clearApp`.
-- `AndroidDeviceGroup`: `tapAll`, `swipeAll`, and `captureAll`.
-- `AdbError`: thrown for ADB failures with a stable `code` and optional `stderr`.
+- `AndroidDevice`: capture, tap, swipe, text, keyevent, app, UIAutomator, shell,
+  display, template matching, and wait helpers.
+- `AndroidDeviceGroup`: batch tap, swipe, and capture.
+- `AdbError`: ADB failure with a stable `code` and optional `stderr`.
 
 Complex connection flows, multi-device usage, wireless debugging, and
-troubleshooting are covered in [Android ADB automation](../../docs/guides/android-adb.md).
+troubleshooting are covered in [Android ADB automation](../../docs/en/guides/android-adb.md).
 
 ## Limits
 
@@ -83,5 +71,5 @@ dedicated IME or clipboard strategy in a later version.
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires authorization.
-See [LICENSE](../../LICENSE).
+Learning and non-commercial use are free. Commercial use requires
+authorization. See [LICENSE](../../LICENSE).

@@ -13,6 +13,9 @@ describe("public API surface", () => {
     expect(core.image).toBeDefined();
     expect(core.mouse).toBeDefined();
     expect(core.keyboard).toBeDefined();
+    expect(core.SpotterJsError).toBeDefined();
+    expect(core.NativeSpotterError).toBeDefined();
+    expect(core.isSpotterJsError).toBeDefined();
   });
 
   it("does not export removed root-level escape hatches or legacy helpers", () => {
@@ -24,5 +27,8 @@ describe("public API surface", () => {
     expect("findInCapture" in core).toBe(false);
     expect("findAllInCapture" in core).toBe(false);
     expect("waitForInCapture" in core).toBe(false);
+    expect("findNeedleInWindow" in core).toBe(false);
+    expect("findNeedleInCapture" in core).toBe(false);
+    expect("loadNeedleCapture" in core).toBe(false);
   });
 });

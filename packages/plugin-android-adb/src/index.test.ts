@@ -22,6 +22,7 @@ vi.mock("@spotterjs/core", () => ({
 
 import {
   AdbError,
+  AndroidAutomationError,
   android,
 } from "./index";
 import { parseAdbDevices } from "./discovery";
@@ -221,6 +222,7 @@ BAD unauthorized model:Other
         serial: "192.168.1.8:5555",
         ok: false,
         error: "tap failed",
+        code: "ADB_COMMAND_FAILED",
       },
     ]);
   });
@@ -249,6 +251,24 @@ BAD unauthorized model:Other
       ],
       ["-s", "emulator-5554", "shell", "input", "keyevent", "BACK"],
     ]);
+  });
+
+  it("rejects invalid numeric input before invoking adb", async () => {
+    const device = await android.connect({ serial: "phone" });
+
+    await expect(device.tap(Number.NaN, 1)).rejects.toMatchObject({
+      name: "AndroidAutomationError",
+      code: "ANDROID_INVALID_ARGUMENT",
+      context: { label: "x" },
+    });
+    await expect(
+      device.swipe({ x: 1, y: 2 }, { x: 3, y: 4 }, { durationMs: -1 })
+    ).rejects.toMatchObject({
+      name: "AndroidAutomationError",
+      code: "ANDROID_INVALID_ARGUMENT",
+      context: { label: "durationMs" },
+    });
+    expect(mocks.execFile).not.toHaveBeenCalled();
   });
 
   it("escapes text for adb shell input text", async () => {
@@ -343,6 +363,18 @@ BAD unauthorized model:Other
       resourceId: "com.example:id/login",
       center: { x: 60, y: 45 },
     });
+  });
+
+  it("rejects unsafe UIAutomator remote paths", async () => {
+    const device = await android.connect({ serial: "phone" });
+
+    await expect(
+      device.dumpTree({ remotePath: "/sdcard/window.xml;rm -rf /" })
+    ).rejects.toMatchObject({
+      name: "AndroidAutomationError",
+      code: "ANDROID_UNSAFE_REMOTE_PATH",
+    });
+    expect(mocks.execFile).not.toHaveBeenCalled();
   });
 
   it("cleans the remote UIAutomator dump file when reading the tree fails", async () => {
@@ -507,6 +539,23 @@ BAD unauthorized model:Other
     await expect(android.discover()).rejects.toMatchObject({
       name: "AdbError",
       code: "ADB_NOT_FOUND",
+      context: { adbPath: expect.any(String) },
     } satisfies Partial<AdbError>);
+  });
+
+  it("throws structured automation errors for element misses", async () => {
+    mocks.execFile.mockImplementation((_file, args, _options, cb) => {
+      if (args.includes("cat")) {
+        cb(null, `<hierarchy><node text="Home" bounds="[0,0][10,10]" /></hierarchy>`, "");
+        return;
+      }
+      cb(null, "", "");
+    });
+    const device = await android.connect({ serial: "phone" });
+
+    await expect(device.findElement({ text: "Missing" })).rejects.toMatchObject({
+      name: "AndroidAutomationError",
+      code: "ANDROID_ELEMENT_NOT_FOUND",
+    } satisfies Partial<AndroidAutomationError>);
   });
 });

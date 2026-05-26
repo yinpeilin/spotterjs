@@ -62,18 +62,25 @@ vi.mock("../adapters/artifacts.js", () => artifacts);
 
 import { registerAndroidTools } from "./android.js";
 
-type ToolHandler = (args: any) => Promise<{ content: Array<{ text?: string }> }>;
+type ToolHandler = (args: any) => Promise<{ content: Array<{ text?: string }>; isError?: boolean }>;
+type RegisteredTool = { config: any; handler: ToolHandler };
 
-function registerTools(): Map<string, ToolHandler> {
-  const tools = new Map<string, ToolHandler>();
+function registerToolEntries(): Map<string, RegisteredTool> {
+  const tools = new Map<string, RegisteredTool>();
   const server = {
-    registerTool(name: string, _config: unknown, handler: ToolHandler) {
-      tools.set(name, handler);
+    registerTool(name: string, config: unknown, handler: ToolHandler) {
+      tools.set(name, { config, handler });
     },
   };
 
   registerAndroidTools(server as never);
   return tools;
+}
+
+function registerTools(): Map<string, ToolHandler> {
+  return new Map(
+    [...registerToolEntries()].map(([name, entry]) => [name, entry.handler])
+  );
 }
 
 function parseToolJson(result: Awaited<ReturnType<ToolHandler>>) {
@@ -189,10 +196,11 @@ describe("android MCP tools", () => {
       originalHeight: 1,
       format: "png",
       isDownscaled: false,
+      detail: "original",
     });
 
     const handler = registerTools().get("android_capture_screen");
-    const result = await handler!({ serial: "phone" });
+    const result = await handler!({ serial: "phone", detail: "original" });
     const json = parseToolJson(result);
 
     expect(plugin.connect).toHaveBeenCalledWith({
@@ -209,6 +217,7 @@ describe("android MCP tools", () => {
       originalHeight: 1,
       format: "png",
       isDownscaled: false,
+      detail: "original",
     });
     expect(artifacts.writeCaptureArtifact).toHaveBeenCalledWith(
       {
@@ -216,7 +225,7 @@ describe("android MCP tools", () => {
         width: 2,
         height: 1,
       },
-      { prefix: "android-phone" }
+      { prefix: "android-phone", detail: "original" }
     );
   });
 
@@ -243,6 +252,7 @@ describe("android MCP tools", () => {
       originalHeight: 1,
       format: "png",
       isDownscaled: false,
+      detail: "original",
     });
 
     const tools = registerTools();
@@ -265,7 +275,9 @@ describe("android MCP tools", () => {
     );
     expect(json).toEqual([{ serial: "phone-a", ok: true }]);
 
-    const result = await tools.get("android_batch_capture")!({});
+    const result = await tools.get("android_batch_capture")!({
+      detail: "original",
+    });
     json = parseToolJson(result);
 
     expect(plugin.group.captureAll).toHaveBeenCalled();
@@ -280,9 +292,14 @@ describe("android MCP tools", () => {
         originalHeight: 1,
         format: "png",
         isDownscaled: false,
+        detail: "original",
       },
       { serial: "phone-b", ok: false, error: "offline" },
     ]);
+    expect(artifacts.writeCaptureArtifact).toHaveBeenCalledWith(
+      { data: Buffer.from("rgba"), width: 2, height: 1 },
+      { prefix: "android-phone-a", detail: "original" }
+    );
     expect(result.content).toHaveLength(1);
   });
 
@@ -309,29 +326,251 @@ describe("android MCP tools", () => {
     expect(plugin.device.keyevent).toHaveBeenCalledWith("BACK");
   });
 
-  it("finds templates from path or base64", async () => {
+  it("uses bounded numeric schemas for coordinates and timeouts", () => {
+    const tools = registerToolEntries();
+    const tapSchema = tools.get("android_tap")!.config.inputSchema;
+    const waitSchema = tools.get("android_wait_for_element")!.config.inputSchema;
+    const captureSchema = tools.get("android_capture_screen")!.config.inputSchema;
+
+    expect(() =>
+      tapSchema.x.parse(Number.NaN)
+    ).toThrow();
+    expect(() =>
+      tapSchema.x.parse(Number.POSITIVE_INFINITY)
+    ).toThrow();
+    expect(() =>
+      waitSchema.waitTimeoutMs.parse(-1)
+    ).toThrow();
+    expect(captureSchema.detail.parse("high")).toBe("high");
+    expect(captureSchema.detail.parse("original")).toBe("original");
+    expect(() => captureSchema.detail.parse("low")).toThrow();
+  });
+
+  it("finds templates from path, base64, or all matches", async () => {
     plugin.device.find.mockResolvedValue({
       region: { left: 1, top: 2, width: 3, height: 4 },
       center: { x: 2, y: 4 },
       score: 0.91,
     });
+    plugin.device.findAll.mockResolvedValue([
+      {
+        region: { left: 5, top: 6, width: 7, height: 8 },
+        center: { x: 8, y: 10 },
+        score: 0.95,
+      },
+    ]);
 
-    const handler = registerTools().get("android_find_template");
-    const json = parseToolJson(
-      await handler!({
+    const tools = registerTools();
+
+    let json = parseToolJson(
+      await tools.get("android_find_template")!({
+        serial: "phone",
+        image: { path: "needle.png" },
+        confidence: 0.8,
+      })
+    );
+
+    expect(plugin.device.find).toHaveBeenCalledWith("needle.png", {
+      confidence: 0.8,
+      region: undefined,
+      scale: undefined,
+    });
+    expect(json.coordinateSpace).toBe("android-device");
+    expect(json.matches[0].score).toBe(0.91);
+
+    json = parseToolJson(
+      await tools.get("android_find_template")!({
         serial: "phone",
         image: { base64: Buffer.from("needle").toString("base64") },
         confidence: 0.9,
       })
     );
 
-    expect(plugin.device.find).toHaveBeenCalledWith(Buffer.from("needle"), {
+    expect(plugin.device.find).toHaveBeenLastCalledWith(Buffer.from("needle"), {
       confidence: 0.9,
       region: undefined,
       scale: undefined,
     });
     expect(json.coordinateSpace).toBe("android-device");
     expect(json.matches[0].score).toBe(0.91);
+
+    json = parseToolJson(
+      await tools.get("android_find_template")!({
+        serial: "phone",
+        image: { path: "needle.png" },
+        all: true,
+        confidence: 0.9,
+      })
+    );
+
+    expect(plugin.device.findAll).toHaveBeenCalledWith("needle.png", {
+      confidence: 0.9,
+      region: undefined,
+      scale: undefined,
+    });
+    expect(json.coordinateSpace).toBe("android-device");
+    expect(json.matches[0].score).toBe(0.95);
+  });
+
+  it("forwards template matching confidence, region, and scale options", async () => {
+    const region = { left: 10, top: 20, width: 300, height: 400 };
+    const scale = { min: 0.75, max: 1.25, step: 0.05 };
+    plugin.device.find.mockResolvedValue({
+      region: { left: 11, top: 22, width: 33, height: 44 },
+      center: { x: 27, y: 44 },
+      score: 0.87,
+    });
+
+    const result = await registerTools().get("android_find_template")!({
+      serial: "phone",
+      adbPath: "adb.exe",
+      timeoutMs: 2500,
+      image: { path: "needle.png" },
+      confidence: 0.87,
+      region,
+      scale,
+    });
+    const json = parseToolJson(result);
+
+    expect(plugin.connect).toHaveBeenCalledWith({
+      serial: "phone",
+      adbPath: "adb.exe",
+      timeoutMs: 2500,
+    });
+    expect(plugin.device.find).toHaveBeenCalledWith("needle.png", {
+      confidence: 0.87,
+      region,
+      scale,
+    });
+    expect(json).toEqual({
+      coordinateSpace: "android-device",
+      matches: [
+        {
+          region: { left: 11, top: 22, width: 33, height: 44 },
+          center: { x: 27, y: 44 },
+          score: 0.87,
+        },
+      ],
+    });
+  });
+
+  it("uses findAll with scale true when all template matches are requested", async () => {
+    plugin.device.findAll.mockResolvedValue([
+      {
+        region: { left: 1, top: 2, width: 3, height: 4 },
+        center: { x: 2, y: 4 },
+        score: 0.91,
+      },
+      {
+        region: { left: 5, top: 6, width: 7, height: 8 },
+        center: { x: 8, y: 10 },
+        score: 0.99,
+      },
+    ]);
+
+    const json = parseToolJson(
+      await registerTools().get("android_find_template")!({
+        serial: "phone",
+        image: { path: "needle.png" },
+        all: true,
+        confidence: 1,
+        scale: true,
+      })
+    );
+
+    expect(plugin.device.find).not.toHaveBeenCalled();
+    expect(plugin.device.findAll).toHaveBeenCalledWith("needle.png", {
+      confidence: 1,
+      region: undefined,
+      scale: true,
+    });
+    expect(json).toEqual({
+      coordinateSpace: "android-device",
+      matches: [
+        {
+          region: { left: 1, top: 2, width: 3, height: 4 },
+          center: { x: 2, y: 4 },
+          score: 0.91,
+        },
+        {
+          region: { left: 5, top: 6, width: 7, height: 8 },
+          center: { x: 8, y: 10 },
+          score: 0.99,
+        },
+      ],
+    });
+  });
+
+  it("returns an empty Android template match list with coordinate space", async () => {
+    plugin.device.findAll.mockResolvedValue([]);
+
+    const json = parseToolJson(
+      await registerTools().get("android_find_template")!({
+        serial: "phone",
+        image: { path: "needle.png" },
+        all: true,
+        confidence: 0,
+      })
+    );
+
+    expect(json).toEqual({
+      coordinateSpace: "android-device",
+      matches: [],
+    });
+  });
+
+  it("uses bounded schemas for template matching accuracy options", () => {
+    const findSchema = registerToolEntries().get("android_find_template")!.config.inputSchema;
+
+    expect(findSchema.confidence.parse(0)).toBe(0);
+    expect(findSchema.confidence.parse(1)).toBe(1);
+    expect(() => findSchema.confidence.parse(-0.01)).toThrow();
+    expect(() => findSchema.confidence.parse(1.01)).toThrow();
+    expect(() => findSchema.confidence.parse(Number.NaN)).toThrow();
+    expect(() => findSchema.confidence.parse(Number.POSITIVE_INFINITY)).toThrow();
+
+    expect(() =>
+      findSchema.region.parse({ left: -1, top: 0, width: 1, height: 1 })
+    ).toThrow();
+    expect(() =>
+      findSchema.region.parse({ left: 0, top: -1, width: 1, height: 1 })
+    ).toThrow();
+    expect(() =>
+      findSchema.region.parse({ left: 0, top: 0, width: 0, height: 1 })
+    ).toThrow();
+    expect(() =>
+      findSchema.region.parse({ left: 0, top: 0, width: 1, height: -1 })
+    ).toThrow();
+    expect(() =>
+      findSchema.region.parse({
+        left: 0,
+        top: 0,
+        width: Number.POSITIVE_INFINITY,
+        height: 1,
+      })
+    ).toThrow();
+
+    expect(() => findSchema.scale.parse({ min: 0 })).toThrow();
+    expect(() => findSchema.scale.parse({ max: -1 })).toThrow();
+    expect(() => findSchema.scale.parse({ step: Number.NaN })).toThrow();
+    expect(() => findSchema.scale.parse({ step: Number.POSITIVE_INFINITY })).toThrow();
+  });
+
+  it("returns an MCP error when high-confidence template matching misses", async () => {
+    plugin.device.find.mockRejectedValue(
+      new Error("best score 0.94 below confidence 0.99")
+    );
+
+    const result = await registerTools().get("android_find_template")!({
+      serial: "phone",
+      image: { path: "needle.png" },
+      confidence: 0.99,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain(
+      "android_find_template failed: best score 0.94 below confidence 0.99"
+    );
   });
 
   it("dumps, finds, waits for, taps, and types Android elements", async () => {
@@ -381,10 +620,16 @@ describe("android MCP tools", () => {
       await tools.get("android_wait_for_element")!({
         serial: "phone",
         text: "Search",
-        timeoutMs: 1000,
+        waitTimeoutMs: 1000,
+        timeoutMs: 2500,
         pollMs: 50,
       })
     );
+    expect(plugin.connect).toHaveBeenLastCalledWith({
+      serial: "phone",
+      adbPath: undefined,
+      timeoutMs: 2500,
+    });
     expect(plugin.device.waitForElement).toHaveBeenCalledWith(
       { text: "Search" },
       1000,
@@ -443,6 +688,23 @@ describe("android MCP tools", () => {
     expect(plugin.device.wake).toHaveBeenCalled();
     expect(plugin.device.sleep).toHaveBeenCalled();
 
+    await tools.get("android_back")!({ serial: "phone" });
+    await tools.get("android_home")!({ serial: "phone" });
+    expect(plugin.device.back).toHaveBeenCalled();
+    expect(plugin.device.home).toHaveBeenCalled();
+
+    await tools.get("android_start_app")!({
+      serial: "phone",
+      packageName: "com.example",
+      activity: ".MainActivity",
+    });
+    await tools.get("android_stop_app")!({
+      serial: "phone",
+      packageName: "com.example",
+    });
+    expect(plugin.device.startApp).toHaveBeenCalledWith("com.example", ".MainActivity");
+    expect(plugin.device.stopApp).toHaveBeenCalledWith("com.example");
+
     json = parseToolJson(await tools.get("android_current_app")!({ serial: "phone" }));
     expect(plugin.device.currentApp).toHaveBeenCalled();
     expect(json.packageName).toBe("com.example");
@@ -452,5 +714,18 @@ describe("android MCP tools", () => {
       packageName: "com.example",
     });
     expect(plugin.device.clearApp).toHaveBeenCalledWith("com.example");
+  });
+
+  it("returns MCP errors when plugin calls fail", async () => {
+    plugin.connect.mockRejectedValue(new Error("adb unavailable"));
+
+    const result = await registerTools().get("android_tap")!({
+      serial: "phone",
+      x: 1,
+      y: 2,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toBe("android_tap failed: adb unavailable");
   });
 });

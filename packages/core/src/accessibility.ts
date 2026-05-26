@@ -7,43 +7,44 @@ import {
 } from "./native";
 import { centerOf, type Region } from "@spotterjs/base";
 
-/** UIA 树遍历视图（Windows） */
+/** Accessibility tree view mode. */
 export type TreeViewMode = "auto" | "raw" | "control" | "content";
 
 /**
- * 无障碍树元素查询条件。
+ * Query fields for accessibility tree elements.
  *
- * Windows 使用 UIA；Linux 使用 AT-SPI。字段组合为 AND 关系。
+ * Windows uses UIA and Linux uses AT-SPI. Fields are combined with AND logic.
  */
 export type A11yQuery = {
-  /** 精确或包含匹配的名称（由 `match` 决定） */
+  /** Accessible name. Matching behavior is controlled by `match`. */
   name?: string;
-  /** 名称包含子串（便捷字段，等价于 name + match:contains） */
+  /** Convenience substring query for accessible name. */
   nameContains?: string;
-  /** 控件类型，如 `"Button"`、`"ListItem"`（平台命名） */
+  /** Platform control type, such as `"Button"` or `"ListItem"`. */
   controlType?: string;
-  /** UIA AutomationId / AT-SPI 等价标识 */
+  /** UIA AutomationId or platform-equivalent stable identifier. */
   automationId?: string;
-  /** 名称匹配模式，默认 `"exact"` */
+  /** Name matching mode. Defaults to `"exact"`. */
   match?: "exact" | "contains";
 };
 
 /**
- * 无障碍子系统初始化选项。
+ * Accessibility subsystem options.
  *
- * 调用 {@link accessibility.quick.enable} 后生效，影响 attach 与树展开行为。
+ * Applied by {@link accessibility.quick.enable}. These settings affect attach
+ * timing and tree expansion behavior.
  */
 export type A11yConfig = {
-  /** attach 后的固定等待（毫秒） */
+  /** Fixed delay after attaching, in milliseconds. */
   attachDelayMs?: number;
-  /** 注册 StructureChanged 事件（WeChat 4.1+ UIA client 模式） */
+  /** Subscribe to structure-change events where supported. */
   eventSubscription?: boolean;
-  /** 等待树展开的最长时间 */
+  /** Maximum wait for tree expansion, in milliseconds. */
   treeWaitTimeoutMs?: number;
   treeWaitPollMs?: number;
-  /** 树健康检查：最少 ListItem 数量 */
+  /** Minimum `ListItem` count used by tree health checks. */
   minListItemCount?: number;
-  /** UIA walker：`auto` 在 client 模式用 control，否则 raw */
+  /** Tree walker mode. `auto` lets the native layer pick a platform default. */
   treeView?: TreeViewMode;
 };
 
@@ -52,16 +53,16 @@ export type TreeDumpOptions = {
   treeView?: TreeViewMode;
 };
 
-/** 无障碍树健康检查结果，形状来自 `@spotterjs/node` */
+/** Accessibility tree health report from the native layer. */
 export type TreeHealth = NativeTreeHealth;
 
-/** attach 报告（attach 前后树状态对比），形状来自 `@spotterjs/node` */
+/** Attach report with candidate window and tree diagnostics. */
 export type AttachReport = NativeAttachReport;
 
-/** 单节点 UIA 元数据 */
+/** Metadata for a single accessibility element. */
 export type ElementInfo = NativeElementInfo;
 
-/** UIA 树节点（结构化） */
+/** Structured accessibility tree node. */
 export type TreeNodeDump = NativeTreeNodeDump;
 
 function queryToNative(q: A11yQuery) {
@@ -96,14 +97,15 @@ function attachReportFromNative(r: NativeAttachReport): AttachReport {
 
 const accessibilityBase = {
   /**
-   * 启用无障碍桥接（UIA / AT-SPI）。
-   * 重复调用会更新配置。
+   * Enable the accessibility bridge.
+   *
+   * Calling this again updates the configuration.
    */
   enable(config?: A11yConfig): void {
     loadNative().accessibilityEnable(configToNative(config));
   },
 
-  /** 释放无障碍资源 */
+  /** Release accessibility resources. */
   disable(): void {
     loadNative().accessibilityDisable();
   },
@@ -113,7 +115,7 @@ const accessibilityBase = {
   },
 
   /**
-   * 将窗口 attach 到无障碍树，返回根元素 ID。
+   * Attach a window and return the root element ID.
    * @param windowId {@link WindowInfo.id}
    */
   attachWindow(windowId: string): string {
@@ -121,32 +123,32 @@ const accessibilityBase = {
   },
 
   /**
-   * 带 UIA client 模式与树展开等待的 attach。
-   * @returns attach 前后树健康对比、HWND 候选与诊断建议
+   * Attach a window and return diagnostics for tree expansion and candidates.
+   * @returns Tree health, selected element ID, and diagnostic metadata.
    */
   attachWindowReport(windowId: string, maxDepth = 12): AttachReport {
     const r = loadNative().accessibilityAttachWindowReport(windowId, maxDepth);
     return attachReportFromNative(r);
   },
 
-  /** attach 当前前台窗口，返回根元素 ID */
+  /** Attach the current foreground window and return the root element ID. */
   attachActive(): string {
     return loadNative().accessibilityAttachActive();
   },
 
   /**
-   * 在子树中查找第一个匹配元素。
-   * @param rootId 根元素 ID（通常来自 attach）
-   * @returns 元素 ID
-   * @throws 未找到
+   * Find the first matching element inside a subtree.
+   * @param rootId Root element ID, usually returned by an attach call.
+   * @returns Element ID.
+   * @throws When no element matches the query.
    */
   find(rootId: string, query: A11yQuery, maxDepth = 12): string {
     return loadNative().accessibilityFind(rootId, queryToNative(query), maxDepth);
   },
 
   /**
-   * 轮询等待元素出现。
-   * @throws 超时
+   * Poll until a matching element appears.
+   * @throws When the timeout expires.
    */
   waitFor(
     rootId: string,
@@ -163,32 +165,32 @@ const accessibilityBase = {
     );
   },
 
-  /** 元素边界（屏幕坐标 {@link Region}） */
+  /** Return element bounds in screen coordinates. */
   getBounds(elementId: string): Region {
     return loadNative().accessibilityGetBounds(elementId);
   },
 
-  /** 单节点 UIA 元数据（无需 dump 整树） */
+  /** Return metadata for one element without dumping the whole tree. */
   getElementInfo(elementId: string): ElementInfo {
     return loadNative().accessibilityGetElementInfo(elementId);
   },
 
-  /** UI 变化后从原 HWND 刷新根元素 COM 引用 */
+  /** Refresh the root reference after UI changes. */
   refreshRoot(elementId: string): void {
     loadNative().accessibilityRefreshRoot(elementId);
   },
 
-  /** 触发 Invoke 模式（按钮等） */
+  /** Invoke the element, typically for buttons and menu items. */
   invoke(elementId: string): void {
     loadNative().accessibilityInvoke(elementId);
   },
 
-  /** 设置 Value 模式文本（输入框等） */
+  /** Set element value text where the native accessibility provider supports it. */
   setValue(elementId: string, text: string): void {
     loadNative().accessibilitySetValue(elementId, text);
   },
 
-  /** 导出子树为 JSON 字符串（调试） */
+  /** Dump a subtree as a JSON string for diagnostics. */
   dumpTree(rootId: string, maxDepthOrOpts: number | TreeDumpOptions = 12): string {
     const opts =
       typeof maxDepthOrOpts === "number"
@@ -201,7 +203,7 @@ const accessibilityBase = {
     );
   },
 
-  /** 导出子树为结构化对象 */
+  /** Dump a subtree as a structured object. */
   dumpTreeObject(
     rootId: string,
     maxDepthOrOpts: number | TreeDumpOptions = 12
@@ -217,7 +219,7 @@ const accessibilityBase = {
     );
   },
 
-  /** 统计子树节点数等指标 */
+  /** Return node counts and other tree health metrics. */
   treeHealth(
     rootId: string,
     maxDepth = 12,
@@ -228,8 +230,9 @@ const accessibilityBase = {
   },
 
   /**
-   * 检查树是否达到最小 ListItem 数量等指标。
-   * 常用于判断 UIA 树是否已充分展开。
+   * Check whether a tree reaches minimum health thresholds.
+   *
+   * Commonly used to decide whether a UIA tree has expanded enough for queries.
    */
   checkTreeHealth(
     rootId: string,
@@ -246,9 +249,10 @@ const accessibilityBase = {
 };
 
 /**
- * 日常无障碍自动化 API。
+ * High-level accessibility automation API.
  *
- * 典型流程：`quick.enable()` → `quick.attach()` → `quick.find()` → `quick.click()` / `quick.invoke()`。
+ * Typical flow: `quick.enable()` -> `quick.attach()` -> `quick.find()` ->
+ * `quick.click()` or `quick.invoke()`.
  */
 export type A11yQuickApi = {
   enable(config?: A11yConfig): void;
@@ -272,10 +276,10 @@ export type A11yQuickApi = {
 };
 
 /**
- * 无障碍诊断 API。
+ * Accessibility diagnostics API.
  *
- * 当 `quick.find()` 找不到元素，或 UIA / AT-SPI 树不完整时，用这里的树导出、
- * 健康检查和元素元数据方法排查。
+ * Use this when `quick.find()` misses an element or the UIA / AT-SPI tree is
+ * incomplete.
  */
 export type A11yDebugApi = {
   attachWindowReport(windowId: string, maxDepth?: number): AttachReport;

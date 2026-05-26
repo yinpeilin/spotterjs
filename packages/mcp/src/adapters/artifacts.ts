@@ -5,21 +5,40 @@ import * as path from "node:path";
 
 export const DEFAULT_CAPTURE_MAX_LONG_EDGE = 1600;
 
+/** Capture artifact detail level requested by MCP callers. */
+export type CaptureArtifactDetail = "high" | "original";
+
+/** Metadata returned after writing a capture PNG into the workspace. */
 export type CaptureArtifact = {
+  /** Workspace-relative PNG path. */
   imagePath: string;
+  /** Width of the written image in pixels. */
   width: number;
+  /** Height of the written image in pixels. */
   height: number;
+  /** Width of the source capture before downscaling. */
   originalWidth: number;
+  /** Height of the source capture before downscaling. */
   originalHeight: number;
+  /** Artifact image format. */
   format: "png";
+  /** Whether the written image was downscaled from the source capture. */
   isDownscaled: boolean;
+  /** Detail level used when writing the artifact. */
+  detail: CaptureArtifactDetail;
 };
 
-type WriteCaptureOptions = {
+/** Options used when persisting a capture artifact. */
+export type WriteCaptureOptions = {
+  /** Safe filename prefix used in `.spotter/artifacts`. */
   prefix: string;
+  /** Maximum long edge for `high` detail captures. Defaults to 1600. */
   maxLongEdge?: number;
+  /** Use `original` to preserve source dimensions; defaults to `high`. */
+  detail?: CaptureArtifactDetail;
 };
 
+/** Downscale a capture with nearest-neighbor sampling when it exceeds `maxLongEdge`. */
 export function optimizeCapture(
   capture: CaptureImage,
   maxLongEdge = DEFAULT_CAPTURE_MAX_LONG_EDGE
@@ -33,14 +52,19 @@ export function optimizeCapture(
   return resizeNearest(capture, width, height);
 }
 
+/** Write a capture PNG and sidecar JSON metadata file under the workspace. */
 export function writeCaptureArtifact(
   capture: CaptureImage,
   options: WriteCaptureOptions
 ): CaptureArtifact {
-  const optimized = optimizeCapture(
-    capture,
-    options.maxLongEdge ?? DEFAULT_CAPTURE_MAX_LONG_EDGE
-  );
+  const detail = options.detail ?? "high";
+  const optimized =
+    detail === "original"
+      ? capture
+      : optimizeCapture(
+          capture,
+          options.maxLongEdge ?? DEFAULT_CAPTURE_MAX_LONG_EDGE
+        );
   const imagePath = artifactPath(options.prefix, "png");
   const metaPath = imagePath.replace(/\.png$/, ".json");
   const artifact: CaptureArtifact = {
@@ -52,6 +76,7 @@ export function writeCaptureArtifact(
     format: "png",
     isDownscaled:
       optimized.width !== capture.width || optimized.height !== capture.height,
+    detail,
   };
 
   writeArtifactFile(imagePath, encodePng(optimized));
@@ -82,19 +107,28 @@ function artifactPath(prefix: string, ext: string): string {
 
 function resizeNearest(image: CaptureImage, width: number, height: number): CaptureImage {
   const data = Buffer.alloc(width * height * 4);
+  const srcXs = new Array<number>(width);
+  for (let x = 0; x < width; x++) {
+    srcXs[x] = Math.min(
+      image.width - 1,
+      Math.floor((x * image.width) / width)
+    );
+  }
+
   for (let y = 0; y < height; y++) {
     const srcY = Math.min(
       image.height - 1,
       Math.floor((y * image.height) / height)
     );
+    const srcRow = srcY * image.width;
+    const dstRow = y * width;
     for (let x = 0; x < width; x++) {
-      const srcX = Math.min(
-        image.width - 1,
-        Math.floor((x * image.width) / width)
-      );
-      const src = (srcY * image.width + srcX) * 4;
-      const dst = (y * width + x) * 4;
-      image.data.copy(data, dst, src, src + 4);
+      const src = (srcRow + srcXs[x]) * 4;
+      const dst = (dstRow + x) * 4;
+      data[dst] = image.data[src];
+      data[dst + 1] = image.data[src + 1];
+      data[dst + 2] = image.data[src + 2];
+      data[dst + 3] = image.data[src + 3];
     }
   }
   return { data, width, height };

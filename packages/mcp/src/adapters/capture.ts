@@ -1,21 +1,40 @@
 import { screen } from "@spotterjs/core";
 import type { Region } from "@spotterjs/base";
-import { writeCaptureArtifact } from "./artifacts.js";
+import {
+  type CaptureArtifactDetail,
+  writeCaptureArtifact,
+} from "./artifacts.js";
 
-export function captureScreenArtifact(region?: Region) {
+type CaptureOptions = {
+  detail?: CaptureArtifactDetail;
+};
+
+/** Capture the full screen or a region and write a workspace PNG artifact. */
+export function captureScreenArtifact(region?: Region, options: CaptureOptions = {}) {
   const img = screen.capture(region);
-  return writeCaptureArtifact(img, { prefix: "desktop-screen" });
+  return writeCaptureArtifact(img, {
+    prefix: "desktop-screen",
+    detail: options.detail,
+  });
 }
 
-export function captureWindowArtifact(windowId: string) {
+/** Capture a desktop window and write a workspace PNG artifact. */
+export function captureWindowArtifact(windowId: string, options: CaptureOptions = {}) {
   const img = screen.captureWindow(windowId);
   return {
-    ...writeCaptureArtifact(img, { prefix: "desktop-window" }),
+    ...writeCaptureArtifact(img, {
+      prefix: "desktop-window",
+      detail: options.detail,
+    }),
     windowId,
   };
 }
 
-export function captureActiveArtifact() {
+/** Capture the active desktop window and write a workspace PNG artifact. */
+export function captureActiveArtifact(options: CaptureOptions = {}) {
   const img = screen.captureActive();
-  return writeCaptureArtifact(img, { prefix: "desktop-active" });
+  return writeCaptureArtifact(img, {
+    prefix: "desktop-active",
+    detail: options.detail,
+  });
 }

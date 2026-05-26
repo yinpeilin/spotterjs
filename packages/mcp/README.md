@@ -1,21 +1,25 @@
 # @spotterjs/mcp
 
-spotterjs MCP Server，把桌面自动化、可选 Android ADB 自动化、workspace 文件 I/O 和 shell 执行暴露给 MCP 客户端。
+[中文文档](../../docs/zh-CN/MCP.md)
 
-## 安装
+spotterjs MCP server exposes desktop automation, optional Android ADB
+automation, OCR, workspace file I/O, and optional shell execution to MCP
+clients.
+
+## Install
 
 ```bash
 npm install @spotterjs/mcp @spotterjs/core
 ```
 
-源码开发：
+Development build:
 
 ```bash
 npm run build -w @spotterjs/mcp
 npx spotterjs-mcp
 ```
 
-## 最小配置
+## Minimal Configuration
 
 ```json
 {
@@ -31,7 +35,7 @@ npx spotterjs-mcp
 }
 ```
 
-启用 shell 或 Android 工具时，再显式设置：
+Enable shell, Android, or accessibility tools explicitly:
 
 ```json
 {
@@ -41,4 +45,5 @@ npx spotterjs-mcp
 }
 ```
 
-完整配置、工具列表和安全策略见 [docs/MCP.md](../../docs/MCP.md)。
+Full configuration, tool lists, response shapes, and security policy are
+documented in [docs/en/MCP.md](../../docs/en/MCP.md).

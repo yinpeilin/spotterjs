@@ -58,18 +58,25 @@ vi.mock("../adapters/capture.js", () => artifacts);
 
 import { registerDesktopTools } from "./desktop.js";
 
-type ToolHandler = (args: any) => Promise<{ content: Array<{ text?: string }> }>;
+type ToolHandler = (args: any) => Promise<{ content: Array<{ text?: string }>; isError?: boolean }>;
+type RegisteredTool = { config: any; handler: ToolHandler };
 
-function registerTools(): Map<string, ToolHandler> {
-  const tools = new Map<string, ToolHandler>();
+function registerToolEntries(a11yEnabled = false): Map<string, RegisteredTool> {
+  const tools = new Map<string, RegisteredTool>();
   const server = {
-    registerTool(name: string, _config: unknown, handler: ToolHandler) {
-      tools.set(name, handler);
+    registerTool(name: string, config: unknown, handler: ToolHandler) {
+      tools.set(name, { config, handler });
     },
   };
 
-  registerDesktopTools(server as never, false);
+  registerDesktopTools(server as never, a11yEnabled);
   return tools;
+}
+
+function registerTools(): Map<string, ToolHandler> {
+  return new Map(
+    [...registerToolEntries()].map(([name, entry]) => [name, entry.handler])
+  );
 }
 
 function parseToolJson(result: Awaited<ReturnType<ToolHandler>>) {
@@ -84,6 +91,24 @@ beforeEach(() => {
   artifacts.captureScreenArtifact.mockReset();
   artifacts.captureWindowArtifact.mockReset();
   artifacts.captureActiveArtifact.mockReset();
+});
+
+describe("desktop MCP error handling", () => {
+  it("returns MCP errors when desktop operations throw", async () => {
+    const { windows } = await import("@spotterjs/core");
+    vi.mocked(windows.focus).mockImplementation(() => {
+      throw new Error("window not found");
+    });
+
+    const result = await registerTools().get("desktop_focus_window")!({
+      windowId: "missing",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toBe(
+      "desktop_focus_window failed: window not found"
+    );
+  });
 });
 
 describe("desktop_find_template", () => {
@@ -173,6 +198,14 @@ describe("desktop_find_template", () => {
     expect(json.coordinateSpace).toBe("screen");
     expect(json.matches).toHaveLength(2);
   });
+
+  it("uses bounded schemas for regions and scale", () => {
+    const schema = registerToolEntries().get("desktop_find_template")!.config.inputSchema;
+
+    expect(() => schema.region.parse({ left: 0, top: 0, width: 0, height: 10 })).toThrow();
+    expect(() => schema.confidence.parse(Number.POSITIVE_INFINITY)).toThrow();
+    expect(() => schema.scale._def.options[1].shape.step.parse(-0.1)).toThrow();
+  });
 });
 
 describe("desktop_capture_screen", () => {
@@ -185,6 +218,7 @@ describe("desktop_capture_screen", () => {
       originalHeight: 1200,
       format: "png",
       isDownscaled: true,
+      detail: "high",
     });
     const handler = registerTools().get("desktop_capture_screen");
     expect(handler).toBeDefined();
@@ -194,9 +228,75 @@ describe("desktop_capture_screen", () => {
 
     expect(json.format).toBe("png");
     expect(json.isDownscaled).toBe(true);
+    expect(json.detail).toBe("high");
     expect(json.originalWidth).toBe(2400);
     expect(json.width).toBe(1600);
     expect(result.content).toHaveLength(1);
-    expect(artifacts.captureScreenArtifact).toHaveBeenCalledWith(undefined);
+    expect(artifacts.captureScreenArtifact).toHaveBeenCalledWith(undefined, {
+      detail: undefined,
+    });
+  });
+
+  it("captures a region, a specific window, and the active window as artifacts", async () => {
+    const artifact = {
+      imagePath: ".spotter/artifacts/cap.png",
+      width: 10,
+      height: 5,
+      originalWidth: 10,
+      originalHeight: 5,
+      format: "png",
+      isDownscaled: false,
+      detail: "high",
+    };
+    artifacts.captureScreenArtifact.mockReturnValue(artifact);
+    artifacts.captureWindowArtifact.mockReturnValue({ ...artifact, windowId: "win-1" });
+    artifacts.captureActiveArtifact.mockReturnValue(artifact);
+    const tools = registerTools();
+    const region = { left: 1, top: 2, width: 3, height: 4 };
+
+    let json = parseToolJson(await tools.get("desktop_capture_screen")!({
+      region,
+      detail: "original",
+    }));
+    expect(artifacts.captureScreenArtifact).toHaveBeenCalledWith(region, {
+      detail: "original",
+    });
+    expect(json.imagePath).toBe(".spotter/artifacts/cap.png");
+
+    json = parseToolJson(await tools.get("desktop_capture_window")!({
+      windowId: "win-1",
+      detail: "original",
+    }));
+    expect(artifacts.captureWindowArtifact).toHaveBeenCalledWith("win-1", {
+      detail: "original",
+    });
+    expect(json.windowId).toBe("win-1");
+
+    json = parseToolJson(await tools.get("desktop_capture_active")!({
+      detail: "original",
+    }));
+    expect(artifacts.captureActiveArtifact).toHaveBeenCalledWith({
+      detail: "original",
+    });
+    expect(json.format).toBe("png");
+  });
+
+  it("uses bounded schemas for capture and accessibility arguments", () => {
+    const tools = registerToolEntries(true);
+    const captureSchema = tools.get("desktop_capture_screen")!.config.inputSchema;
+    const captureWindowSchema = tools.get("desktop_capture_window")!.config.inputSchema;
+    const captureActiveSchema = tools.get("desktop_capture_active")!.config.inputSchema;
+    const mouseSchema = tools.get("desktop_mouse_move")!.config.inputSchema;
+    const dumpSchema = tools.get("desktop_a11y_dump_tree")!.config.inputSchema;
+
+    expect(() =>
+      captureSchema.region.parse({ left: 0, top: 0, width: 0, height: 1 })
+    ).toThrow();
+    expect(captureSchema.detail.parse("high")).toBe("high");
+    expect(captureWindowSchema.detail.parse("original")).toBe("original");
+    expect(captureActiveSchema.detail.parse("high")).toBe("high");
+    expect(() => captureSchema.detail.parse("low")).toThrow();
+    expect(() => mouseSchema.x.parse(Number.NaN)).toThrow();
+    expect(() => dumpSchema.maxDepth.parse(101)).toThrow();
   });
 });

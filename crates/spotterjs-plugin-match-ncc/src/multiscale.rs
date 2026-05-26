@@ -18,6 +18,24 @@ fn scale_list(opts: &MatchOptions) -> Vec<f64> {
     scales
 }
 
+fn validate_scale_options(opts: &MatchOptions) -> Result<()> {
+    if !opts.scale_min.is_finite() || !opts.scale_max.is_finite() || !opts.scale_step.is_finite() {
+        return Err(SpotterError::Plugin("scale values must be finite".into()));
+    }
+    if opts.scale_min <= 0.0 || opts.scale_max <= 0.0 || opts.scale_step <= 0.0 {
+        return Err(SpotterError::Plugin("scale values must be positive".into()));
+    }
+    if opts.scale_min > opts.scale_max {
+        return Err(SpotterError::Plugin(
+            "scale_min must be less than or equal to scale_max".into(),
+        ));
+    }
+    if ((opts.scale_max - opts.scale_min) / opts.scale_step).ceil() > 256.0 {
+        return Err(SpotterError::Plugin("scale range has too many steps".into()));
+    }
+    Ok(())
+}
+
 struct ScaleContext<'a> {
     haystack: &'a RgbaImage,
     hay_gray: &'a [f32],
@@ -64,6 +82,7 @@ pub fn find_multi_scale(
     opts: &MatchOptions,
     collect_all: bool,
 ) -> Result<Vec<MatchResult>> {
+    validate_scale_options(opts)?;
     let hay_gray = rgba_to_gray(haystack)?;
     let needle_gray = rgba_to_gray(needle)?;
     let scales = scale_list(opts);
@@ -200,5 +219,46 @@ pub fn find_all_with_multiscale(
             needle.height,
             opts,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn image(width: u32, height: u32) -> RgbaImage {
+        RgbaImage {
+            width,
+            height,
+            data: vec![255; (width * height * 4) as usize],
+        }
+    }
+
+    #[test]
+    fn invalid_scale_config_returns_plugin_error() {
+        let haystack = image(16, 16);
+        let needle = image(4, 4);
+        let mut opts = MatchOptions::default();
+        opts.multi_scale = true;
+        opts.scale_min = 1.0;
+        opts.scale_max = 2.0;
+        opts.scale_step = 0.0;
+
+        let err = find_with_multiscale(&haystack, &needle, &opts).unwrap_err();
+        assert!(format!("{err}").contains("scale"));
+    }
+
+    #[test]
+    fn too_many_scale_steps_are_rejected() {
+        let haystack = image(32, 32);
+        let needle = image(4, 4);
+        let mut opts = MatchOptions::default();
+        opts.multi_scale = true;
+        opts.scale_min = 0.5;
+        opts.scale_max = 4.5;
+        opts.scale_step = 0.01;
+
+        let err = find_with_multiscale(&haystack, &needle, &opts).unwrap_err();
+        assert!(format!("{err}").contains("too many steps"));
     }
 }

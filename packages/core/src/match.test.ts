@@ -3,21 +3,49 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const findTemplate = vi.fn();
 const findAllTemplates = vi.fn();
 const waitForTemplate = vi.fn();
+const findTemplateInWindow = vi.fn();
+const findAllTemplatesInWindow = vi.fn();
+const findTemplateBuffers = vi.fn();
+const findAllTemplateBuffers = vi.fn();
+const loadImageFromPath = vi.fn();
+const loadImageFromBuffer = vi.fn();
 
 vi.mock("./native", () => ({
   loadNative: () => ({
     findTemplate,
     findAllTemplates,
     waitForTemplate,
+    findTemplateInWindow,
+    findAllTemplatesInWindow,
+    findTemplateBuffers,
+    findAllTemplateBuffers,
+    loadImageFromPath,
+    loadImageFromBuffer,
   }),
 }));
 
-import { findAllNeedle, findNeedle, waitForNeedle } from "./match";
+import {
+  findAllNeedle,
+  findAllNeedleInCapture,
+  findAllNeedleInWindow,
+  findNeedle,
+  findNeedleInCapture,
+  findNeedleInWindow,
+  loadNeedleCapture,
+  waitForNeedle,
+} from "./match";
+import { NativeSpotterError } from "./errors";
 
 beforeEach(() => {
   findTemplate.mockReset();
   findAllTemplates.mockReset();
   waitForTemplate.mockReset();
+  findTemplateInWindow.mockReset();
+  findAllTemplatesInWindow.mockReset();
+  findTemplateBuffers.mockReset();
+  findAllTemplateBuffers.mockReset();
+  loadImageFromPath.mockReset();
+  loadImageFromBuffer.mockReset();
   findTemplate.mockReturnValue({
     region: { left: 0, top: 0, width: 10, height: 10 },
     score: 0.97,
@@ -29,6 +57,23 @@ beforeEach(() => {
     region: { left: 1, top: 2, width: 10, height: 10 },
     score: 0.96,
   });
+  findTemplateInWindow.mockReturnValue({
+    region: { left: 12, top: 24, width: 8, height: 10 },
+    score: 0.94,
+  });
+  findAllTemplatesInWindow.mockReturnValue([
+    { region: { left: 14, top: 28, width: 8, height: 10 }, score: 0.93 },
+  ]);
+  const needleCapture = { data: Buffer.from("needle"), width: 8, height: 10 };
+  loadImageFromPath.mockReturnValue(needleCapture);
+  loadImageFromBuffer.mockReturnValue(needleCapture);
+  findTemplateBuffers.mockReturnValue({
+    region: { left: 2, top: 4, width: 8, height: 10 },
+    score: 0.92,
+  });
+  findAllTemplateBuffers.mockReturnValue([
+    { region: { left: 6, top: 8, width: 8, height: 10 }, score: 0.91 },
+  ]);
 });
 
 describe("findNeedle", () => {
@@ -64,6 +109,19 @@ describe("findNeedle", () => {
     });
   });
 
+  it("does not enable multi-scale matching when scale is false", async () => {
+    await findNeedle("needle.png", { scale: false });
+
+    expect(findTemplate).toHaveBeenCalledWith("needle.png", undefined, {
+      confidence: undefined,
+      searchRegion: undefined,
+      multiScale: undefined,
+      scaleMin: undefined,
+      scaleMax: undefined,
+      scaleStep: undefined,
+    });
+  });
+
   it("returns a MatchResult with screen center and score", async () => {
     findTemplate.mockReturnValue({
       region: { left: 10, top: 20, width: 5, height: 7 },
@@ -77,6 +135,26 @@ describe("findNeedle", () => {
       center: { x: 12, y: 23 },
       score: 0.91,
     });
+  });
+
+  it("wraps native matching errors with stable code and context", async () => {
+    const error = new Error("template not found");
+    (error as Error & { code?: string }).code = "MATCH_NOT_FOUND";
+    findTemplate.mockImplementation(() => {
+      throw error;
+    });
+
+    await expect(findNeedle("missing.png", { confidence: 0.99 })).rejects.toMatchObject({
+      name: "NativeSpotterError",
+      code: "NATIVE_MATCH_NOT_FOUND",
+      message: "findNeedle failed: template not found",
+      context: {
+        api: "findNeedle",
+        confidence: 0.99,
+        needle: "path",
+      },
+    });
+    await expect(findNeedle("missing.png")).rejects.toBeInstanceOf(NativeSpotterError);
   });
 });
 
@@ -137,5 +215,78 @@ describe("waitForNeedle", () => {
       center: { x: 6, y: 7 },
       score: 0.96,
     });
+  });
+});
+
+describe("findNeedleInWindow", () => {
+  it("uses the shared needle and option mapping for window matching", () => {
+    const buf = Buffer.from("needle");
+
+    const match = findNeedleInWindow("123", buf, {
+      confidence: 0.9,
+      region: { left: 1, top: 2, width: 3, height: 4 },
+      scale: true,
+    });
+
+    expect(findTemplateInWindow).toHaveBeenCalledWith("123", "", buf, {
+      confidence: 0.9,
+      searchRegion: { left: 1, top: 2, width: 3, height: 4 },
+      multiScale: true,
+      scaleMin: undefined,
+      scaleMax: undefined,
+      scaleStep: undefined,
+    });
+    expect(match).toEqual({
+      region: { left: 12, top: 24, width: 8, height: 10 },
+      center: { x: 16, y: 29 },
+      score: 0.94,
+    });
+  });
+
+  it("returns all window matches through the shared result mapper", () => {
+    const matches = findAllNeedleInWindow("123", "button.png");
+
+    expect(findAllTemplatesInWindow).toHaveBeenCalledWith(
+      "123",
+      "button.png",
+      undefined,
+      undefined
+    );
+    expect(matches).toEqual([
+      {
+        region: { left: 14, top: 28, width: 8, height: 10 },
+        center: { x: 18, y: 33 },
+        score: 0.93,
+      },
+    ]);
+  });
+});
+
+describe("capture image matching helpers", () => {
+  it("loads path and buffer needles through one helper", () => {
+    const encoded = Buffer.from("encoded");
+
+    loadNeedleCapture("button.png");
+    loadNeedleCapture(encoded);
+
+    expect(loadImageFromPath).toHaveBeenCalledWith("button.png");
+    expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
+  });
+
+  it("matches already captured images through the shared result mapper", async () => {
+    const haystack = { data: Buffer.from("hay"), width: 20, height: 20 };
+
+    await expect(findNeedleInCapture(haystack, "button.png")).resolves.toEqual({
+      region: { left: 2, top: 4, width: 8, height: 10 },
+      center: { x: 6, y: 9 },
+      score: 0.92,
+    });
+    await expect(findAllNeedleInCapture(haystack, "button.png")).resolves.toEqual([
+      {
+        region: { left: 6, top: 8, width: 8, height: 10 },
+        center: { x: 10, y: 13 },
+        score: 0.91,
+      },
+    ]);
   });
 });
