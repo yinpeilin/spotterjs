@@ -7,7 +7,7 @@ addons. It provides screen capture, mouse and keyboard input, window discovery,
 accessibility automation, NCC template matching, OCR, Android ADB automation,
 and an MCP server for code agents.
 
-- Source: [GitHub / Gitee repository](https://gitee.com/ypl0lpy/spotterjs)
+- Source: [GitHub repository](https://github.com/yinpeilin/spotterjs)
 - npm packages: `@spotterjs/core` and optional plugins
 - Documentation: [English](./docs/en/README.md) / [中文](./docs/zh-CN/README.md)
 
@@ -24,8 +24,39 @@ Prebuilt native packages currently target:
 
 ## Quick Start
 
+Create `check-spotter.ts`:
+
 ```typescript
-import { keyboard, mouse, screen } from "@spotterjs/core";
+import { screen } from "@spotterjs/core";
+
+const size = screen.size();
+const capture = screen.capture({
+  left: 0,
+  top: 0,
+  width: Math.min(200, size.width),
+  height: Math.min(200, size.height),
+});
+
+console.log({
+  screen: size,
+  capture: {
+    width: capture.width,
+    height: capture.height,
+    bytes: capture.data.length,
+  },
+});
+```
+
+Run it:
+
+```bash
+npx tsx check-spotter.ts
+```
+
+After that works, use template matching to click a visible button or icon:
+
+```typescript
+import { mouse, screen } from "@spotterjs/core";
 
 const match = await screen.find("./button.png", {
   confidence: 0.9,
@@ -33,7 +64,6 @@ const match = await screen.find("./button.png", {
 });
 
 mouse.tap(match.center.x, match.center.y);
-keyboard.write("hello from spotterjs");
 ```
 
 `screen.find` accepts either an image path or an encoded PNG/JPEG/WebP `Buffer`.
@@ -75,7 +105,7 @@ Maintainer docs:
 ## Local Development
 
 ```bash
-git clone https://gitee.com/ypl0lpy/spotterjs.git
+git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
 npm run build:ts
@@ -96,4 +126,4 @@ npm run build:native
 
 - Free: personal learning, teaching, non-commercial research, and local evaluation.
 - Commercial: products, SaaS, paid delivery, enterprise production, and similar use
-  require authorization. Contact `ypl123698745@qq.com` or open a Gitee issue.
+  require authorization. Contact `ypl123698745@qq.com` or open a GitHub issue.

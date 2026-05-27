@@ -27,14 +27,14 @@ npm run smoke
 ## Git Remote
 
 ```bash
-git remote add origin git@gitee.com:ypl0lpy/spotterjs.git
+git remote add origin git@github.com:yinpeilin/spotterjs.git
 git push -u origin master
 ```
 
 HTTPS clone:
 
 ```bash
-git clone https://gitee.com/ypl0lpy/spotterjs.git
+git clone https://github.com/yinpeilin/spotterjs.git
 ```
 
 ## Changesets
@@ -129,4 +129,4 @@ npx @modelcontextprotocol/inspector npx @spotterjs/mcp
 ## Commercial License
 
 For commercial authorization, contact `ypl123698745@qq.com` or use
-[Gitee Issues](https://gitee.com/ypl0lpy/spotterjs/issues).
+[GitHub Issues](https://github.com/yinpeilin/spotterjs/issues).

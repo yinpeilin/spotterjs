@@ -20,6 +20,8 @@ npm install @spotterjs/core
 From the repository:
 
 ```bash
+git clone https://github.com/yinpeilin/spotterjs.git
+cd spotterjs
 npm ci
 npm run build:ts
 ```
@@ -33,10 +35,43 @@ npm run build:native
 
 ## First Script
 
-Create a template image for a visible button or icon, then run:
+Run this first to verify that `@spotterjs/core` loads and can read screen and
+capture data.
+
+Create `check-spotter.ts`:
 
 ```typescript
-import { keyboard, mouse, screen } from "@spotterjs/core";
+import { screen } from "@spotterjs/core";
+
+const size = screen.size();
+const capture = screen.capture({
+  left: 0,
+  top: 0,
+  width: Math.min(200, size.width),
+  height: Math.min(200, size.height),
+});
+
+console.log({
+  screen: size,
+  capture: {
+    width: capture.width,
+    height: capture.height,
+    bytes: capture.data.length,
+  },
+});
+```
+
+Run it:
+
+```bash
+npx tsx check-spotter.ts
+```
+
+If you already have a visible button or icon screenshot, use template matching
+next:
+
+```typescript
+import { mouse, screen } from "@spotterjs/core";
 
 const match = await screen.find("./button.png", {
   confidence: 0.9,
@@ -44,7 +79,6 @@ const match = await screen.find("./button.png", {
 });
 
 mouse.tap(match.center.x, match.center.y);
-keyboard.write("hello from spotterjs");
 ```
 
 All high-level desktop match results use screen coordinates. Passing

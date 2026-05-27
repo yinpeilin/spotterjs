@@ -22,7 +22,7 @@ npm install @spotterjs/core
 源码开发时：
 
 ```bash
-git clone https://gitee.com/ypl0lpy/spotterjs.git
+git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
 npm run build:ts
@@ -37,30 +37,42 @@ npm run build:native
 
 ## 第一个脚本
 
-创建 `hello-spotter.ts`：
+先跑这个脚本，确认 `@spotterjs/core` 能正常加载，也能读取屏幕和截图数据。
+
+创建 `check-spotter.ts`：
 
 ```typescript
-import { keyboard, mouse, screen } from "@spotterjs/core";
+import { screen } from "@spotterjs/core";
 
 const size = screen.size();
-console.log("screen:", size);
+const capture = screen.capture({
+  left: 0,
+  top: 0,
+  width: Math.min(200, size.width),
+  height: Math.min(200, size.height),
+});
 
-keyboard.hotkey(["Ctrl", "L"]);
-keyboard.write("hello from spotterjs");
-
-const center = { x: Math.floor(size.width / 2), y: Math.floor(size.height / 2) };
-mouse.move(center.x, center.y);
+console.log({
+  screen: size,
+  capture: {
+    width: capture.width,
+    height: capture.height,
+    bytes: capture.data.length,
+  },
+});
 ```
 
 运行：
 
 ```bash
-npx tsx hello-spotter.ts
+npx tsx check-spotter.ts
 ```
 
-如果脚本会操作真实桌面，请先确认当前焦点窗口是你愿意被输入和点击的窗口。
+上面的连通性脚本不会输入或点击。下面的模板匹配脚本会操作真实桌面，请先确认当前窗口适合被点击。
 
 ## 模板匹配点击
+
+如果你已经准备好了按钮或图标截图，再用这个脚本验证模板匹配和点击：
 
 ```typescript
 import { mouse, screen } from "@spotterjs/core";

@@ -18,8 +18,39 @@ targets are Windows x64 (MSVC) and Linux x64 (glibc).
 
 ## Quick Start
 
+Create `check-spotter.ts`:
+
 ```typescript
-import { keyboard, mouse, screen } from "@spotterjs/core";
+import { screen } from "@spotterjs/core";
+
+const size = screen.size();
+const capture = screen.capture({
+  left: 0,
+  top: 0,
+  width: Math.min(200, size.width),
+  height: Math.min(200, size.height),
+});
+
+console.log({
+  screen: size,
+  capture: {
+    width: capture.width,
+    height: capture.height,
+    bytes: capture.data.length,
+  },
+});
+```
+
+Run it:
+
+```bash
+npx tsx check-spotter.ts
+```
+
+After that works, use template matching to click a visible button or icon:
+
+```typescript
+import { mouse, screen } from "@spotterjs/core";
 
 const match = await screen.find("./assets/button.png", {
   confidence: 0.9,
@@ -27,7 +58,6 @@ const match = await screen.find("./assets/button.png", {
 });
 
 mouse.tap(match.center.x, match.center.y);
-keyboard.write("hello");
 ```
 
 Window-scoped matching:
