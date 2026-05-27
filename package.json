@@ -31,6 +31,7 @@
     "smoke:a11y": "tsx scripts/smoke/06-accessibility-notepad.ts",
     "smoke:desktop": "tsx scripts/smoke/07-desktop-apps.ts",
     "smoke:android": "tsx scripts/smoke/android-adb.ts",
+    "smoke:android:wireless": "tsx scripts/smoke/android-wireless.ts",
     "examples:paint": "tsx examples/paint/run-all.ts",
     "example:paint:open-focus": "tsx examples/paint/01-open-focus.ts",
     "example:paint:capture": "tsx examples/paint/02-capture-window.ts",
