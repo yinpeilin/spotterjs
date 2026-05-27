@@ -1,11 +1,5 @@
 # @spotterjs/mcp
 
-## 2.0.0
-
-### Major Changes
-
-- 834a036: Rename `android_wait_for_element`'s element wait timeout from `timeoutMs` to `waitTimeoutMs`; `timeoutMs` now only represents the optional ADB connection timeout.
-
 ## 1.0.1
 
 ### Patch Changes
@@ -18,6 +12,8 @@
   - Replace root image helpers with `image.decode()`, `image.find()`, and `image.findAll()`.
   - Move `loadNative` and native binding types to `@spotterjs/core/native`.
   - Rebuild native packages in release mode, with the Windows binary statically linking the MSVC CRT.
+
+- Rename `android_wait_for_element`'s element wait timeout from `timeoutMs` to `waitTimeoutMs`; `timeoutMs` now only represents the optional ADB connection timeout.
 
 ### Patch Changes
 
