@@ -4,6 +4,9 @@ const findTemplateBuffers = vi.fn();
 const findAllTemplateBuffers = vi.fn();
 const loadImageFromPath = vi.fn();
 const loadImageFromBuffer = vi.fn();
+const getImageSize = vi.fn();
+const encodeCapturePng = vi.fn();
+const encodeCapturePngBase64 = vi.fn();
 
 vi.mock("./native", () => ({
   loadNative: () => ({
@@ -11,10 +14,13 @@ vi.mock("./native", () => ({
     findAllTemplateBuffers,
     loadImageFromPath,
     loadImageFromBuffer,
+    getImageSize,
+    encodeCapturePng,
+    encodeCapturePngBase64,
   }),
 }));
 
-import { image } from "./buffer-match";
+import { image } from "./image";
 import type { CaptureImage } from "@spotterjs/base";
 
 const haystack: CaptureImage = {
@@ -24,7 +30,7 @@ const haystack: CaptureImage = {
 };
 
 const needleCapture: CaptureImage = {
-  data: Buffer.from("needle"),
+  data: Buffer.alloc(10 * 6 * 4),
   width: 10,
   height: 6,
 };
@@ -34,8 +40,15 @@ beforeEach(() => {
   findAllTemplateBuffers.mockReset();
   loadImageFromPath.mockReset();
   loadImageFromBuffer.mockReset();
+  getImageSize.mockReset();
+  encodeCapturePng.mockReset();
+  encodeCapturePngBase64.mockReset();
+
   loadImageFromPath.mockReturnValue(needleCapture);
   loadImageFromBuffer.mockReturnValue(needleCapture);
+  getImageSize.mockReturnValue({ width: 10, height: 6 });
+  encodeCapturePng.mockReturnValue(Buffer.from("png"));
+  encodeCapturePngBase64.mockReturnValue("cG5n");
   findTemplateBuffers.mockReturnValue({
     region: { left: 4, top: 8, width: 10, height: 6 },
     score: 0.94,
@@ -45,11 +58,46 @@ beforeEach(() => {
   ]);
 });
 
-describe("image.decode", () => {
-  it("decodes an encoded image buffer", () => {
+describe("image.load", () => {
+  it("loads path, encoded bytes, and existing captures through one entrypoint", () => {
     const encoded = Buffer.from("encoded");
 
-    expect(image.decode(encoded)).toBe(needleCapture);
+    expect(image.load("button.png")).toBe(needleCapture);
+    expect(image.load({ path: "button.png" })).toBe(needleCapture);
+    expect(image.load(encoded)).toBe(needleCapture);
+    expect(image.load({ bytes: encoded, mimeType: "image/png" })).toBe(needleCapture);
+    expect(image.load({ capture: haystack })).toBe(haystack);
+    expect(image.load(haystack)).toBe(haystack);
+
+    expect(loadImageFromPath).toHaveBeenCalledWith("button.png");
+    expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
+  });
+});
+
+describe("image encoding", () => {
+  it("encodes captures as PNG bytes and base64", () => {
+    expect(image.encode(haystack)).toEqual(Buffer.from("png"));
+    expect(image.encodeBase64(haystack)).toBe("cG5n");
+    expect(encodeCapturePng).toHaveBeenCalledWith(haystack);
+    expect(encodeCapturePngBase64).toHaveBeenCalledWith(haystack);
+  });
+
+  it("rejects non-PNG output formats", () => {
+    expect(() => image.encode(haystack, { format: "jpeg" as never })).toThrow(
+      /only supports png/i
+    );
+  });
+});
+
+describe("image.size", () => {
+  it("returns dimensions for paths, buffers, and captures", () => {
+    const encoded = Buffer.from("encoded");
+
+    expect(image.size("button.png")).toEqual({ width: 10, height: 6 });
+    expect(image.size(encoded)).toEqual({ width: 10, height: 6 });
+    expect(image.size(haystack)).toEqual({ width: 100, height: 80 });
+
+    expect(getImageSize).toHaveBeenCalledWith("button.png");
     expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
   });
 });
@@ -77,23 +125,8 @@ describe("image.find", () => {
     });
   });
 
-  it("matches an encoded image buffer needle against a provided capture", async () => {
-    const encoded = Buffer.from("encoded");
-
-    await image.find(haystack, encoded);
-
-    expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
-    expect(findTemplateBuffers).toHaveBeenCalledWith(
-      haystack,
-      needleCapture,
-      undefined
-    );
-  });
-});
-
-describe("image.findAll", () => {
-  it("returns all buffer matches with centers", async () => {
-    const matches = await image.findAll(haystack, "button.png");
+  it("matches all results with centers", async () => {
+    const matches = await image.findAll(haystack, { capture: needleCapture });
 
     expect(findAllTemplateBuffers).toHaveBeenCalledWith(
       haystack,

@@ -1,15 +1,11 @@
-import * as fs from "fs";
 import type { CaptureImage, Region } from "@spotterjs/base";
+import { image as coreImage } from "@spotterjs/core";
 import { OcrError } from "./errors";
 import type { OcrImage, OcrPreprocessOptions } from "./types";
 
 export async function loadImage(image: OcrImage): Promise<CaptureImage> {
-  if (typeof image === "string") {
-    return decodeImage(fs.readFileSync(image));
-  }
-
-  if (Buffer.isBuffer(image)) {
-    return decodeImage(image);
+  if (typeof image === "string" || Buffer.isBuffer(image)) {
+    return validateCaptureImage(coreImage.load(image), "image");
   }
 
   if (!image || typeof image !== "object" || !("data" in image)) {
@@ -103,13 +99,7 @@ export function validateCaptureImage(image: CaptureImage, label: string): Captur
 }
 
 export async function decodeImage(bytes: Buffer): Promise<CaptureImage> {
-  const sharp = await import("sharp");
-  const { data, info } = await sharp
-    .default(bytes)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return { data, width: info.width, height: info.height };
+  return validateCaptureImage(coreImage.decode(bytes), "image");
 }
 
 function imageSummary(image: CaptureImage): Record<string, number> {

@@ -25,7 +25,7 @@ Prefer these public modules:
 - `accessibility`
 - `host`
 - `image`
-- `encodePng` / `encodePngBase64`
+- `image.encode` / `image.encodeBase64`
 
 Treat `@spotterjs/core/native` as an escape hatch for low-level scripts and
 diagnostics, not as the first choice for user code.

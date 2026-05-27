@@ -1,15 +1,14 @@
 import * as fs from "node:fs";
-import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { performance } from "node:perf_hooks";
 import sharp from "sharp";
-import { image, encodePng, screen, windows } from "@spotterjs/core";
+import { image, screen, windows } from "@spotterjs/core";
 import { loadNative } from "@spotterjs/core/native";
 import { createOcr, defaultModelDir } from "@spotterjs/plugin-ocr";
 import { cropImage, loadImage, resizeRgba } from "../../packages/plugin-ocr/src/image";
 import { boxesFromBitmap, decodeCtc } from "../../packages/plugin-ocr/src/postprocess";
-import { optimizeCapture, writeCaptureArtifact } from "../../packages/mcp/src/adapters/artifacts";
+import { optimizeCapture, workspaceImageStore } from "../../packages/mcp/src/adapters/artifacts";
 import {
   findAndroidElements,
   parseUiautomatorXml,
@@ -329,8 +328,8 @@ async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]>
   const native = loadNative();
   const fixture = syntheticMatchFixture();
   const needlePng = fs.readFileSync(fixture.needlePath);
-  const decodedNeedle = native.loadImageFromBuffer(needlePng);
-  const encodedHay = encodePng(fixture.hay);
+  const decodedNeedle = image.decode(needlePng);
+  const encodedHay = image.encode(fixture.hay);
   const bitmap = buildBitmap(480, 320);
   const logits = Array.from({ length: 64 }, (_, step) =>
     Array.from({ length: 96 }, (_, i) => (i === (step % 20) + 1 ? 0.95 : 0.01))
@@ -365,7 +364,7 @@ async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]>
     native.findTemplateBuffers(fixture.hay, decodedNeedle, { confidence: CONFIDENCE }), options));
   await add(results, bench("synthetic", "core.image.findAll decoded needle", () =>
     native.findAllTemplateBuffers(fixture.hay, decodedNeedle, { confidence: CONFIDENCE }), options));
-  await add(results, bench("synthetic", "core.encodePng 800x600", () => encodePng(fixture.hay), options));
+  await add(results, bench("synthetic", "core.image.encode 800x600", () => image.encode(fixture.hay), options));
   await add(results, bench("synthetic", "ocr.cropImage 600x400", () =>
     cropImage(fixture.hay, { left: 100, top: 80, width: 600, height: 400 }), options));
   await add(results, bench("synthetic", "ocr.resizeRgba 960x960", () =>
@@ -409,8 +408,8 @@ async function deepBenchmarks(options: Options): Promise<BenchmarkResult[]> {
       screen.find(needleBytes, { confidence: 0.7 }), options));
     await add(results, bench("deep", "screen.find multi-scale buffer", () =>
       screen.find(needleBytes, { confidence: 0.7, scale: { min: 0.9, max: 1.1, step: 0.05 } }), options));
-    await add(results, bench("deep", "mcp.writeCaptureArtifact", () =>
-      writeCaptureArtifact(capture!, { prefix: "benchmark-deep" }), options));
+    await add(results, bench("deep", "mcp.workspaceImageStore.writeCapture", () =>
+      workspaceImageStore.writeCapture(capture!, { prefix: "benchmark-deep" }), options));
   }
 
   try {

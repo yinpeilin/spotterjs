@@ -41,7 +41,9 @@ const plugin = vi.hoisted(() => ({
 }));
 
 const artifacts = vi.hoisted(() => ({
-  writeCaptureArtifact: vi.fn(),
+  workspaceImageStore: {
+    writeCapture: vi.fn(),
+  },
 }));
 
 vi.mock("@spotterjs/plugin-android-adb", () => ({
@@ -100,7 +102,7 @@ beforeEach(() => {
   plugin.group.tapAll.mockReset();
   plugin.group.swipeAll.mockReset();
   plugin.group.captureAll.mockReset();
-  artifacts.writeCaptureArtifact.mockReset();
+  artifacts.workspaceImageStore.writeCapture.mockReset();
   plugin.connect.mockResolvedValue(plugin.device);
   plugin.connectNetwork.mockResolvedValue({ serial: "192.168.1.8:42173" });
   plugin.connectDefault.mockResolvedValue({ serial: "phone" });
@@ -188,7 +190,7 @@ describe("android MCP tools", () => {
       width: 2,
       height: 1,
     });
-    artifacts.writeCaptureArtifact.mockReturnValue({
+    artifacts.workspaceImageStore.writeCapture.mockReturnValue({
       imagePath: ".spotter/artifacts/android-phone.png",
       width: 2,
       height: 1,
@@ -219,7 +221,7 @@ describe("android MCP tools", () => {
       isDownscaled: false,
       detail: "original",
     });
-    expect(artifacts.writeCaptureArtifact).toHaveBeenCalledWith(
+    expect(artifacts.workspaceImageStore.writeCapture).toHaveBeenCalledWith(
       {
         data: Buffer.from("rgba"),
         width: 2,
@@ -244,7 +246,7 @@ describe("android MCP tools", () => {
       },
       { serial: "phone-b", ok: false, error: "offline" },
     ]);
-    artifacts.writeCaptureArtifact.mockReturnValue({
+    artifacts.workspaceImageStore.writeCapture.mockReturnValue({
       imagePath: ".spotter/artifacts/android-phone-a.png",
       width: 2,
       height: 1,
@@ -296,7 +298,7 @@ describe("android MCP tools", () => {
       },
       { serial: "phone-b", ok: false, error: "offline" },
     ]);
-    expect(artifacts.writeCaptureArtifact).toHaveBeenCalledWith(
+    expect(artifacts.workspaceImageStore.writeCapture).toHaveBeenCalledWith(
       { data: Buffer.from("rgba"), width: 2, height: 1 },
       { prefix: "android-phone-a", detail: "original" }
     );

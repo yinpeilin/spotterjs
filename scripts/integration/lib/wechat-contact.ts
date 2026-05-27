@@ -25,6 +25,7 @@ import {
   windows,
 
   type MatchBox,
+  image,
 
 } from "@spotterjs/core";
 
@@ -150,7 +151,7 @@ export function readTemplateSize(templatePath: string): {
 
 } {
 
-  return loadNative().getImageSize(templatePath);
+  return image.size(templatePath);
 
 }
 

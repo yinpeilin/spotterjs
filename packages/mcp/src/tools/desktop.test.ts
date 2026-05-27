@@ -24,7 +24,6 @@ vi.mock("@spotterjs/core", () => ({
       invoke: vi.fn(),
     },
   },
-  captureToBase64: vi.fn(() => ""),
   clipboard: {
     get: vi.fn(),
     set: vi.fn(),

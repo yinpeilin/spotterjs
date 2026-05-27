@@ -1,5 +1,4 @@
 import {
-  centerOf,
   type CaptureImage,
   type MatchOptions,
   type MatchWaitOptions,
@@ -10,27 +9,8 @@ import {
 
 import { wrapNativeError, type SpotterErrorContext } from "./errors";
 import { loadNative } from "./native";
-
-/** Convert public {@link MatchOptions} into the native option shape. */
-export function toNativeOpts(opts?: MatchOptions) {
-  if (!opts) return undefined;
-  const scale = opts.scale;
-  const scaleConfig = typeof scale === "object" ? scale : undefined;
-
-  return {
-    confidence: opts.confidence,
-    searchRegion: opts.region,
-    multiScale: scale === true || typeof scale === "object" ? true : undefined,
-    scaleMin: scaleConfig?.min,
-    scaleMax: scaleConfig?.max,
-    scaleStep: scaleConfig?.step,
-  };
-}
-
-type NativeMatchResult = {
-  region: Region;
-  score: number;
-};
+import { image } from "./image";
+import { toMatchResult, toNativeOpts } from "./match-shared";
 
 export function needleArgs(needle: TemplateImage): { path: string; buffer?: Buffer } {
   if (typeof needle === "string") {
@@ -57,19 +37,8 @@ function callNative<T>(api: string, context: SpotterErrorContext, fn: () => T): 
   }
 }
 
-export function toMatchResult(native: NativeMatchResult): MatchResult {
-  return {
-    region: native.region,
-    center: centerOf(native.region),
-    score: native.score,
-  };
-}
-
 export function loadNeedleCapture(needle: TemplateImage): CaptureImage {
-  const native = loadNative();
-  return typeof needle === "string"
-    ? native.loadImageFromPath(needle)
-    : native.loadImageFromBuffer(needle);
+  return image.load(needle);
 }
 
 /**
@@ -169,13 +138,7 @@ export async function findNeedleInCapture(
   options?: MatchOptions
 ): Promise<MatchResult> {
   return callNative("findNeedleInCapture", matchContext(needle, options), () =>
-    toMatchResult(
-      loadNative().findTemplateBuffers(
-        haystack,
-        loadNeedleCapture(needle),
-        toNativeOpts(options)
-      )
-    )
+    image.find(haystack, needle, options)
   );
 }
 
@@ -185,9 +148,7 @@ export async function findAllNeedleInCapture(
   options?: MatchOptions
 ): Promise<MatchResult[]> {
   return callNative("findAllNeedleInCapture", matchContext(needle, options), () =>
-    loadNative()
-      .findAllTemplateBuffers(haystack, loadNeedleCapture(needle), toNativeOpts(options))
-      .map(toMatchResult)
+    image.findAll(haystack, needle, options)
   );
 }
 

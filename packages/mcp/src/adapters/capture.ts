@@ -2,7 +2,7 @@ import { screen } from "@spotterjs/core";
 import type { Region } from "@spotterjs/base";
 import {
   type CaptureArtifactDetail,
-  writeCaptureArtifact,
+  workspaceImageStore,
 } from "./artifacts.js";
 
 type CaptureOptions = {
@@ -12,7 +12,7 @@ type CaptureOptions = {
 /** Capture the full screen or a region and write a workspace PNG artifact. */
 export function captureScreenArtifact(region?: Region, options: CaptureOptions = {}) {
   const img = screen.capture(region);
-  return writeCaptureArtifact(img, {
+  return workspaceImageStore.writeCapture(img, {
     prefix: "desktop-screen",
     detail: options.detail,
   });
@@ -22,7 +22,7 @@ export function captureScreenArtifact(region?: Region, options: CaptureOptions =
 export function captureWindowArtifact(windowId: string, options: CaptureOptions = {}) {
   const img = screen.captureWindow(windowId);
   return {
-    ...writeCaptureArtifact(img, {
+    ...workspaceImageStore.writeCapture(img, {
       prefix: "desktop-window",
       detail: options.detail,
     }),
@@ -33,7 +33,7 @@ export function captureWindowArtifact(windowId: string, options: CaptureOptions 
 /** Capture the active desktop window and write a workspace PNG artifact. */
 export function captureActiveArtifact(options: CaptureOptions = {}) {
   const img = screen.captureActive();
-  return writeCaptureArtifact(img, {
+  return workspaceImageStore.writeCapture(img, {
     prefix: "desktop-active",
     detail: options.detail,
   });

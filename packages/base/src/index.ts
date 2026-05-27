@@ -53,7 +53,7 @@ export interface MatchResult {
  * `data` is row-major RGBA bytes with 4 bytes per pixel and no stride padding.
  * Its byte length should equal `width * height * 4`.
  *
- * Use `encodePng` from `@spotterjs/core` to encode it as PNG bytes.
+ * Use `image.encode` from `@spotterjs/core` to encode it as PNG bytes.
  */
 export interface CaptureImage {
   /** Row-major RGBA pixel buffer. */

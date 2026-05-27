@@ -30,5 +30,8 @@ describe("public API surface", () => {
     expect("findNeedleInWindow" in core).toBe(false);
     expect("findNeedleInCapture" in core).toBe(false);
     expect("loadNeedleCapture" in core).toBe(false);
+    expect("encodePng" in core).toBe(false);
+    expect("encodePngBase64" in core).toBe(false);
+    expect("captureToBase64" in core).toBe(false);
   });
 });

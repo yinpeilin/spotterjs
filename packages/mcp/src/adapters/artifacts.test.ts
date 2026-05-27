@@ -1,9 +1,15 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CaptureImage } from "@spotterjs/base";
-import { optimizeCapture, writeCaptureArtifact } from "./artifacts";
+import { optimizeCapture, workspaceImageStore } from "./artifacts";
+
+vi.mock("@spotterjs/core", () => ({
+  image: {
+    encode: vi.fn(() => Buffer.from("png")),
+  },
+}));
 
 const tmpDirs: string[] = [];
 
@@ -83,7 +89,7 @@ describe("capture artifact writing", () => {
     const root = tmpDir();
     process.env.SPOTTERJS_WORKSPACE_ROOT = root;
 
-    const artifact = writeCaptureArtifact(image(2, 1), {
+    const artifact = workspaceImageStore.writeCapture(image(2, 1), {
       prefix: "desktop screen!",
     });
     const pngPath = path.join(root, artifact.imagePath);
@@ -101,7 +107,7 @@ describe("capture artifact writing", () => {
     const root = tmpDir();
     process.env.SPOTTERJS_WORKSPACE_ROOT = root;
 
-    const artifact = writeCaptureArtifact(image(4000, 2000), {
+    const artifact = workspaceImageStore.writeCapture(image(4000, 2000), {
       prefix: "large",
       maxLongEdge: 1000,
     });
@@ -121,7 +127,7 @@ describe("capture artifact writing", () => {
     const root = tmpDir();
     process.env.SPOTTERJS_WORKSPACE_ROOT = root;
 
-    const artifact = writeCaptureArtifact(image(4000, 2000), {
+    const artifact = workspaceImageStore.writeCapture(image(4000, 2000), {
       prefix: "large",
       detail: "original",
     });
@@ -141,7 +147,7 @@ describe("capture artifact writing", () => {
     const root = tmpDir();
     process.env.SPOTTERJS_WORKSPACE_ROOT = root;
 
-    const artifact = writeCaptureArtifact(image(1, 1), {
+    const artifact = workspaceImageStore.writeCapture(image(1, 1), {
       prefix: "../../escape\\name",
     });
     const resolved = path.resolve(root, artifact.imagePath);

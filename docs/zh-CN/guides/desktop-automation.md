@@ -43,10 +43,10 @@ const regionCap = screen.capture({ left: 0, top: 0, width: 800, height: 600 });
 需要传给 MCP、网页或日志系统时，使用 PNG 编码工具：
 
 ```typescript
-import { encodePng, encodePngBase64 } from "@spotterjs/core";
+import { image } from "@spotterjs/core";
 
-const bytes = encodePng(cap);
-const base64 = encodePngBase64(cap);
+const bytes = image.encode(cap);
+const base64 = image.encodeBase64(cap);
 ```
 
 ## 鼠标、键盘、剪贴板

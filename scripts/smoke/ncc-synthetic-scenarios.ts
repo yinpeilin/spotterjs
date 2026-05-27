@@ -8,6 +8,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import { image } from "@spotterjs/core";
 import { loadNative } from "@spotterjs/core/native";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { drawRectOutline, writeRgbaPng } from "../lib/png";
@@ -433,13 +434,13 @@ export async function run(): Promise<void> {
 
   const disk = scenarios[0];
   const matchDisk = native.findTemplateBuffers(
-    native.loadImageFromPath(path.join(FIXTURES, disk.name, "haystack.png")),
-    native.loadImageFromPath(path.join(FIXTURES, disk.name, "needle.png")),
+    image.load(path.join(FIXTURES, disk.name, "haystack.png")),
+    image.load(path.join(FIXTURES, disk.name, "needle.png")),
     { confidence: CONFIDENCE }
   );
   const foundDisk = matchDisk.region;
   assertNear(`${disk.name}_png_disk`, foundDisk, disk.expected, disk.tol);
-  info(`✓ ${disk.name}_png_disk (loadImageFromPath)`);
+  info(`✓ ${disk.name}_png_disk (image.load)`);
   passed++;
 
   info(`ncc synthetic: ${passed}/${passed} scenarios passed`);

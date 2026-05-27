@@ -1,6 +1,5 @@
 import { loadNative } from "./native";
-import { centerOf, type CaptureImage } from "@spotterjs/base";
-import { encodePngBase64 } from "./capture";
+import { centerOf } from "@spotterjs/base";
 
 type LetterKey =
   | "A"
@@ -342,15 +341,6 @@ export const clipboard = {
 
 export { centerOf };
 
-/**
- * Encode a {@link CaptureImage} as a Base64 PNG string.
- *
- * Equivalent to `encodePngBase64(capture)`. Useful for MCP and JSON payloads.
- */
-export function captureToBase64(capture: CaptureImage): string {
-  return encodePngBase64(capture);
-}
-
 export * from "@spotterjs/base";
 export { screen } from "./screen";
 export { windows } from "./windows";
@@ -372,8 +362,14 @@ export { host, configureHost, HostPathError } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";
 export { SpotterJsError, NativeSpotterError, isSpotterJsError } from "./errors";
 export type { SpotterErrorContext } from "./errors";
-export { encodePng, encodePngBase64 } from "./capture";
-export { image } from "./buffer-match";
+export {
+  image,
+  type ImageArtifact,
+  type ImageFormat,
+  type ImageSaveOptions,
+  type ImageSize,
+  type ImageSource,
+} from "./image";
 export {
   matchTapScreen,
   toLocal,

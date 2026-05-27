@@ -51,14 +51,14 @@ const cap = screen.capture();
 const regionCap = screen.capture({ left: 0, top: 0, width: 800, height: 600 });
 ```
 
-Use PNG encoders when you need to save, upload, log, or pass captures through
-JSON/MCP:
+Use the image facade when you need to save, upload, log, or pass captures
+through JSON/MCP:
 
 ```typescript
-import { encodePng, encodePngBase64 } from "@spotterjs/core";
+import { image } from "@spotterjs/core";
 
-const bytes = encodePng(cap);
-const base64 = encodePngBase64(cap);
+const bytes = image.encode(cap);
+const base64 = image.encodeBase64(cap);
 ```
 
 ## Mouse, Keyboard, and Clipboard

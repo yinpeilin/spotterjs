@@ -3,7 +3,7 @@ import { z } from "zod";
 import { android } from "@spotterjs/plugin-android-adb";
 import {
   type CaptureArtifactDetail,
-  writeCaptureArtifact,
+  workspaceImageStore,
 } from "../adapters/artifacts.js";
 import { json, ok, registerSafeTool } from "./results.js";
 
@@ -135,14 +135,14 @@ function serialJson(device: { serial: string }) {
 
 function captureArtifactJson(
   serial: string,
-  capture: Parameters<typeof writeCaptureArtifact>[0],
+  capture: Parameters<typeof workspaceImageStore.writeCapture>[0],
   extra: Record<string, unknown> = {},
   options: { detail?: CaptureArtifactDetail } = {}
 ) {
   return {
     serial,
     ...extra,
-    ...writeCaptureArtifact(capture, {
+    ...workspaceImageStore.writeCapture(capture, {
       prefix: `android-${serial}`,
       detail: options.detail,
     }),

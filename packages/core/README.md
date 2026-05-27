@@ -4,7 +4,7 @@
 
 Main TypeScript entrypoint for spotterjs desktop automation. It provides screen
 capture, template matching, mouse and keyboard input, window discovery,
-accessibility automation, clipboard access, PNG encoding, coordinate helpers,
+accessibility automation, clipboard access, image encoding, coordinate helpers,
 and sandboxed host I/O for agent workflows.
 
 ## Install
@@ -79,9 +79,8 @@ windows.tapTemplate(win.id, "./assets/save-btn.png", { confidence: 0.9 });
 | `desktop` | List apps by process, find windows by title, and wait for windows |
 | `accessibility` | UIA / AT-SPI quick actions and diagnostics |
 | `host` | Sandboxed workspace file I/O and optional shell execution for agent scenarios |
-| `encodePng` / `encodePngBase64` | Encode `CaptureImage` to PNG bytes or base64 |
 | `toMatchBox` / `matchTapScreen` | Coordinate conversion helpers |
-| `image` | Match templates against an existing raw RGBA capture; decode encoded image buffers |
+| `image` | Load, decode, encode, save, inspect, and match `CaptureImage` data |
 | `@spotterjs/core/native` | Unstable low-level N-API escape hatch |
 
 Public APIs include English TSDoc in the generated declarations, so IDE hover

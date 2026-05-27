@@ -1,5 +1,5 @@
 import type { CaptureImage } from "@spotterjs/base";
-import { encodePng } from "@spotterjs/core";
+import { image } from "@spotterjs/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -28,6 +28,8 @@ export type CaptureArtifact = {
   detail: CaptureArtifactDetail;
 };
 
+export type WorkspaceImageArtifact = CaptureArtifact;
+
 /** Options used when persisting a capture artifact. */
 export type WriteCaptureOptions = {
   /** Safe filename prefix used in `.spotter/artifacts`. */
@@ -53,7 +55,7 @@ export function optimizeCapture(
 }
 
 /** Write a capture PNG and sidecar JSON metadata file under the workspace. */
-export function writeCaptureArtifact(
+function writeWorkspaceCapture(
   capture: CaptureImage,
   options: WriteCaptureOptions
 ): CaptureArtifact {
@@ -79,10 +81,14 @@ export function writeCaptureArtifact(
     detail,
   };
 
-  writeArtifactFile(imagePath, encodePng(optimized));
+  writeArtifactFile(imagePath, image.encode(optimized));
   writeArtifactFile(metaPath, JSON.stringify(artifact, null, 2));
   return artifact;
 }
+
+export const workspaceImageStore = {
+  writeCapture: writeWorkspaceCapture,
+};
 
 function writeArtifactFile(relativePath: string, content: string | Buffer): void {
   const root = path.resolve(
