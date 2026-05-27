@@ -81,7 +81,7 @@ windows.tapTemplate(win.id, "./assets/save-btn.png", { confidence: 0.9 });
 | `host` | Sandboxed workspace file I/O and optional shell execution for agent scenarios |
 | `toMatchBox` / `matchTapScreen` | Coordinate conversion helpers |
 | `image` | Load, decode, encode, save, inspect, and match `CaptureImage` data |
-| `@spotterjs/core/native` | Unstable low-level N-API escape hatch |
+| `@spotterjs/core/unstable-native` | Unstable low-level N-API escape hatch |
 
 Public APIs include English TSDoc in the generated declarations, so IDE hover
 text explains parameters, coordinate spaces, errors, and side effects.

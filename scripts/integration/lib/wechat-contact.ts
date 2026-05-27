@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 import type { MatchOptions, Point, Region } from "@spotterjs/base";
-import { loadNative } from "@spotterjs/core/native";
+import { loadNative } from "@spotterjs/core/unstable-native";
 
 import {
   matchTapScreen,

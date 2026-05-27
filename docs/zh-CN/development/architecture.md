@@ -65,6 +65,6 @@ MCP 的安全边界在 server 层处理：文件必须在 workspace root 内，s
 
 ## 设计原则
 
-- 用户优先使用高层 API，`@spotterjs/core/native` 的 `loadNative()` 只作为不稳定逃生舱。
+- 用户优先使用高层 API，`@spotterjs/core/unstable-native` 的 `loadNative()` 只作为不稳定逃生舱。
 - 文档中的包 README 保持短入口，深度内容放在 `docs/`。
 - 新增平台能力时，同时补 TypeScript API、MCP 行为、测试和文档。

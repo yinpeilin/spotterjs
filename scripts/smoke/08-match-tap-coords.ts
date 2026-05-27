@@ -7,7 +7,7 @@
  * moves the mouse to matchTapScreen, and asserts getPosition is within tolerance.
  */
 import * as path from "path";
-import { loadNative } from "@spotterjs/core/native";
+import { loadNative } from "@spotterjs/core/unstable-native";
 import {
   matchTapScreen,
   mouse,

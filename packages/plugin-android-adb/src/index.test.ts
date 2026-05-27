@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureImage } from "@spotterjs/base";
+import * as androidRoot from "./index";
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
@@ -27,6 +30,11 @@ import {
 } from "./index";
 import { parseAdbDevices } from "./discovery";
 import { escapeAdbText } from "./input";
+import {
+  findAndroidElements,
+  isAndroidElementNode,
+  parseUiautomatorXml,
+} from "./uiautomator-public";
 
 function mockExec(stdout: string | Buffer, stderr = "") {
   mocks.execFile.mockImplementation((_file, _args, _options, cb) => {
@@ -97,6 +105,24 @@ BAD unauthorized
 });
 
 describe("android ADB commands", () => {
+  it("publishes UIAutomator helpers through an explicit package subpath", () => {
+    const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8"));
+
+    expect(pkg.exports["./uiautomator"]).toEqual({
+      types: "./dist/uiautomator-public.d.ts",
+      require: "./dist/uiautomator-public.js",
+      default: "./dist/uiautomator-public.js",
+    });
+    expect("parseUiautomatorXml" in androidRoot).toBe(false);
+    expect("findAndroidElements" in androidRoot).toBe(false);
+  });
+
+  it("keeps UIAutomator helpers available through the explicit subpath", () => {
+    expect(typeof parseUiautomatorXml).toBe("function");
+    expect(typeof findAndroidElements).toBe("function");
+    expect(typeof isAndroidElementNode).toBe("function");
+  });
+
   it("discovers devices from adb devices -l", async () => {
     mockExec("List of devices attached\nUSB123 device model:Pixel\n");
 

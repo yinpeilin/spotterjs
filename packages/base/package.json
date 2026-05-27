@@ -4,6 +4,14 @@
   "description": "Shared TypeScript types for spotterjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",

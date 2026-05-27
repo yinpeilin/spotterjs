@@ -3,7 +3,7 @@
  * Run with: npm run integration:wechat:probe
  */
 import * as path from "path";
-import { loadNative } from "@spotterjs/core/native";
+import { loadNative } from "@spotterjs/core/unstable-native";
 import { windows } from "@spotterjs/core";
 import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 import { writeRgbaPng } from "../lib/png";

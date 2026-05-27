@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { performance } from "node:perf_hooks";
 import sharp from "sharp";
 import { image, screen, windows } from "@spotterjs/core";
-import { loadNative } from "@spotterjs/core/native";
+import { loadNative } from "@spotterjs/core/unstable-native";
 import { createOcr, defaultModelDir } from "@spotterjs/plugin-ocr";
 import { cropImage, loadImage, resizeRgba } from "../../packages/plugin-ocr/src/image";
 import { boxesFromBitmap, decodeCtc } from "../../packages/plugin-ocr/src/postprocess";

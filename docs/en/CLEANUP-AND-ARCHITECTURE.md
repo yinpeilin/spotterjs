@@ -27,5 +27,5 @@ Prefer these public modules:
 - `image`
 - `image.encode` / `image.encodeBase64`
 
-Treat `@spotterjs/core/native` as an escape hatch for low-level scripts and
+Treat `@spotterjs/core/unstable-native` as an escape hatch for low-level scripts and
 diagnostics, not as the first choice for user code.

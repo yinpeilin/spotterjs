@@ -10,10 +10,15 @@
             "require": "./dist/index.js",
             "default": "./dist/index.js"
         },
+        "./unstable-native": {
+            "types": "./dist/unstable-native.d.ts",
+            "require": "./dist/unstable-native.js",
+            "default": "./dist/unstable-native.js"
+        },
         "./native": {
-            "types": "./dist/native.d.ts",
-            "require": "./dist/native.js",
-            "default": "./dist/native.js"
+            "types": "./dist/unstable-native.d.ts",
+            "require": "./dist/unstable-native.js",
+            "default": "./dist/unstable-native.js"
         },
         "./package.json": "./package.json"
     },

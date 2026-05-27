@@ -10,6 +10,11 @@
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./uiautomator": {
+      "types": "./dist/uiautomator-public.d.ts",
+      "require": "./dist/uiautomator-public.js",
+      "default": "./dist/uiautomator-public.js"
+    },
     "./package.json": "./package.json"
   },
   "license": "SEE LICENSE IN LICENSE",

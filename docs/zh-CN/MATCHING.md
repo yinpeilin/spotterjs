@@ -80,7 +80,7 @@ windows.findTemplate(windowId, fs.readFileSync("./icon.png"), { confidence: 0.9 
 Image utilities (decode / size / PNG encode):
 
 ```typescript
-import { loadNative } from "@spotterjs/core/native";
+import { loadNative } from "@spotterjs/core/unstable-native";
 
 const native = loadNative();
 const { width, height } = native.getImageSize("./button.png");

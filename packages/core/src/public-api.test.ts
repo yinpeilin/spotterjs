@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { loadNative as loadUnstableNative } from "./unstable-native";
+import type { SpotterNative } from "./unstable-native";
 
 vi.mock("./native", () => ({
   loadNative: () => ({}),
@@ -33,5 +37,20 @@ describe("public API surface", () => {
     expect("encodePng" in core).toBe(false);
     expect("encodePngBase64" in core).toBe(false);
     expect("captureToBase64" in core).toBe(false);
+  });
+
+  it("publishes native bindings only through explicit unstable subpaths", () => {
+    const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8"));
+
+    expect(pkg.exports["./unstable-native"]).toEqual({
+      types: "./dist/unstable-native.d.ts",
+      require: "./dist/unstable-native.js",
+      default: "./dist/unstable-native.js",
+    });
+    expect(pkg.exports["./native"]).toEqual(pkg.exports["./unstable-native"]);
+    expect(typeof loadUnstableNative).toBe("function");
+
+    const native: SpotterNative | null = null;
+    expect(native).toBeNull();
   });
 });

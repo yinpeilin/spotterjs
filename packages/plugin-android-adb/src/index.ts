@@ -12,11 +12,7 @@ import { discoverDevices } from "./discovery";
 import { AdbDeviceGroup } from "./group";
 import { escapeAdbText } from "./input";
 import { connectNetworkRaw, pairTcp } from "./pairing";
-import {
-  findAndroidElements,
-  isAndroidElementNode,
-  parseUiautomatorXml,
-} from "./uiautomator";
+import { isAndroidElementNode } from "./uiautomator";
 import type {
   AndroidConnectOptions,
   AndroidCurrentApp,
@@ -87,8 +83,6 @@ export type {
   AndroidPairTcpOptions,
   AndroidTreeOptions,
 } from "./types";
-
-export { findAndroidElements, parseUiautomatorXml };
 
 function componentName(packageName: string, activity?: string): string {
   if (!activity) return packageName;
@@ -229,6 +223,7 @@ class AdbDevice implements AndroidDevice {
           "cat",
           remotePath,
         ])) as string;
+        const { parseUiautomatorXml } = await import("./uiautomator");
         const tree = parseUiautomatorXml(xml);
         return options?.maxDepth === undefined
           ? tree
@@ -264,6 +259,7 @@ class AdbDevice implements AndroidDevice {
     options?: AndroidElementQueryOptions
   ): Promise<AndroidElementNode[]> {
     const tree = await this.dumpTree(options);
+    const { findAndroidElements } = await import("./uiautomator");
     return findAndroidElements(tree, query, options);
   }
 

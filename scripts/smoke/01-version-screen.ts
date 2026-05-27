@@ -1,4 +1,4 @@
-import { loadNative } from "@spotterjs/core/native";
+import { loadNative } from "@spotterjs/core/unstable-native";
 import { screen } from "@spotterjs/core";
 import { info, runSmokeScript } from "../lib/log";
 

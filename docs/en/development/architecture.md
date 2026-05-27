@@ -80,7 +80,7 @@ are denied by default.
 ## Design Principles
 
 - Prefer high-level APIs for user scripts.
-- Treat `@spotterjs/core/native` as an unstable escape hatch.
+- Treat `@spotterjs/core/unstable-native` as the unstable escape hatch.
 - Keep package READMEs short; put deep guides in `docs/en` and `docs/zh-CN`.
 - When adding a platform capability, update TypeScript APIs, MCP behavior,
   tests, and both language docs together.
