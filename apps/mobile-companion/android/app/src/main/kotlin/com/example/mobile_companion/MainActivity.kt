@@ -1,14 +1,18 @@
-package com.example.mobile_companion
+package com.spotterjs.mobilecompanion
 
+import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.format.Formatter
+import android.view.inputmethod.InputMethodManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -36,6 +40,7 @@ class MainActivity : FlutterActivity() {
         if (!::bridge.isInitialized) {
             bridge = CompanionBridge(this)
         }
+        requestNotificationPermissionIfNeeded()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -57,6 +62,7 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "getState" -> result.success(bridge.state())
                 "startPairingServer" -> {
+                    requestNotificationPermissionIfNeeded()
                     bridge.start()
                     result.success(null)
                 }
@@ -73,10 +79,25 @@ class MainActivity : FlutterActivity() {
                     bridge.addEvent("opened accessibility settings")
                     result.success(null)
                 }
+                "openInputMethodSettings" -> {
+                    if (bridge.isSpotterInputMethodEnabled()) {
+                        val manager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                        manager.showInputMethodPicker()
+                        bridge.addEvent("opened input method picker")
+                    } else {
+                        startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                        bridge.addEvent("opened input method settings")
+                    }
+                    result.success(null)
+                }
                 "requestScreenCapture" -> {
                     val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                     startActivityForResult(manager.createScreenCaptureIntent(), SCREEN_CAPTURE_REQUEST)
                     bridge.addEvent("requested screen capture permission")
+                    result.success(null)
+                }
+                "requestStartupPermissions" -> {
+                    requestNotificationPermissionIfNeeded()
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -86,8 +107,21 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            NOTIFICATION_PERMISSION_REQUEST
+        )
+        if (::bridge.isInitialized) {
+            bridge.addEvent("requested notification permission")
+        }
+    }
+
     companion object {
         private const val SCREEN_CAPTURE_REQUEST = 4101
+        private const val NOTIFICATION_PERMISSION_REQUEST = 4102
     }
 }
 
@@ -98,7 +132,6 @@ private class CompanionBridge(private val context: Context) {
 
     private var running = false
     private var pairingCode = nextPairingCode()
-    private var codeExpiresAtMs = System.currentTimeMillis() + CODE_TTL_MS
     private var server: PairingWebSocketServer? = null
     var screenCaptureReady: Boolean = false
     private var connectedClient: String? = null
@@ -113,7 +146,19 @@ private class CompanionBridge(private val context: Context) {
                     connectedClient = clientId
                     addEvent("paired client $clientId")
                 },
-                ::addEvent
+                ::addEvent,
+                ::displayInfo,
+                ::currentApp,
+                { maxDepth -> SpotterAccessibilityService.dumpTree(maxDepth) },
+                { x, y -> SpotterAccessibilityService.tap(x, y) },
+                { fromX, fromY, toX, toY, durationMs ->
+                    SpotterAccessibilityService.swipe(fromX, fromY, toX, toY, durationMs)
+                },
+                { strokes -> SpotterAccessibilityService.gesture(strokes) },
+                ::text,
+                { key -> SpotterAccessibilityService.keyevent(key) },
+                { SpotterAccessibilityService.back() },
+                { SpotterAccessibilityService.home() }
             ).also { it.start() }
         }
         running = true
@@ -137,13 +182,12 @@ private class CompanionBridge(private val context: Context) {
 
     fun regeneratePairingCode() {
         pairingCode = nextPairingCode()
-        codeExpiresAtMs = System.currentTimeMillis() + CODE_TTL_MS
         connectedClient = null
         addEvent("pairing code regenerated")
     }
 
     private fun isPairingCodeValid(code: String): Boolean {
-        return code == pairingCode && System.currentTimeMillis() <= codeExpiresAtMs
+        return code == pairingCode
     }
 
     @Synchronized
@@ -157,22 +201,35 @@ private class CompanionBridge(private val context: Context) {
     @Synchronized
     fun state(): Map<String, Any?> {
         val accessibility = SpotterAccessibilityService.isEnabled
+        val inputMethodEnabled = isSpotterInputMethodEnabled()
+        val inputMethodSelected = isSpotterInputMethodSelected()
+        val notifications = areNotificationsAllowed()
         return mapOf(
             "running" to running,
             "host" to localHost(),
             "port" to DEFAULT_PORT,
             "pairingCode" to pairingCode,
-            "pairingCodeExpiresAtMs" to codeExpiresAtMs,
             "connectedClient" to connectedClient,
             "accessibilityEnabled" to accessibility,
+            "inputMethodEnabled" to inputMethodEnabled,
+            "inputMethodSelected" to inputMethodSelected,
             "screenCaptureReady" to screenCaptureReady,
             "capabilities" to mapOf(
                 "screenCapture" to screenCaptureReady,
                 "accessibilityTree" to accessibility,
                 "accessibilityActions" to accessibility,
-                "imeText" to false,
-                "notifications" to false,
-                "adbBootstrap" to true
+                "imeText" to (inputMethodSelected || accessibility),
+                "spotterKeyboard" to inputMethodSelected,
+                "notifications" to notifications,
+                "displayInfo" to true,
+                "currentApp" to true,
+                "multiTouch" to accessibility,
+                "tap" to accessibility,
+                "swipe" to accessibility,
+                "textInput" to (inputMethodSelected || accessibility),
+                "keyevent" to accessibility,
+                "back" to accessibility,
+                "home" to accessibility
             ),
             "events" to events.toList()
         )
@@ -203,8 +260,50 @@ private class CompanionBridge(private val context: Context) {
         return "0.0.0.0"
     }
 
+    private fun displayInfo(): Map<String, Any?> {
+        val metrics = context.resources.displayMetrics
+        return mapOf(
+            "width" to metrics.widthPixels,
+            "height" to metrics.heightPixels,
+            "density" to metrics.densityDpi
+        )
+    }
+
+    private fun currentApp(): Map<String, Any?> {
+        return mapOf(
+            "packageName" to SpotterAccessibilityService.lastEventPackage
+        )
+    }
+
+    private fun text(text: String) {
+        if (SpotterInputMethodService.text(text)) return
+        SpotterAccessibilityService.text(text)
+    }
+
+    fun isSpotterInputMethodEnabled(): Boolean {
+        val manager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        return manager.enabledInputMethodList.any { info ->
+            info.serviceName == SpotterInputMethodService::class.java.name
+        }
+    }
+
+    private fun isSpotterInputMethodSelected(): Boolean {
+        val current = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.DEFAULT_INPUT_METHOD
+        ) ?: return false
+        val component = ComponentName(context, SpotterInputMethodService::class.java)
+        return current == component.flattenToString() ||
+            current == component.flattenToShortString()
+    }
+
+    private fun areNotificationsAllowed(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
     companion object {
         private const val DEFAULT_PORT = 17341
-        private const val CODE_TTL_MS = 5 * 60 * 1000L
     }
 }

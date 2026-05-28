@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
@@ -12,7 +13,7 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <activity
-            android:name="com.example.mobile_companion.MainActivity"
+            android:name="com.spotterjs.mobilecompanion.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
@@ -39,11 +40,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <service
-            android:name="com.example.mobile_companion.MobileCompanionService"
+            android:name="com.spotterjs.mobilecompanion.MobileCompanionService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <service
-            android:name="com.example.mobile_companion.SpotterAccessibilityService"
+            android:name="com.spotterjs.mobilecompanion.SpotterAccessibilityService"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
@@ -52,6 +53,18 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/spotter_accessibility_service" />
+        </service>
+        <service
+            android:name="com.spotterjs.mobilecompanion.SpotterInputMethodService"
+            android:exported="true"
+            android:label="@string/spotter_input_method_label"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/spotter_input_method" />
         </service>
     </application>
     <!-- Required to query activities that can process text, see:

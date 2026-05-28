@@ -26,8 +26,14 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+
+            // TODO: Replace the debug signing config before public distribution.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -45,4 +51,5 @@ flutter {
 
 dependencies {
     implementation("org.java-websocket:Java-WebSocket:1.5.6")
+    testImplementation("junit:junit:4.13.2")
 }

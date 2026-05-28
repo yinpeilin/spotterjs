@@ -1,4 +1,4 @@
-package com.example.mobile_companion
+package com.spotterjs.mobilecompanion
 
 import android.app.Notification
 import android.app.NotificationChannel

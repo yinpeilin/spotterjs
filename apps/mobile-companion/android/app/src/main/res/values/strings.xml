@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">Spotter Companion</string>
     <string name="spotter_accessibility_description">Expose Android UI state and actions to paired Spotter desktop clients.</string>
+    <string name="spotter_input_method_label">Spotter Keyboard</string>
 </resources>

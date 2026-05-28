@@ -20,14 +20,16 @@ void main() {
                 'pairingCode': '123456',
                 'connectedClient': null,
                 'accessibilityEnabled': false,
+                'inputMethodEnabled': true,
+                'inputMethodSelected': true,
                 'screenCaptureReady': false,
                 'capabilities': {
                   'screenCapture': false,
                   'accessibilityTree': false,
                   'accessibilityActions': false,
-                  'imeText': false,
+                  'imeText': true,
+                  'spotterKeyboard': true,
                   'notifications': false,
-                  'adbBootstrap': true,
                 },
                 'events': ['12:00:00 pairing server started'],
               };
@@ -35,6 +37,7 @@ void main() {
             case 'stopPairingServer':
             case 'regeneratePairingCode':
             case 'openAccessibilitySettings':
+            case 'openInputMethodSettings':
             case 'requestScreenCapture':
               return null;
           }
@@ -54,6 +57,10 @@ void main() {
     expect(find.text('Spotter Companion'), findsWidgets);
     expect(find.text('ws://192.168.1.23:17341'), findsOneWidget);
     expect(find.text('123456'), findsOneWidget);
-    expect(find.text('Waiting for pairing'), findsOneWidget);
+    expect(find.text('Listening'), findsOneWidget);
+    expect(find.text('Start listening'), findsOneWidget);
+    expect(find.text('Stop listening'), findsOneWidget);
+    expect(find.text('IME text input'), findsWidgets);
+    expect(find.text('Spotter Keyboard'), findsWidgets);
   });
 }

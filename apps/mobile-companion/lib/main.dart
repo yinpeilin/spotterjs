@@ -113,6 +113,7 @@ class _PairingHomePageState extends State<PairingHomePage> {
             _PermissionsPanel(
               state: state,
               onAccessibility: () => _run(_bridge.openAccessibilitySettings),
+              onInputMethod: () => _run(_bridge.openInputMethodSettings),
               onScreenCapture: () => _run(_bridge.requestScreenCapture),
             ),
             const SizedBox(height: 16),
@@ -135,11 +136,9 @@ class _HeroPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final connected = state?.connectedClient != null;
-    final status = connected
-        ? 'Connected'
-        : state?.running == true
-        ? 'Waiting for pairing'
-        : 'Server stopped';
+    final listening = state?.running == true;
+    final status = _connectionStatusLabel(state);
+    final accent = _connectionStatusColor(state);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -152,17 +151,31 @@ class _HeroPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                connected ? Icons.link : Icons.phone_android,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  status,
-                  style: Theme.of(context).textTheme.titleLarge,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: accent.withOpacity(0.28)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_connectionStatusIcon(state), size: 16, color: accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      status,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelLarge?.copyWith(color: accent),
+                    ),
+                  ],
                 ),
               ),
+              const Spacer(),
               if (busy)
                 const SizedBox.square(
                   dimension: 20,
@@ -174,8 +187,21 @@ class _HeroPanel extends StatelessWidget {
           Text(
             connected
                 ? 'Desktop client: ${state!.connectedClient}'
-                : 'Use the address and six digit pairing code from the desktop bridge.',
+                : listening
+                ? 'The pairing endpoint is live on ${state!.uri}.'
+                : 'Tap Start listening to expose the pairing endpoint.',
             style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            connected
+                ? 'The listener is active and paired.'
+                : listening
+                ? 'Pairing code: ${state?.pairingCode ?? '------'}'
+                : 'The listener is offline.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -202,9 +228,11 @@ class _PairingPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final uri = state?.uri ?? 'ws://0.0.0.0:0';
     final code = state?.pairingCode ?? '------';
+    final listening = state?.running == true;
     return _Section(
-      title: 'Pairing',
+      title: 'Listener',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _InfoTile(label: 'Address', value: uri, icon: Icons.dns_outlined),
           _InfoTile(
@@ -212,31 +240,62 @@ class _PairingPanel extends StatelessWidget {
             value: code,
             icon: Icons.pin_outlined,
           ),
+          const SizedBox(height: 8),
+          Text(
+            listening
+                ? 'Listening for desktop clients.'
+                : 'Stopped. Start listening to accept a pairing request.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: busy ? null : onStart,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 520;
+              final start = FilledButton.icon(
+                onPressed: busy || listening ? null : onStart,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Start listening'),
+              );
+              final stop = FilledButton.icon(
+                onPressed: busy || !listening ? null : onStop,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xffb42318),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xfff4b4af),
+                  disabledForegroundColor: const Color(0xff7a1b13),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: busy ? null : onRegenerate,
-                  icon: const Icon(Icons.autorenew),
-                  label: const Text('Code'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.outlined(
-                tooltip: 'Stop server',
-                onPressed: busy ? null : onStop,
                 icon: const Icon(Icons.stop),
-              ),
-            ],
+                label: const Text('Stop listening'),
+              );
+              final rotate = OutlinedButton.icon(
+                onPressed: busy ? null : onRegenerate,
+                icon: const Icon(Icons.autorenew),
+                label: const Text('Rotate code'),
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    start,
+                    const SizedBox(height: 8),
+                    stop,
+                    const SizedBox(height: 8),
+                    rotate,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: start),
+                  const SizedBox(width: 8),
+                  Expanded(child: stop),
+                  const SizedBox(width: 8),
+                  rotate,
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -248,29 +307,52 @@ class _PermissionsPanel extends StatelessWidget {
   const _PermissionsPanel({
     required this.state,
     required this.onAccessibility,
+    required this.onInputMethod,
     required this.onScreenCapture,
   });
 
   final PairingState? state;
   final VoidCallback onAccessibility;
+  final VoidCallback onInputMethod;
   final VoidCallback onScreenCapture;
 
   @override
   Widget build(BuildContext context) {
+    final imeTextReady = state?.capabilities['imeText'] == true;
     return _Section(
       title: 'Permissions',
       child: Column(
         children: [
           _PermissionRow(
             label: 'Accessibility service',
+            subtitle: 'Required for tap, swipe, tree, and text input.',
             granted: state?.accessibilityEnabled ?? false,
             onTap: onAccessibility,
           ),
           const Divider(height: 1),
           _PermissionRow(
+            label: 'Spotter Keyboard',
+            subtitle: state?.inputMethodSelected == true
+                ? 'Selected as the active Android keyboard.'
+                : 'Enable and select it in Android keyboard settings.',
+            granted: state?.inputMethodSelected ?? false,
+            onTap: onInputMethod,
+          ),
+          const Divider(height: 1),
+          _PermissionRow(
             label: 'Screen capture session',
+            subtitle: 'Required for screenshots and frame capture.',
             granted: state?.screenCaptureReady ?? false,
             onTap: onScreenCapture,
+          ),
+          const Divider(height: 1),
+          _PermissionRow(
+            label: 'IME text input',
+            subtitle: state?.inputMethodSelected == true
+                ? 'Uses Spotter Keyboard to type into the focused field.'
+                : 'Falls back to accessibility until Spotter Keyboard is selected.',
+            granted: imeTextReady,
+            onTap: onInputMethod,
           ),
         ],
       ),
@@ -285,7 +367,8 @@ class _CapabilitiesPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final keys = capabilities.keys.toList()..sort();
+    final keys = capabilities.keys.toList()
+      ..sort((a, b) => _capabilityOrder(a).compareTo(_capabilityOrder(b)));
     return _Section(
       title: 'Capabilities',
       child: Wrap(
@@ -300,7 +383,7 @@ class _CapabilitiesPanel extends StatelessWidget {
                     : Icons.lock_outline,
                 size: 18,
               ),
-              label: Text(key),
+              label: Text(_capabilityLabel(key)),
             ),
         ],
       ),
@@ -341,20 +424,22 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xffd9e6df)),
+        side: const BorderSide(color: Color(0xffd9e6df)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          child,
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -385,11 +470,13 @@ class _InfoTile extends StatelessWidget {
 class _PermissionRow extends StatelessWidget {
   const _PermissionRow({
     required this.label,
+    required this.subtitle,
     required this.granted,
     required this.onTap,
   });
 
   final String label;
+  final String subtitle;
   final bool granted;
   final VoidCallback onTap;
 
@@ -398,7 +485,7 @@ class _PermissionRow extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(label),
-      subtitle: Text(granted ? 'Ready' : 'Needs user approval'),
+      subtitle: Text(subtitle),
       trailing: Icon(granted ? Icons.check_circle : Icons.chevron_right),
       onTap: granted ? null : onTap,
     );
@@ -448,6 +535,8 @@ class NativeCompanionBridge {
       _channel.invokeMethod('regeneratePairingCode');
   Future<void> openAccessibilitySettings() =>
       _channel.invokeMethod('openAccessibilitySettings');
+  Future<void> openInputMethodSettings() =>
+      _channel.invokeMethod('openInputMethodSettings');
   Future<void> requestScreenCapture() =>
       _channel.invokeMethod('requestScreenCapture');
 }
@@ -460,6 +549,8 @@ class PairingState {
     required this.pairingCode,
     required this.connectedClient,
     required this.accessibilityEnabled,
+    required this.inputMethodEnabled,
+    required this.inputMethodSelected,
     required this.screenCaptureReady,
     required this.capabilities,
     required this.events,
@@ -471,6 +562,8 @@ class PairingState {
   final String pairingCode;
   final String? connectedClient;
   final bool accessibilityEnabled;
+  final bool inputMethodEnabled;
+  final bool inputMethodSelected;
   final bool screenCaptureReady;
   final Map<String, bool> capabilities;
   final List<String> events;
@@ -485,6 +578,8 @@ class PairingState {
       pairingCode: (map['pairingCode'] as String?) ?? '------',
       connectedClient: map['connectedClient'] as String?,
       accessibilityEnabled: map['accessibilityEnabled'] == true,
+      inputMethodEnabled: map['inputMethodEnabled'] == true,
+      inputMethodSelected: map['inputMethodSelected'] == true,
       screenCaptureReady: map['screenCaptureReady'] == true,
       capabilities: _boolMap(map['capabilities']),
       events: ((map['events'] as List<Object?>?) ?? const [])
@@ -496,5 +591,77 @@ class PairingState {
   static Map<String, bool> _boolMap(Object? value) {
     final raw = value as Map<Object?, Object?>? ?? const {};
     return raw.map((key, value) => MapEntry(key.toString(), value == true));
+  }
+}
+
+String _connectionStatusLabel(PairingState? state) {
+  if (state?.connectedClient != null) return 'Connected';
+  if (state?.running == true) return 'Listening';
+  return 'Stopped';
+}
+
+IconData _connectionStatusIcon(PairingState? state) {
+  if (state?.connectedClient != null) return Icons.link;
+  if (state?.running == true) return Icons.radar;
+  return Icons.pause_circle_outline;
+}
+
+Color _connectionStatusColor(PairingState? state) {
+  if (state?.connectedClient != null) return const Color(0xff0f766e);
+  if (state?.running == true) return const Color(0xff1f7a3a);
+  return const Color(0xffb42318);
+}
+
+String _capabilityLabel(String key) {
+  switch (key) {
+    case 'accessibilityTree':
+      return 'Accessibility tree';
+    case 'accessibilityActions':
+      return 'Accessibility actions';
+    case 'currentApp':
+      return 'Current app';
+    case 'displayInfo':
+      return 'Display info';
+    case 'imeText':
+      return 'IME text input';
+    case 'multiTouch':
+      return 'Multi-touch';
+    case 'notifications':
+      return 'Notifications';
+    case 'screenCapture':
+      return 'Screen capture';
+    case 'spotterKeyboard':
+      return 'Spotter Keyboard';
+    case 'textInput':
+      return 'Text input';
+    default:
+      return key;
+  }
+}
+
+int _capabilityOrder(String key) {
+  switch (key) {
+    case 'screenCapture':
+      return 0;
+    case 'accessibilityTree':
+      return 1;
+    case 'accessibilityActions':
+      return 2;
+    case 'imeText':
+      return 3;
+    case 'spotterKeyboard':
+      return 4;
+    case 'textInput':
+      return 5;
+    case 'multiTouch':
+      return 6;
+    case 'displayInfo':
+      return 7;
+    case 'currentApp':
+      return 8;
+    case 'notifications':
+      return 9;
+    default:
+      return 100;
   }
 }
