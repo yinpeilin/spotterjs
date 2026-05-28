@@ -63,7 +63,7 @@ import { registerOptionalAndroidTools, runSpotterMcp } from "./server.js";
 
 beforeEach(() => {
   delete process.env.SPOTTERJS_A11Y;
-  delete process.env.SPOTTERJS_ANDROID_ADB;
+  delete process.env.SPOTTERJS_ANDROID;
   delete process.env.SPOTTERJS_WORKSPACE_ROOT;
   delete process.env.SPOTTERJS_ALLOW_SHELL;
   core.accessibility.quick.enable.mockReset();
@@ -120,5 +120,13 @@ describe("runSpotterMcp", () => {
       false
     );
     expect(ocrTools.registerOcrTools).toHaveBeenCalledWith(expect.any(Object));
+  });
+
+  it("registers Android companion tools when enabled", async () => {
+    process.env.SPOTTERJS_ANDROID = "1";
+
+    await runSpotterMcp();
+
+    expect(androidTools.registerAndroidTools).toHaveBeenCalledWith(expect.any(Object));
   });
 });

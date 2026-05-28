@@ -9,10 +9,6 @@ import { createOcr, defaultModelDir } from "@spotterjs/plugin-ocr";
 import { cropImage, loadImage, resizeRgba } from "../../packages/plugin-ocr/src/image";
 import { boxesFromBitmap, decodeCtc } from "../../packages/plugin-ocr/src/postprocess";
 import { optimizeCapture, workspaceImageStore } from "../../packages/mcp/src/adapters/artifacts";
-import {
-  findAndroidElements,
-  parseUiautomatorXml,
-} from "../../packages/plugin-android-adb/src/uiautomator";
 import { writeRgbaPng } from "../lib/png";
 
 type Suite = "synthetic" | "deep" | "ocr" | "all";
@@ -299,30 +295,6 @@ function buildBitmap(width: number, height: number): Float32Array {
   return bitmap;
 }
 
-function buildXml(depth: number, breadth: number): string {
-  let index = 0;
-  function node(level: number): string {
-    const id = index++;
-    const attrs = [
-      `text="Item ${id}"`,
-      `resource-id="app:id/item_${id}"`,
-      `class="android.widget.TextView"`,
-      `package="app"`,
-      `content-desc="Desc ${id}"`,
-      `clickable="${id % 3 === 0}"`,
-      `enabled="true"`,
-      `checked="false"`,
-      `selected="false"`,
-      `scrollable="false"`,
-      `focusable="${id % 2 === 0}"`,
-      `bounds="[${id % 300},${level * 10}][${(id % 300) + 50},${level * 10 + 20}]"`,
-    ].join(" ");
-    if (level >= depth) return `<node ${attrs}/>`;
-    return `<node ${attrs}>${Array.from({ length: breadth }, () => node(level + 1)).join("")}</node>`;
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?><hierarchy>${node(0)}</hierarchy>`;
-}
-
 async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]> {
   const results: BenchmarkResult[] = [];
   const native = loadNative();
@@ -334,8 +306,6 @@ async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]>
   const logits = Array.from({ length: 64 }, (_, step) =>
     Array.from({ length: 96 }, (_, i) => (i === (step % 20) + 1 ? 0.95 : 0.01))
   );
-  const xml = buildXml(5, 4);
-  const parsedRoot = parseUiautomatorXml(xml);
   const ocr = await createOcr({
     engine: {
       async read() {
@@ -377,10 +347,6 @@ async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]>
     ocr.findAllText(fixture.hay, "send", { caseSensitive: false }), options));
   await add(results, bench("synthetic", "mcp.optimizeCapture downscale", () =>
     optimizeCapture(solid(2400, 1350, [30, 40, 50]), 1600), options));
-  await add(results, bench("synthetic", "android.parseUiautomatorXml large tree", () =>
-    parseUiautomatorXml(xml), options));
-  await add(results, bench("synthetic", "android.findAndroidElements large tree", () =>
-    findAndroidElements(parsedRoot, { textContains: "Item", focusable: true }, { maxDepth: 5 }), options));
 
   return results;
 }

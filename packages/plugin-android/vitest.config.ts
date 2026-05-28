@@ -5,7 +5,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@spotterjs/base": fileURLToPath(new URL("../base/src/index.ts", import.meta.url)),
-      "@spotterjs/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
     },
   },
   test: {

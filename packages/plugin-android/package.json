@@ -1,7 +1,7 @@
 {
-  "name": "@spotterjs/plugin-android-adb",
+  "name": "@spotterjs/plugin-android",
   "version": "1.0.1",
-  "description": "Android ADB automation plugin for spotterjs",
+  "description": "Android companion app automation plugin for spotterjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -10,24 +10,19 @@
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./uiautomator": {
-      "types": "./dist/uiautomator-public.d.ts",
-      "require": "./dist/uiautomator-public.js",
-      "default": "./dist/uiautomator-public.js"
-    },
     "./package.json": "./package.json"
   },
   "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "android",
-    "adb",
+    "companion",
     "automation",
     "spotterjs"
   ],
   "repository": {
     "type": "git",
     "url": "https://gitee.com/ypl0lpy/spotterjs.git",
-    "directory": "packages/plugin-android-adb"
+    "directory": "packages/plugin-android"
   },
   "publishConfig": {
     "access": "public",
@@ -52,11 +47,11 @@
   },
   "dependencies": {
     "@spotterjs/base": "1.0.1",
-    "@spotterjs/core": "1.0.1",
-    "fast-xml-parser": "^4.5.0"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0"
   }

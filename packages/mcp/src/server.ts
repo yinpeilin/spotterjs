@@ -20,8 +20,8 @@ export async function runSpotterMcp(): Promise<void> {
     process.env.SPOTTERJS_A11Y === "1" ||
     process.env.SPOTTERJS_A11Y?.toLowerCase() === "true";
   const androidEnabled =
-    process.env.SPOTTERJS_ANDROID_ADB === "1" ||
-    process.env.SPOTTERJS_ANDROID_ADB?.toLowerCase() === "true";
+    process.env.SPOTTERJS_ANDROID === "1" ||
+    process.env.SPOTTERJS_ANDROID?.toLowerCase() === "true";
 
   if (process.env.SPOTTERJS_WORKSPACE_ROOT) {
     configureHost({
