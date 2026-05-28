@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Spotter Companion</string>
+    <string name="spotter_accessibility_description">Expose Android UI state and actions to paired Spotter desktop clients.</string>
+</resources>
