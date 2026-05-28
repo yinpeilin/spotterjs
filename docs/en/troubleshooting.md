@@ -60,23 +60,16 @@ manual conversion.
 
 See [Accessibility automation](./guides/accessibility.md).
 
-## ADB Device Is Unavailable
+## Android Companion Is Unavailable
 
 | State | Action |
 |-------|--------|
-| `unauthorized` | Accept USB debugging authorization on the device |
-| `offline` | Run `adb kill-server`, then reconnect |
-| `adb` not found | Set `SPOTTERJS_ADB_PATH` or install Android SDK platform-tools |
-| Wireless debugging fails | Verify pairing and connection ports separately |
+| WebSocket connection refused | Confirm the phone app is listening and the URL/port match the app screen |
+| Pairing fails | Rotate the pairing code in the app and retry with `android.pair` |
+| Session rejected | Pair again and reuse the new `sessionToken` |
+| Tree or input commands fail | Enable the Spotter accessibility service and, for robust text, select Spotter Keyboard |
 
-Start with:
-
-```typescript
-const devices = await android.discover();
-console.log(devices);
-```
-
-See [Android ADB automation](./guides/android-adb.md).
+See [Android companion automation](./guides/android-companion.md).
 
 ## OCR Model Download Fails
 

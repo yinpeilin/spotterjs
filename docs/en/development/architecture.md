@@ -14,7 +14,7 @@ automation, image processing, native bindings, and NCC matching.
 | `packages/base` | Shared TypeScript types |
 | `packages/mcp` | MCP server exposing desktop, Android, OCR, and host tools |
 | `packages/plugin-ocr` | OCR plugin, model download, and recognition pipeline |
-| `packages/plugin-android-adb` | Android ADB automation plugin |
+| `packages/plugin-android` | Android companion automation plugin |
 | `crates/spotterjs-base` | Rust shared types, errors, and N-API conversions |
 | `crates/spotterjs-core` | Rust platform capabilities: capture, input, windows, accessibility, image |
 | `crates/spotterjs-node` | Node native loader and N-API binding |
@@ -69,7 +69,7 @@ TypeScript packages that depend on it. See [Publishing](../PUBLISHING.md).
 The MCP server exposes:
 
 - desktop: capture, input, windows, template matching, and optional accessibility.
-- android: ADB tools when `SPOTTERJS_ANDROID_ADB=1`.
+- android: companion app tools when `SPOTTERJS_ANDROID=1`.
 - ocr: OCR tools backed by `@spotterjs/plugin-ocr`.
 - host: workspace file tools and optional shell execution.
 

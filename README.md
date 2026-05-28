@@ -4,7 +4,7 @@
 
 spotterjs is a TypeScript-first desktop automation toolkit backed by Rust native
 addons. It provides screen capture, mouse and keyboard input, window discovery,
-accessibility automation, NCC template matching, OCR, Android ADB automation,
+accessibility automation, NCC template matching, OCR, Android companion automation,
 and an MCP server for code agents.
 
 - Source: [GitHub repository](https://github.com/yinpeilin/spotterjs)
@@ -79,7 +79,7 @@ Match results use screen coordinates.
 | `@spotterjs/node-win32-x64-msvc` | Optional | Windows x64 native binary |
 | `@spotterjs/node-linux-x64-gnu` | Optional | Linux x64 glibc native binary |
 | `@spotterjs/mcp` | Optional | MCP server for desktop, Android, OCR, and workspace tools |
-| `@spotterjs/plugin-android-adb` | Optional | Android automation through ADB |
+| `@spotterjs/plugin-android` | Optional | Android automation through the mobile companion app |
 | `@spotterjs/plugin-ocr` | Optional | OCR with ONNX Runtime |
 
 ## Documentation Map
@@ -89,10 +89,10 @@ Match results use screen coordinates.
 - [Template matching](./docs/en/MATCHING.md): NCC options, encoded buffers, regions, and performance.
 - [Accessibility automation](./docs/en/guides/accessibility.md): UIA / AT-SPI trees, queries, and diagnostics.
 - [MCP server](./docs/en/MCP.md): client configuration, tools, response shapes, and security policy.
-- [Android ADB](./docs/en/guides/android-adb.md): USB, wireless debugging, multi-device flows, and plugin API.
+- [Android companion](./docs/en/guides/android-companion.md): WebSocket pairing, session reuse, device input, and accessibility tree API.
 - [OCR plugin](./docs/en/guides/ocr.md): model cache, download sources, local models, coordinates, and testing.
 - [Examples](./docs/en/examples.md): Paint examples, smoke scripts, integration scripts, and benchmarks.
-- [Troubleshooting](./docs/en/troubleshooting.md): native loading, matching, ADB, OCR, and MCP issues.
+- [Troubleshooting](./docs/en/troubleshooting.md): native loading, matching, Android companion, OCR, and MCP issues.
 
 Maintainer docs:
 

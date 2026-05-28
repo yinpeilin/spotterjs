@@ -44,18 +44,18 @@ npm run build -w @spotterjs/mcp
 | `SPOTTERJS_EXEC_TIMEOUT_MS` | `60000` | Shell command timeout |
 | `SPOTTERJS_SHELL` | *(auto)* | Override shell executable |
 | `SPOTTERJS_A11Y` | off | Set to `1` to register accessibility tools |
-| `SPOTTERJS_ANDROID_ADB` | off | Set to `1` to register Android ADB tools |
+| `SPOTTERJS_ANDROID` | off | Set to `1` to register Android companion tools |
 
 ## Error diagnostics
 
-MCP 工具失败时仍返回兼容的 `isError: true` 文本结果。底层库提供结构化错误时，
-文本会附带稳定的 `code` 和简短 `context` 摘要，方便按错误码排查：
+MCP 工具失败时仍返回兼容�?`isError: true` 文本结果。底层库提供结构化错误时�?
+文本会附带稳定的 `code` 和简�?`context` 摘要，方便按错误码排查：
 
 ```text
 ocr_find_text failed: OCR text not found: Send (code=OCR_TEXT_NOT_FOUND context={"text":"Send","exact":true})
 ```
 
-`context` 只放短小、可序列化的信息，不包含大块二进制数据或敏感文件内容。
+`context` 只放短小、可序列化的信息，不包含大块二进制数据或敏感文件内容�?
 
 ### Shell platform policy
 
@@ -146,42 +146,24 @@ With `SPOTTERJS_A11Y=1`:
 
 ### Android (`android_*`)
 
-Enable with `SPOTTERJS_ANDROID_ADB=1`. `adb` must be installed on `PATH` unless
-the tool call provides `adbPath`. Connect phones to the ADB server first by USB
-debugging authorization or Android 11+ wireless debugging. Use discovery tools
-when you do not want to handle serials manually.
+Enable with `SPOTTERJS_ANDROID=1`. Pair with the Spotter mobile companion app
+over WebSocket, then reuse the returned session token for later calls.
 
 | Tool | Description |
 |------|-------------|
-| `android_discover_devices` | Devices currently visible from `adb devices -l` |
-| `android_pair_tcp` | Run `adb pair host:pairPort code` |
-| `android_connect_network` | Run `adb connect host:connectPort` |
-| `android_connect_default` | Connect the only authorized discovered device |
-| `android_connect_all` | Connect all authorized discovered devices |
-| `android_capture_screen` | Capture device screen as a workspace PNG file path |
+| `android_connect` | Pair with a companion app or reuse a session token |
+| `android_heartbeat` | Check the companion session |
+| `android_status` | Fetch companion state |
+| `android_display_info` | Get Android display size and density |
+| `android_current_app` | Report the focused Android package/activity |
+| `android_capture_screen` | Not implemented until companion frame capture exists |
 | `android_tap` / `android_swipe` | Touch input |
-| `android_type_text` | Type text through `adb shell input text` |
+| `android_text` | Type text through the companion app |
 | `android_keyevent` / `android_back` / `android_home` | Android key events |
-| `android_start_app` / `android_stop_app` | Start or force-stop packages |
-| `android_dump_tree` | Dump Android UIAutomator element tree |
-| `android_find_element` / `android_wait_for_element` | Query UIAutomator elements by text, resource id, class, content description, package, and element state |
-| `android_tap_element` / `android_type_element` | Tap or type through a matched UIAutomator element |
-| `android_shell` | Run a raw `adb shell` command |
-| `android_get_display_info` | Get `wm size` / `wm density` display metadata |
-| `android_wake` / `android_sleep` | Wake or sleep the device |
-| `android_current_app` | Report the focused package/activity from `dumpsys window` |
-| `android_clear_app` | Clear app data with `pm clear packageName` |
-| `android_find_template` | Template match on a device screenshot |
-| `android_batch_tap` / `android_batch_swipe` | Touch input on all authorized devices |
-| `android_batch_capture` | Capture all authorized devices |
-
-`android_capture_screen` and `android_batch_capture` accept the same
-`detail: "high" | "original"` capture option as desktop capture tools. The
-default is `high`; pass `original` for full-resolution device screenshots.
-
-`android_find_template` accepts the same `{ "path": "..." }` or base64 image
-input shape as `desktop_find_template`, and returns matches in
-`android-device` coordinate space.
+| `android_dump_tree` | Dump Android accessibility tree |
+| `android_find_element` / `android_wait_for_element` | Query accessibility elements |
+| `android_tap_element` / `android_type_element` | Act on accessibility elements |
+| `android_find_template` | Not implemented until companion frame capture exists |
 
 Element tools also return `android-device` coordinate space. Queries can use
 `text`, `textContains`, `resourceId`, `resourceIdContains`, `className`,
@@ -190,15 +172,10 @@ Element tools also return `android-device` coordinate space. Queries can use
 `focusable`.
 
 `android_wait_for_element` uses `waitTimeoutMs` for the UI element wait timeout.
-The optional `timeoutMs` parameter remains reserved for ADB connection timeout.
+The optional `timeoutMs` parameter remains reserved for WebSocket request timeout.
 
-Wireless debugging uses two steps. Pair with the host, pairing port, and code
-from "Pair device with pairing code"; then connect with the host and connection
-port shown on the main Wireless debugging screen. The two ports are often
-different.
-
-For plugin-level examples, multi-device usage, and ADB troubleshooting, see
-[Android ADB automation](./guides/android-adb.md).
+For plugin-level examples and companion pairing, see
+[Android companion automation](./guides/android-companion.md).
 
 ### Host (`host_*`)
 
@@ -217,7 +194,7 @@ For plugin-level examples, multi-device usage, and ADB troubleshooting, see
 - File paths must resolve **inside** `SPOTTERJS_WORKSPACE_ROOT`.
 - Writing to `.env`, `credentials.json`, etc. is blocked by default.
 - Shell execution is **disabled** unless `SPOTTERJS_ALLOW_SHELL=1`.
-- Desktop tools can control your mouse, keyboard, and windows — enable only on trusted machines.
+- Desktop tools can control your mouse, keyboard, and windows �?enable only on trusted machines.
 
 ## Smoke test
 

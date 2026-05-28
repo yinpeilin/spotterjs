@@ -99,7 +99,7 @@ npm publish -w @spotterjs/base
 npm publish -w @spotterjs/core
 npm publish -w @spotterjs/mcp
 npm publish -w @spotterjs/plugin-ocr
-npm publish -w @spotterjs/plugin-android-adb
+npm publish -w @spotterjs/plugin-android
 ```
 
 With changesets:

@@ -104,7 +104,7 @@ the real desktop, so run them on a machine where that is safe.
 | Window discovery and window-scoped matching | [`desktop` and `windows`](./guides/desktop-automation.md) |
 | Semantic UI controls | [`accessibility`](./guides/accessibility.md) |
 | Text in screenshots | [`@spotterjs/plugin-ocr`](./guides/ocr.md) |
-| Android devices | [`@spotterjs/plugin-android-adb`](./guides/android-adb.md) |
+| Android devices | [`@spotterjs/plugin-android`](./guides/android-companion.md) |
 | Code-agent tools | [`@spotterjs/mcp`](./MCP.md) |
 
 ## Next Steps

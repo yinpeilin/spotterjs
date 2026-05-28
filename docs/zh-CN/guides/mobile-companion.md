@@ -1,4 +1,4 @@
-# Mobile Companion App
+﻿# Mobile Companion App
 
 `apps/mobile-companion` 是 Spotter 的 Android companion app。首版目标是建立手机和桌面 MCP/bridge 的连接闭环，后续再承载截图、无障碍树和输入能力。
 
@@ -40,7 +40,7 @@ flutter build apk
 ```json
 {
   "type": "pair",
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "clientId": "desktop-dev",
   "code": "123456"
 }
@@ -48,8 +48,27 @@ flutter build apk
 
 配对成功后手机返回 `sessionToken`。后续 `heartbeat` 和 `status` 等消息必须携带该 token。
 
+多指手势示例：
+
+```json
+{
+  "type": "gesture",
+  "sessionToken": "<token>",
+  "strokes": [
+    {
+      "points": [{ "x": 120, "y": 800 }, { "x": 120, "y": 500 }],
+      "durationMs": 300
+    },
+    {
+      "points": [{ "x": 360, "y": 800 }, { "x": 360, "y": 500 }],
+      "durationMs": 300
+    }
+  ]
+}
+```
+
 ## 权限边界
 
 - `MediaProjection` 需要用户确认，首版只完成授权入口。
 - `AccessibilityService` 需要用户在系统设置里手动开启，首版声明服务和权限状态。
-- ADB 仍作为安装、调试和兜底通道，不替代 companion app 的日常连接通道。
+- 自动化连接以 companion app 的 WebSocket 协议为准。

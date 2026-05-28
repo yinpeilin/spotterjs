@@ -10,7 +10,7 @@ or maintaining the repository.
 
 - [Getting started](./getting-started.md): install packages, run the first script, and verify the local environment.
 - [Examples](./examples.md): Paint examples, smoke scripts, WeChat integration scripts, and benchmark commands.
-- [Troubleshooting](./troubleshooting.md): common native, matching, ADB, OCR, MCP, and documentation issues.
+- [Troubleshooting](./troubleshooting.md): common native, matching, Android companion, OCR, MCP, and documentation issues.
 
 ## Guides
 
@@ -21,14 +21,14 @@ or maintaining the repository.
 ## Integrations
 
 - [MCP server](./MCP.md): MCP client configuration, desktop / Android / OCR / host tools, response shapes, and security policy.
-- [Android ADB automation](./guides/android-adb.md): USB, wireless debugging, multi-device control, UIAutomator, and template matching.
+- [Android companion automation](./guides/android-companion.md): WebSocket pairing, session reuse, device input, and accessibility tree access.
 - [OCR plugin](./guides/ocr.md): model download, cache directories, local models, coordinates, and integration tests.
 
 ## API Entrypoints
 
 - [`@spotterjs/core`](../../packages/core/README.md): desktop automation API.
 - [`@spotterjs/mcp`](../../packages/mcp/README.md): MCP server package.
-- [`@spotterjs/plugin-android-adb`](../../packages/plugin-android-adb/README.md): Android ADB plugin.
+- [`@spotterjs/plugin-android`](../../packages/plugin-android/README.md): Android companion plugin.
 - [`@spotterjs/plugin-ocr`](../../packages/plugin-ocr/README.md): OCR plugin.
 
 ## Maintainers

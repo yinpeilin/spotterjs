@@ -13,12 +13,11 @@ dependencies. Put real environment checks in smoke or integration scripts.
 
 When adding key-path coverage, prefer deterministic fixtures for MCP artifacts
 and tool schemas, OCR image validation and post-processing, Android
-UIAutomator XML parsing and max-depth pruning, core match wrapper option
+companion protocol routing and accessibility tree pruning, core match wrapper option
 mapping, and Rust NCC synthetic matching.
 
 Synthetic benchmarks are report-only baselines. Track
-`mcp.optimizeCapture`, `ocr.resizeRgba`, `ocr.boxesFromBitmap`,
-`android.parseUiautomatorXml`, and `android.findAndroidElements` for trends;
+`mcp.optimizeCapture`, `ocr.resizeRgba`, and `ocr.boxesFromBitmap` for trends;
 do not turn them into hard CI gates without a separate decision.
 
 ## Common Commands
@@ -30,7 +29,7 @@ npm run test -w @spotterjs/base
 npm run test -w @spotterjs/core
 npm run test -w @spotterjs/mcp
 npm run test -w @spotterjs/plugin-ocr
-npm run test -w @spotterjs/plugin-android-adb
+npm run test -w @spotterjs/plugin-android
 cargo test
 ```
 
@@ -40,7 +39,7 @@ cargo test
 - Public TypeScript API comments or declarations: run `npm run build:ts`.
 - Core desktop API changes: run `npm run test -w @spotterjs/core`.
 - MCP tool schema or behavior changes: run `npm run test -w @spotterjs/mcp`.
-- ADB parsing, connection, device, or batch behavior: run `npm run test -w @spotterjs/plugin-android-adb`.
+- Android companion client behavior: run `npm run test -w @spotterjs/plugin-android`.
 - OCR model, image, post-processing, or input-shape behavior: run `npm run test -w @spotterjs/plugin-ocr`.
 - Rust native behavior: run the affected `cargo test` package, then relevant smoke scripts.
 
@@ -57,10 +56,9 @@ await expect(ocr.findText(image, "Missing")).rejects.toMatchObject({
 });
 ```
 
-Prefer `isSpotterJsError`, `isOcrError`, `instanceof AdbError`, or
-`instanceof AndroidAutomationError` when application code needs programmable
-catch behavior. Avoid snapshotting whole error objects because `cause` and
-platform messages may vary.
+Prefer `isSpotterJsError`, `isOcrError`, or stable `code` fields when
+application code needs programmable catch behavior. Avoid snapshotting whole
+error objects because `cause` and platform messages may vary.
 
 ## Smoke Scripts
 

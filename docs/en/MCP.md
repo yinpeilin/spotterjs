@@ -2,7 +2,7 @@
 
 [中文文档](../zh-CN/MCP.md)
 
-The spotterjs MCP server exposes desktop automation, optional Android ADB
+The spotterjs MCP server exposes desktop automation, optional Android companion
 automation, OCR, workspace file I/O, and controlled shell execution to MCP
 clients such as Cursor and Claude Desktop.
 
@@ -48,7 +48,7 @@ npm run build -w @spotterjs/mcp
 | `SPOTTERJS_EXEC_TIMEOUT_MS` | `60000` | Shell command timeout |
 | `SPOTTERJS_SHELL` | auto | Override shell executable |
 | `SPOTTERJS_A11Y` | off | Set to `1` to register accessibility tools |
-| `SPOTTERJS_ANDROID_ADB` | off | Set to `1` to register Android ADB tools |
+| `SPOTTERJS_ANDROID` | off | Set to `1` to register Android companion tools |
 
 Use `host_shell_info` to check whether commands run through PowerShell, bash,
 or a custom shell.
@@ -172,31 +172,28 @@ another coordinate space.
 
 ## Android Tools
 
-Enable with `SPOTTERJS_ANDROID_ADB=1`. ADB must be on `PATH`, configured with
-`SPOTTERJS_ADB_PATH`, or provided by the tool call.
+Enable with `SPOTTERJS_ANDROID=1`. Pair with the Spotter mobile companion app
+over WebSocket, then reuse the returned session token for later calls.
 
 | Tool | Description |
 |------|-------------|
-| `android_discover_devices` | List devices from `adb devices -l` |
-| `android_pair_tcp` | Pair an Android 11+ wireless debugging device |
-| `android_connect_network` | Connect to a wireless debugging endpoint |
-| `android_connect_default` | Connect the only authorized discovered device |
-| `android_connect_all` | Connect all authorized discovered devices |
-| `android_capture_screen` | Capture a device screen as a workspace PNG |
+| `android_connect` | Pair with a companion app or reuse a session token |
+| `android_heartbeat` | Check the companion session |
+| `android_status` | Fetch companion state |
+| `android_display_info` | Get Android display size and density |
+| `android_current_app` | Report the focused Android package/activity |
+| `android_capture_screen` | Not implemented until companion frame capture exists |
 | `android_tap` / `android_swipe` | Touch input |
-| `android_type_text` | Type text through `adb shell input text` |
+| `android_text` | Type text through the companion app |
 | `android_keyevent` / `android_back` / `android_home` | Android key events |
-| `android_start_app` / `android_stop_app` | Start or stop packages |
-| `android_dump_tree` | Dump UIAutomator tree |
-| `android_find_element` / `android_wait_for_element` | Query UIAutomator elements |
-| `android_tap_element` / `android_type_element` | Act on UIAutomator elements |
-| `android_shell` | Run a raw `adb shell` command |
-| `android_find_template` | Template match on a device screenshot |
-| `android_batch_tap` / `android_batch_swipe` / `android_batch_capture` | Multi-device helpers |
+| `android_dump_tree` | Dump Android accessibility tree |
+| `android_find_element` / `android_wait_for_element` | Query accessibility elements |
+| `android_tap_element` / `android_type_element` | Act on accessibility elements |
+| `android_find_template` | Not implemented until companion frame capture exists |
 
 Android element and template results use `android-device` coordinates.
 `android_wait_for_element` uses `waitTimeoutMs` for UI element wait time;
-`timeoutMs` remains reserved for ADB command timeout.
+`timeoutMs` remains reserved for WebSocket request timeout.
 
 ## Host Tools
 

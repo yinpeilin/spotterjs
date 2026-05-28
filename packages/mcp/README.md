@@ -2,7 +2,7 @@
 
 [中文文档](../../docs/zh-CN/MCP.md)
 
-spotterjs MCP server exposes desktop automation, optional Android ADB
+spotterjs MCP server exposes desktop automation, optional Android companion
 automation, OCR, workspace file I/O, and optional shell execution to MCP
 clients.
 
@@ -40,7 +40,7 @@ Enable shell, Android, or accessibility tools explicitly:
 ```json
 {
   "SPOTTERJS_ALLOW_SHELL": "1",
-  "SPOTTERJS_ANDROID_ADB": "1",
+  "SPOTTERJS_ANDROID": "1",
   "SPOTTERJS_A11Y": "1"
 }
 ```

@@ -13,20 +13,20 @@
   - Move `loadNative` and native binding types to `@spotterjs/core/native`.
   - Rebuild native packages in release mode, with the Windows binary statically linking the MSVC CRT.
 
-- Rename `android_wait_for_element`'s element wait timeout from `timeoutMs` to `waitTimeoutMs`; `timeoutMs` now only represents the optional ADB connection timeout.
+- Rename `android_wait_for_element`'s element wait timeout from `timeoutMs` to `waitTimeoutMs`; `timeoutMs` now only represents the optional Android connection timeout.
 
 ### Patch Changes
 
 - Updated dependencies
   - @spotterjs/core@1.0.1
-  - @spotterjs/plugin-android-adb@1.0.1
+  - @spotterjs/plugin-android@1.0.1
   - @spotterjs/plugin-ocr@1.0.1
 
 ## 1.0.0
 
 ### Minor Changes
 
-- acfe3fa: Add optional Android ADB tools and support encoded template images for desktop matching.
+- acfe3fa: Add optional Android tools and support encoded template images for desktop matching.
 
 ### Patch Changes
 
@@ -34,4 +34,4 @@
 - Updated dependencies [acfe3fa]
 - Updated dependencies [4efb357]
   - @spotterjs/core@1.0.0
-  - @spotterjs/plugin-android-adb@0.2.0
+  - @spotterjs/plugin-android@0.2.0

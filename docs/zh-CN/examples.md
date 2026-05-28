@@ -98,4 +98,4 @@ npm run benchmark:ncc:rust
 - 学核心 API：从 Paint 示例开始。
 - 查模板匹配稳定性：运行 `smoke:match` 和 `smoke:match-tap`。
 - 查无障碍树：运行 `example:paint:ui-tree` 或 `integration:wechat:dump`。
-- 查 Android ADB：运行 `smoke:android` 前先确认设备授权。
+- 查 Android companion：运行 `smoke:android` 前先确认手机 app 已启动并已准备好配对码或 session token。

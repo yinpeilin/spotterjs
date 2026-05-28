@@ -42,14 +42,14 @@ cargo test -p spotterjs-core --features linux-x11
 npm run test -w @spotterjs/core
 npm run test -w @spotterjs/mcp
 npm run test -w @spotterjs/plugin-ocr
-npm run test -w @spotterjs/plugin-android-adb
+npm run test -w @spotterjs/plugin-android
 ```
 
 适用场景：
 
 - 改 core API：跑 `@spotterjs/core`。
 - 改 MCP tool schema 或行为：跑 `@spotterjs/mcp`。
-- 改 ADB 解析、连接、多设备逻辑：跑 `@spotterjs/plugin-android-adb`。
+- 改 Android companion client 或协议逻辑：跑 `@spotterjs/plugin-android`。
 - 改 OCR 模型解析、后处理、输入形状：跑 `@spotterjs/plugin-ocr`。
 
 ## Smoke 脚本
@@ -124,5 +124,5 @@ await expect(ocr.findText(image, "Missing")).rejects.toMatchObject({
 ```
 
 应用代码需要可编程 catch 时，优先使用 `isSpotterJsError`、`isOcrError`、
-`instanceof AdbError` 或 `instanceof AndroidAutomationError`。不要快照整个
+稳定的 `code` 字段。不要快照整个
 错误对象，因为 `cause` 和平台错误消息可能随环境变化。
