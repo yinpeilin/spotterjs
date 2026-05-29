@@ -46,8 +46,10 @@ pub use input::{
     MouseConfig,
 };
 pub use keyboard::{
-    keyboard_config, keyboard_press, keyboard_release, keyboard_type, keyboard_type_keys,
-    parse_key, parse_keys, set_keyboard_config, Key, KeyboardConfig,
+    keyboard_config, keyboard_press, keyboard_press_with_config, keyboard_release,
+    keyboard_release_with_config, keyboard_type, keyboard_type_keys,
+    keyboard_type_keys_with_config, keyboard_type_with_config, parse_key, parse_keys,
+    set_keyboard_config, Key, KeyboardConfig,
 };
 pub use matcher::{
     find_all_template_buffers, find_all_templates, find_all_templates_in_window,

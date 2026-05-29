@@ -7,6 +7,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Key {
+    Digit(char),
     Enter,
     Tab,
     Escape,
@@ -88,7 +89,9 @@ impl FromStr for Key {
             "rightsuper" => Ok(Key::RightSuper),
             _ if trimmed.len() == 1 => {
                 let c = trimmed.chars().next().unwrap();
-                if c.is_ascii_alphabetic() {
+                if c.is_ascii_digit() {
+                    Ok(Key::Digit(c))
+                } else if c.is_ascii_alphabetic() {
                     Ok(Key::Letter(c.to_ascii_lowercase()))
                 } else {
                     Err(SpotterError::Platform(format!("unknown key: {trimmed}")))
@@ -102,6 +105,7 @@ impl FromStr for Key {
 impl Key {
     pub fn to_enigo(self) -> EnigoKey {
         match self {
+            Key::Digit(c) => digit_to_enigo(c),
             Key::Enter => EnigoKey::Return,
             Key::Tab => EnigoKey::Tab,
             Key::Escape => EnigoKey::Escape,
@@ -137,6 +141,29 @@ impl Key {
     }
 }
 
+fn digit_to_enigo(c: char) -> EnigoKey {
+    #[cfg(windows)]
+    {
+        match c {
+            '0' => EnigoKey::Num0,
+            '1' => EnigoKey::Num1,
+            '2' => EnigoKey::Num2,
+            '3' => EnigoKey::Num3,
+            '4' => EnigoKey::Num4,
+            '5' => EnigoKey::Num5,
+            '6' => EnigoKey::Num6,
+            '7' => EnigoKey::Num7,
+            '8' => EnigoKey::Num8,
+            '9' => EnigoKey::Num9,
+            _ => EnigoKey::Unicode(c),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        EnigoKey::Unicode(c)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct KeyboardConfig {
     pub auto_delay_ms: u64,
@@ -162,57 +189,74 @@ fn enigo() -> Result<Enigo> {
     Enigo::new(&Settings::default()).map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
 }
 
-fn auto_delay() {
-    let ms = keyboard_config().auto_delay_ms;
+fn auto_delay_for(config: KeyboardConfig) {
+    let ms = config.auto_delay_ms;
     if ms > 0 {
         thread::sleep(Duration::from_millis(ms));
     }
 }
 
 pub fn keyboard_type(text: &str) -> Result<()> {
+    keyboard_type_with_config(text, None)
+}
+
+pub fn keyboard_type_with_config(text: &str, config: Option<KeyboardConfig>) -> Result<()> {
     let mut e = enigo()?;
     e.text(text)
         .map_err(|err| SpotterError::Platform(format!("keyboard_type: {err}")))?;
-    auto_delay();
+    auto_delay_for(config.unwrap_or_else(keyboard_config));
     Ok(())
 }
 
 pub fn keyboard_press(keys: &[Key]) -> Result<()> {
+    keyboard_press_with_config(keys, None)
+}
+
+pub fn keyboard_press_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
     let mut e = enigo()?;
     for key in keys {
         e.key(key.to_enigo(), Direction::Press)
             .map_err(|err| SpotterError::Platform(format!("keyboard_press: {err}")))?;
     }
-    auto_delay();
+    auto_delay_for(config.unwrap_or_else(keyboard_config));
     Ok(())
 }
 
 pub fn keyboard_release(keys: &[Key]) -> Result<()> {
+    keyboard_release_with_config(keys, None)
+}
+
+pub fn keyboard_release_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
     let mut e = enigo()?;
     for key in keys.iter().rev() {
         e.key(key.to_enigo(), Direction::Release)
             .map_err(|err| SpotterError::Platform(format!("keyboard_release: {err}")))?;
     }
-    auto_delay();
+    auto_delay_for(config.unwrap_or_else(keyboard_config));
     Ok(())
 }
 
 pub fn keyboard_type_keys(keys: &[Key]) -> Result<()> {
+    keyboard_type_keys_with_config(keys, None)
+}
+
+pub fn keyboard_type_keys_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
     if keys.is_empty() {
         return Ok(());
     }
+    let cfg = config.unwrap_or_else(keyboard_config);
     if keys.len() == 1 {
         let mut e = enigo()?;
         e.key(keys[0].to_enigo(), Direction::Click)
             .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
-        auto_delay();
+        auto_delay_for(cfg);
         return Ok(());
     }
-    keyboard_press(keys)?;
+    keyboard_press_with_config(keys, Some(cfg))?;
     let mut e = enigo()?;
     e.key(keys[keys.len() - 1].to_enigo(), Direction::Click)
         .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
-    keyboard_release(keys)
+    keyboard_release_with_config(keys, Some(cfg))
 }
 
 pub fn parse_key(s: &str) -> Result<Key> {
@@ -250,7 +294,15 @@ mod tests {
     }
 
     #[test]
+    fn parse_digit_keys() {
+        for digit in '0'..='9' {
+            assert_eq!(parse_key(&digit.to_string()).unwrap(), Key::Digit(digit));
+        }
+    }
+
+    #[test]
     fn parse_unknown_key_errors() {
         assert!(parse_key("NotARealKey").is_err());
+        assert!(parse_key("10").is_err());
     }
 }

@@ -11,14 +11,14 @@ use spotterjs_core::{
     a11y_dump_tree, a11y_dump_tree_node, a11y_enable, a11y_find_descendant, a11y_get_bounds,
     a11y_get_element_info, a11y_invoke, a11y_refresh_root, a11y_set_value, a11y_tree_health,
     a11y_wait_for_descendant, check_tree_health, clipboard_get, clipboard_set, find_apps,
-    find_windows, format_element_id, get_foreground_app, is_accessibility_enabled, keyboard_press,
-    keyboard_release, keyboard_type, keyboard_type_keys, list_desktop_apps, minimize_window,
-    mouse_click, mouse_drag_to, mouse_get_position, mouse_move, move_window, parse_element_id,
-    parse_key, parse_keys, parse_window_id, resize_window, restore_window, screen_height,
-    screen_size, screen_width, set_keyboard_config, set_mouse_config, straight_line_points,
-    wait_for_window, A11yBounds, A11yConfig, A11yElementId, A11yQuery, AttachReport, DesktopApp,
-    ElementInfo, KeyboardConfig, MouseButton, MouseConfig, Point, TreeHealth, TreeNodeDump,
-    TreeViewMode, WindowInfo, VERSION,
+    find_windows, format_element_id, get_foreground_app, is_accessibility_enabled,
+    keyboard_press_with_config, keyboard_release_with_config, keyboard_type_keys_with_config,
+    keyboard_type_with_config, list_desktop_apps, minimize_window, mouse_click, mouse_drag_to,
+    mouse_get_position, mouse_move, move_window, parse_element_id, parse_key, parse_keys,
+    parse_window_id, resize_window, restore_window, screen_height, screen_size, screen_width,
+    set_keyboard_config, set_mouse_config, straight_line_points, wait_for_window, A11yBounds,
+    A11yConfig, A11yElementId, A11yQuery, AttachReport, DesktopApp, ElementInfo, KeyboardConfig,
+    MouseButton, MouseConfig, Point, TreeHealth, TreeNodeDump, TreeViewMode, WindowInfo, VERSION,
 };
 use std::path::Path;
 
@@ -534,33 +534,43 @@ pub fn set_keyboard_config_js(config: JsKeyboardConfig) -> Result<()> {
     Ok(())
 }
 
-#[napi]
-pub fn keyboard_type_text(text: String) -> Result<()> {
-    keyboard_type(&text).map_err(map_err)
+fn keyboard_config_from_js(config: Option<JsKeyboardConfig>) -> Option<KeyboardConfig> {
+    config.map(|js| {
+        let mut cfg = KeyboardConfig::default();
+        if let Some(ms) = js.auto_delay_ms {
+            cfg.auto_delay_ms = ms as u64;
+        }
+        cfg
+    })
 }
 
 #[napi]
-pub fn keyboard_press_keys(keys: Vec<String>) -> Result<()> {
+pub fn keyboard_type_text(text: String, config: Option<JsKeyboardConfig>) -> Result<()> {
+    keyboard_type_with_config(&text, keyboard_config_from_js(config)).map_err(map_err)
+}
+
+#[napi]
+pub fn keyboard_press_keys(keys: Vec<String>, config: Option<JsKeyboardConfig>) -> Result<()> {
     let parsed = parse_keys(&keys).map_err(map_err)?;
-    keyboard_press(&parsed).map_err(map_err)
+    keyboard_press_with_config(&parsed, keyboard_config_from_js(config)).map_err(map_err)
 }
 
 #[napi]
-pub fn keyboard_release_keys(keys: Vec<String>) -> Result<()> {
+pub fn keyboard_release_keys(keys: Vec<String>, config: Option<JsKeyboardConfig>) -> Result<()> {
     let parsed = parse_keys(&keys).map_err(map_err)?;
-    keyboard_release(&parsed).map_err(map_err)
+    keyboard_release_with_config(&parsed, keyboard_config_from_js(config)).map_err(map_err)
 }
 
 #[napi]
-pub fn keyboard_type_key(key: String) -> Result<()> {
+pub fn keyboard_type_key(key: String, config: Option<JsKeyboardConfig>) -> Result<()> {
     let k = parse_key(&key).map_err(map_err)?;
-    keyboard_type_keys(&[k]).map_err(map_err)
+    keyboard_type_keys_with_config(&[k], keyboard_config_from_js(config)).map_err(map_err)
 }
 
 #[napi]
-pub fn keyboard_shortcut(keys: Vec<String>) -> Result<()> {
+pub fn keyboard_shortcut(keys: Vec<String>, config: Option<JsKeyboardConfig>) -> Result<()> {
     let parsed = parse_keys(&keys).map_err(map_err)?;
-    keyboard_type_keys(&parsed).map_err(map_err)
+    keyboard_type_keys_with_config(&parsed, keyboard_config_from_js(config)).map_err(map_err)
 }
 
 // --- Clipboard ---

@@ -102,7 +102,7 @@ Capture tools return a workspace PNG file path, not inline base64. They accept
 | `desktop_capture_active` | Capture the foreground window as a workspace PNG |
 | `desktop_focus_window` | Bring a window to the foreground |
 | `desktop_mouse_move` / `desktop_mouse_click` / `desktop_mouse_tap` | Mouse input |
-| `desktop_keyboard_type` | Type text |
+| `desktop_keyboard_type` / `desktop_keyboard_tap` | Type text or tap a named/number key |
 | `desktop_clipboard_get` / `desktop_clipboard_set` | Clipboard text |
 | `desktop_find_template` | Template match on the screen |
 

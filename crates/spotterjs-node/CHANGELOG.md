@@ -1,5 +1,12 @@
 # @spotterjs/node
 
+## 1.0.3
+
+### Minor Changes
+
+- Add per-call keyboard delay options, numeric key taps, clipboard-backed text
+  writing, and the `desktop_keyboard_tap` MCP tool.
+
 ## 1.0.1
 
 ### Patch Changes

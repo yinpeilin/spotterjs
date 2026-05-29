@@ -59,6 +59,15 @@ const captureDetailOptionsSchema = {
   detail: captureDetailSchema,
 };
 
+const keyboardOptionsSchema = {
+  autoDelayMs: finiteNumber.min(0).optional(),
+};
+
+const keyboardTapKeySchema = z.union([
+  z.string(),
+  z.number().int().min(0).max(9),
+]);
+
 function decodeTemplateImage(image: z.infer<typeof templateImageSchema>): string | Buffer {
   if ("path" in image) return image.path;
   return Buffer.from(image.base64, "base64");
@@ -193,9 +202,31 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   registerSafeTool(
     server,
     "desktop_keyboard_type",
-    { inputSchema: z.object({ text: z.string() }) },
-    async ({ text }) => {
-      keyboard.write(text);
+    {
+      inputSchema: z.object({
+        text: z.string(),
+        ...keyboardOptionsSchema,
+        mode: z.enum(["paste", "native"]).optional(),
+        restoreClipboard: z.boolean().optional(),
+      }),
+    },
+    async ({ text, autoDelayMs, mode, restoreClipboard }) => {
+      keyboard.write(text, { autoDelayMs, mode, restoreClipboard });
+      return ok();
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "desktop_keyboard_tap",
+    {
+      inputSchema: z.object({
+        key: keyboardTapKeySchema,
+        ...keyboardOptionsSchema,
+      }),
+    },
+    async ({ key, autoDelayMs }) => {
+      keyboard.tap(key, { autoDelayMs });
       return ok();
     }
   );

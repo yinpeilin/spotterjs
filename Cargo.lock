@@ -1420,7 +1420,7 @@ dependencies = [
 
 [[package]]
 name = "spotterjs-base"
-version = "0.1.0"
+version = "1.0.3"
 dependencies = [
  "napi",
  "napi-derive",
@@ -1430,7 +1430,7 @@ dependencies = [
 
 [[package]]
 name = "spotterjs-core"
-version = "0.1.0"
+version = "1.0.3"
 dependencies = [
  "arboard",
  "atspi",
@@ -1452,7 +1452,7 @@ dependencies = [
 
 [[package]]
 name = "spotterjs-node"
-version = "0.1.0"
+version = "1.0.3"
 dependencies = [
  "base64",
  "napi",
@@ -1464,7 +1464,7 @@ dependencies = [
 
 [[package]]
 name = "spotterjs-plugin-match-ncc"
-version = "0.1.0"
+version = "1.0.3"
 dependencies = [
  "rayon",
  "spotterjs-base",

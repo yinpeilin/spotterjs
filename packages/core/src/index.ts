@@ -55,6 +55,8 @@ type LetterKey =
   | "y"
   | "z";
 
+type DigitKey = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+
 type FunctionKey =
   | "F1"
   | "F2"
@@ -109,6 +111,7 @@ type NamedKey =
  * aliases such as `enter`, `ctrl`, and `esc` are kept for compatibility.
  */
 export type KeyName =
+  | DigitKey
   | LetterKey
   | FunctionKey
   | Lowercase<FunctionKey>
@@ -116,8 +119,31 @@ export type KeyName =
   | Lowercase<NamedKey>;
 
 type KeyInput = KeyName | KeyName[];
+type NumericKey = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type TapKeyInput = KeyName | NumericKey;
+
+export type KeyboardTapOptions = {
+  autoDelayMs?: number;
+};
+
+export type KeyboardWriteOptions = KeyboardTapOptions & {
+  mode?: "paste" | "native";
+  restoreClipboard?: boolean;
+};
+
+type NativeKeyboardConfig = {
+  autoDelayMs?: number;
+};
+
+type NativeKeyboardWithConfig = ReturnType<typeof loadNative> & {
+  keyboardTypeText(text: string, config?: NativeKeyboardConfig): void;
+  keyboardTypeKey(key: string, config?: NativeKeyboardConfig): void;
+  keyboardPressKeys(keys: string[], config?: NativeKeyboardConfig): void;
+  keyboardReleaseKeys(keys: string[], config?: NativeKeyboardConfig): void;
+};
 
 const pressedKeys = new Set<string>();
+let keyboardDefaultAutoDelayMs = 10;
 
 function keyList(keys: KeyInput): string[] {
   return (Array.isArray(keys) ? keys : [keys]).map((key) => String(key));
@@ -162,6 +188,81 @@ function normalizeKeyName(key: string): string {
   };
   if (/^f([1-9]|1[0-2])$/.test(lower)) return lower.toUpperCase();
   return aliases[lower] ?? trimmed;
+}
+
+function nativeKeyboard(): NativeKeyboardWithConfig {
+  return loadNative() as NativeKeyboardWithConfig;
+}
+
+function nativeKeyboardConfig(options?: KeyboardTapOptions): NativeKeyboardConfig | undefined {
+  return options?.autoDelayMs === undefined
+    ? undefined
+    : { autoDelayMs: options.autoDelayMs };
+}
+
+function effectiveKeyboardDelayMs(options?: KeyboardTapOptions): number {
+  return options?.autoDelayMs ?? keyboardDefaultAutoDelayMs;
+}
+
+function sleepSync(ms: number) {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function callKeyboardTypeText(text: string, options?: KeyboardTapOptions) {
+  const config = nativeKeyboardConfig(options);
+  const n = nativeKeyboard();
+  if (config) n.keyboardTypeText(text, config);
+  else n.keyboardTypeText(text);
+}
+
+function callKeyboardTypeKey(key: string, options?: KeyboardTapOptions) {
+  const config = nativeKeyboardConfig(options);
+  const n = nativeKeyboard();
+  if (config) n.keyboardTypeKey(key, config);
+  else n.keyboardTypeKey(key);
+}
+
+function callKeyboardPressKeys(keys: string[], options?: KeyboardTapOptions) {
+  const config = nativeKeyboardConfig(options);
+  const n = nativeKeyboard();
+  if (config) n.keyboardPressKeys(keys, config);
+  else n.keyboardPressKeys(keys);
+}
+
+function callKeyboardReleaseKeys(keys: string[], options?: KeyboardTapOptions) {
+  const config = nativeKeyboardConfig(options);
+  const n = nativeKeyboard();
+  if (config) n.keyboardReleaseKeys(keys, config);
+  else n.keyboardReleaseKeys(keys);
+}
+
+function normalizeTapKey(key: TapKeyInput): string {
+  if (typeof key === "number") {
+    if (!Number.isInteger(key) || key < 0 || key > 9) {
+      throw new RangeError(`keyboard.tap number key must be an integer from 0 to 9: ${key}`);
+    }
+    return String(key);
+  }
+  return String(key);
+}
+
+function pasteText(text: string, options?: KeyboardWriteOptions) {
+  const shouldRestore = options?.restoreClipboard !== false;
+  const n = loadNative();
+  let previous = "";
+  if (shouldRestore) {
+    previous = n.clipboardGet();
+  }
+  n.clipboardSet(text);
+  try {
+    keyboard.hotkey(["Ctrl", "V"], options);
+    sleepSync(effectiveKeyboardDelayMs(options));
+  } finally {
+    if (shouldRestore) {
+      n.clipboardSet(previous);
+    }
+  }
 }
 
 /**
@@ -265,66 +366,76 @@ export const mouse = {
  */
 export const keyboard = {
   /** Type Unicode text. */
-  write(text: string) {
-    loadNative().keyboardTypeText(text);
+  write(text: string, options?: KeyboardWriteOptions) {
+    if (options?.mode === "native") {
+      callKeyboardTypeText(text, options);
+      return;
+    }
+    pasteText(text, options);
+  },
+
+  /** Type Unicode text. Alias for {@link keyboard.write}. */
+  writeText(text: string, options?: KeyboardWriteOptions) {
+    keyboard.write(text, options);
   },
 
   /** Press and release a single key. */
-  tap(key: KeyName) {
-    loadNative().keyboardTypeKey(String(key));
+  tap(key: TapKeyInput, options?: KeyboardTapOptions) {
+    callKeyboardTypeKey(normalizeTapKey(key), options);
   },
 
   /** Press one or more keys and track them as held. */
-  down(keys: KeyInput) {
+  down(keys: KeyInput, options?: KeyboardTapOptions) {
     const names = keyList(keys);
-    loadNative().keyboardPressKeys(names);
+    callKeyboardPressKeys(names, options);
     for (const name of names) {
       pressedKeys.add(normalizeKeyName(name));
     }
   },
 
   /** Release keys recorded by {@link keyboard.down}; unknown keys are skipped. */
-  up(keys: KeyInput) {
+  up(keys: KeyInput, options?: KeyboardTapOptions) {
     const names = keyList(keys);
     const releasable = names
       .filter((name) => pressedKeys.has(normalizeKeyName(name)))
       .reverse();
     if (releasable.length === 0) return;
-    loadNative().keyboardReleaseKeys(releasable);
+    callKeyboardReleaseKeys(releasable, options);
     for (const name of releasable) {
       pressedKeys.delete(normalizeKeyName(name));
     }
   },
 
   /** Send a native key-down event without recording local state. */
-  rawDown(keys: KeyInput) {
-    loadNative().keyboardPressKeys(keyList(keys));
+  rawDown(keys: KeyInput, options?: KeyboardTapOptions) {
+    callKeyboardPressKeys(keyList(keys), options);
   },
 
   /** Send a native key-up event without checking local state. */
-  rawUp(keys: KeyInput) {
-    loadNative().keyboardReleaseKeys(keyList(keys));
+  rawUp(keys: KeyInput, options?: KeyboardTapOptions) {
+    callKeyboardReleaseKeys(keyList(keys), options);
   },
 
   /** Press modifiers, tap the final key, then release the modifiers. */
-  hotkey(keys: KeyName[]) {
+  hotkey(keys: KeyName[], options?: KeyboardTapOptions) {
     if (keys.length === 0) return;
     if (keys.length === 1) {
-      keyboard.tap(keys[0]);
+      keyboard.tap(keys[0], options);
       return;
     }
     const modifiers = keys.slice(0, -1);
     const key = keys[keys.length - 1];
-    keyboard.down(modifiers);
+    keyboard.down(modifiers, options);
     try {
-      keyboard.tap(key);
+      keyboard.tap(key, options);
     } finally {
-      keyboard.up(modifiers);
+      keyboard.up(modifiers, options);
     }
   },
 
   /** @param config.autoDelayMs Delay between key events. */
   setConfig(config: { autoDelayMs?: number }) {
+    keyboardDefaultAutoDelayMs = config.autoDelayMs ?? 10;
     loadNative().setKeyboardConfig({ autoDelayMs: config.autoDelayMs });
   },
 };

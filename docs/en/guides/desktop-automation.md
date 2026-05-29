@@ -68,7 +68,8 @@ mouse.move(200, 300);
 mouse.click("left");
 mouse.tap(200, 300);
 
-keyboard.write("hello");
+keyboard.writeText("hello", { autoDelayMs: 50 });
+keyboard.tap(1);
 keyboard.hotkey(["Ctrl", "V"]);
 
 clipboard.set("text from spotterjs");

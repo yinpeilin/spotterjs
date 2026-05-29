@@ -32,6 +32,7 @@ vi.mock("@spotterjs/core", () => ({
     listApps: vi.fn(),
   },
   keyboard: {
+    tap: vi.fn(),
     write: vi.fn(),
   },
   mouse: {
@@ -297,5 +298,46 @@ describe("desktop_capture_screen", () => {
     expect(() => captureSchema.detail.parse("low")).toThrow();
     expect(() => mouseSchema.x.parse(Number.NaN)).toThrow();
     expect(() => dumpSchema.maxDepth.parse(101)).toThrow();
+  });
+});
+
+describe("desktop keyboard tools", () => {
+  it("passes text typing options through to core keyboard.write", async () => {
+    const { keyboard } = await import("@spotterjs/core");
+    const handler = registerTools().get("desktop_keyboard_type");
+
+    await handler!({
+      text: "hello",
+      autoDelayMs: 30,
+      mode: "native",
+      restoreClipboard: false,
+    });
+
+    expect(keyboard.write).toHaveBeenCalledWith("hello", {
+      autoDelayMs: 30,
+      mode: "native",
+      restoreClipboard: false,
+    });
+  });
+
+  it("registers desktop_keyboard_tap for named and numeric keys", async () => {
+    const { keyboard } = await import("@spotterjs/core");
+    const handler = registerTools().get("desktop_keyboard_tap");
+
+    await handler!({ key: "Enter", autoDelayMs: 10 });
+    await handler!({ key: "1" });
+    await handler!({ key: 1 });
+
+    expect(keyboard.tap).toHaveBeenNthCalledWith(1, "Enter", { autoDelayMs: 10 });
+    expect(keyboard.tap).toHaveBeenNthCalledWith(2, "1", { autoDelayMs: undefined });
+    expect(keyboard.tap).toHaveBeenNthCalledWith(3, 1, { autoDelayMs: undefined });
+  });
+
+  it("rejects out-of-range numeric key schema values", () => {
+    const schema = registerToolEntries().get("desktop_keyboard_tap")!.config.inputSchema;
+
+    expect(() => schema.shape.key.parse(10)).toThrow();
+    expect(schema.shape.key.parse(0)).toBe(0);
+    expect(schema.shape.key.parse("Enter")).toBe("Enter");
   });
 });

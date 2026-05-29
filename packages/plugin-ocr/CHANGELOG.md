@@ -1,5 +1,14 @@
 # @spotterjs/plugin-ocr
 
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [5537232]
+- Updated dependencies
+  - @spotterjs/base@1.0.3
+  - @spotterjs/core@1.0.3
+
 ## 1.0.1
 
 ### Patch Changes

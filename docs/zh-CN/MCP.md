@@ -82,7 +82,7 @@ Use `host_shell_info` to query the active shell and syntax hint.
 | `desktop_capture_active` | Capture foreground window as a workspace PNG file path |
 | `desktop_focus_window` | Focus window |
 | `desktop_mouse_move` / `desktop_mouse_click` / `desktop_mouse_tap` | Mouse input |
-| `desktop_keyboard_type` | Type text |
+| `desktop_keyboard_type` / `desktop_keyboard_tap` | Type text or tap a named/number key |
 | `desktop_clipboard_get` / `desktop_clipboard_set` | Clipboard |
 | `desktop_find_template` | Template match on screen |
 

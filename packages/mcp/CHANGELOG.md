@@ -1,5 +1,20 @@
 # @spotterjs/mcp
 
+## 1.0.3
+
+### Minor Changes
+
+- Add per-call keyboard delay options, numeric key taps, clipboard-backed text
+  writing, and the `desktop_keyboard_tap` MCP tool.
+
+### Patch Changes
+
+- Updated dependencies [5537232]
+- Updated dependencies
+  - @spotterjs/core@1.0.3
+  - @spotterjs/plugin-android@1.0.3
+  - @spotterjs/plugin-ocr@1.0.3
+
 ## 1.0.1
 
 ### Patch Changes
