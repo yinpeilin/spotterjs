@@ -47,3 +47,12 @@ Enable shell, Android, or accessibility tools explicitly:
 
 Full configuration, tool lists, response shapes, and security policy are
 documented in [docs/en/MCP.md](../../docs/en/MCP.md).
+
+Desktop OCR, template matching, mouse click/tap, and accessibility tap tools
+also support opt-in `debugImage: true` responses. These return annotated
+workspace PNGs plus normalized `matchScore` diagnostics for matching results.
+
+Android companion tools cache `android_connect` sessions by `deviceId` (default:
+`"default"`), so follow-up tools can use the short `{ "deviceId": "default" }`
+shape after pairing. The legacy `{ "url": "...", "sessionToken": "..." }`
+shape remains supported for one-shot calls.

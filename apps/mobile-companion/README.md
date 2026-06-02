@@ -106,6 +106,16 @@ Success:
 Later `heartbeat` and `status` messages must include the returned
 `sessionToken`.
 
+Launch an app by package name:
+
+```json
+{
+  "type": "launchApp",
+  "sessionToken": "<token>",
+  "packageName": "com.android.settings"
+}
+```
+
 Multi-touch gesture:
 
 ```json

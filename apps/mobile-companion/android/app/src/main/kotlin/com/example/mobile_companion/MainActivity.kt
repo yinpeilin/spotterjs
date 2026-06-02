@@ -158,7 +158,8 @@ private class CompanionBridge(private val context: Context) {
                 ::text,
                 { key -> SpotterAccessibilityService.keyevent(key) },
                 { SpotterAccessibilityService.back() },
-                { SpotterAccessibilityService.home() }
+                { SpotterAccessibilityService.home() },
+                ::launchApp
             ).also { it.start() }
         }
         running = true
@@ -182,6 +183,7 @@ private class CompanionBridge(private val context: Context) {
 
     fun regeneratePairingCode() {
         pairingCode = nextPairingCode()
+        server?.invalidateSessions("pairing code regenerated")
         connectedClient = null
         addEvent("pairing code regenerated")
     }
@@ -223,6 +225,7 @@ private class CompanionBridge(private val context: Context) {
                 "notifications" to notifications,
                 "displayInfo" to true,
                 "currentApp" to true,
+                "launchApp" to true,
                 "multiTouch" to accessibility,
                 "tap" to accessibility,
                 "swipe" to accessibility,
@@ -272,6 +275,18 @@ private class CompanionBridge(private val context: Context) {
     private fun currentApp(): Map<String, Any?> {
         return mapOf(
             "packageName" to SpotterAccessibilityService.lastEventPackage
+        )
+    }
+
+    private fun launchApp(packageName: String): Map<String, Any?> {
+        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            ?: throw IllegalArgumentException("launchable app not found: $packageName")
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        context.startActivity(intent)
+        addEvent("launched app $packageName")
+        return mapOf(
+            "packageName" to packageName,
+            "activity" to intent.component?.className
         )
     }
 

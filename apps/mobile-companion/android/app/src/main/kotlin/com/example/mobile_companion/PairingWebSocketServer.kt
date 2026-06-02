@@ -24,12 +24,16 @@ class PairingWebSocketServer(
     private val text: (String) -> Unit,
     private val keyevent: (String) -> Unit,
     private val back: () -> Unit,
-    private val home: () -> Unit
+    private val home: () -> Unit,
+    private val launchApp: (String) -> Map<String, Any?>
 ) : WebSocketServer(InetSocketAddress("0.0.0.0", port)) {
     private val random = SecureRandom()
     private val sessions = ConcurrentHashMap<WebSocket, String>()
+    private val sessionTokens = ConcurrentHashMap<String, String>()
+    private val activeConnections = ConcurrentHashMap.newKeySet<WebSocket>()
 
     override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
+        activeConnections.add(conn)
         conn.send(
             json(
                 "type" to "hello",
@@ -42,6 +46,7 @@ class PairingWebSocketServer(
 
     override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) {
         sessions.remove(conn)
+        activeConnections.remove(conn)
         onEvent("websocket closed: ${reason.ifBlank { code.toString() }}")
     }
 
@@ -113,6 +118,14 @@ class PairingWebSocketServer(
                     home()
                     conn.send(json("type" to "ok").toString())
                 }
+                "launchApp" -> authenticated(conn, request) {
+                    conn.send(
+                        json(
+                            "type" to "appLaunched",
+                            *launchApp(readString(request, "packageName")).toPairs()
+                        ).toString()
+                    )
+                }
                 else -> conn.send(error("UNKNOWN_MESSAGE", "unsupported message type").toString())
             }
         } catch (error: Throwable) {
@@ -131,6 +144,16 @@ class PairingWebSocketServer(
 
     override fun onStart() {
         onEvent("websocket server listening on $address")
+    }
+
+    fun invalidateSessions(reason: String) {
+        sessionTokens.clear()
+        sessions.clear()
+        val connections = activeConnections.toList()
+        for (connection in connections) {
+            connection.close(1008, reason)
+        }
+        onEvent("sessions invalidated: $reason")
     }
 
     private fun pair(conn: WebSocket, request: JSONObject) {
@@ -153,8 +176,9 @@ class PairingWebSocketServer(
         }
 
         val token = sessionToken()
-        sessions[conn] = token
         val clientId = request.optString("clientId", conn.remoteSocketAddress.hostString)
+        sessionTokens[token] = clientId
+        sessions[conn] = token
         onPaired(clientId)
         conn.send(
             json(
@@ -172,11 +196,16 @@ class PairingWebSocketServer(
         action: () -> Unit
     ) {
         val token = request.optString("sessionToken")
-        if (sessions[conn] != token) {
-            conn.send(error("SESSION_UNAUTHORIZED", "message requires a valid sessionToken").toString())
+        if (sessions[conn] == token) {
+            action()
             return
         }
-        action()
+        if (token.isNotBlank() && sessionTokens.containsKey(token)) {
+            sessions[conn] = token
+            action()
+            return
+        }
+        conn.send(error("SESSION_UNAUTHORIZED", "message requires a valid sessionToken").toString())
     }
 
     private fun sessionToken(): String {
@@ -230,6 +259,14 @@ private fun point(node: JSONObject?, label: String): Pair<Int, Int> {
 
 private fun point(node: JSONObject, xKey: String, yKey: String): Pair<Int, Int> {
     return readInt(node, xKey) to readInt(node, yKey)
+}
+
+private fun readString(node: JSONObject, key: String): String {
+    val value = node.opt(key)
+    if (value !is String || value.isBlank()) {
+        throw IllegalArgumentException("$key must be a non-empty string")
+    }
+    return value
 }
 
 private fun readGestures(request: JSONObject): List<GestureStrokeSpec> {

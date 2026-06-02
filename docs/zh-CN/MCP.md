@@ -149,15 +149,22 @@ With `SPOTTERJS_A11Y=1`:
 Enable with `SPOTTERJS_ANDROID=1`. Pair with the Spotter mobile companion app
 over WebSocket, then reuse the returned session token for later calls.
 
+`android_connect` caches the connected phone in the MCP server and returns a
+`deviceId` (`"default"` unless provided). Later Android tools accept either
+`{ "deviceId": "default" }` or the legacy `{ "url": "...", "sessionToken": "..." }`
+shape.
+
 | Tool | Description |
 |------|-------------|
 | `android_connect` | Pair with a companion app or reuse a session token |
+| `android_disconnect` | Close a cached companion session |
 | `android_heartbeat` | Check the companion session |
 | `android_status` | Fetch companion state |
 | `android_display_info` | Get Android display size and density |
 | `android_current_app` | Report the focused Android package/activity |
+| `android_launch_app` | Launch an app by Android package name |
 | `android_capture_screen` | Not implemented until companion frame capture exists |
-| `android_tap` / `android_swipe` | Touch input |
+| `android_tap` / `android_swipe` / `android_gesture` | Touch input |
 | `android_text` | Type text through the companion app |
 | `android_keyevent` / `android_back` / `android_home` | Android key events |
 | `android_dump_tree` | Dump Android accessibility tree |
@@ -172,7 +179,28 @@ Element tools also return `android-device` coordinate space. Queries can use
 `focusable`.
 
 `android_wait_for_element` uses `waitTimeoutMs` for the UI element wait timeout.
-The optional `timeoutMs` parameter remains reserved for WebSocket request timeout.
+It also accepts optional `pollMs` and `maxDepth`. The optional `timeoutMs`
+parameter remains reserved for WebSocket request timeout.
+
+Example loop:
+
+```json
+{ "url": "ws://192.168.1.23:17341", "code": "123456" }
+```
+
+```json
+{ "deviceId": "default", "packageName": "com.android.settings" }
+```
+
+```json
+{
+  "deviceId": "default",
+  "textContains": "Settings",
+  "waitTimeoutMs": 5000,
+  "pollMs": 250,
+  "maxDepth": 8
+}
+```
 
 For plugin-level examples and companion pairing, see
 [Android companion automation](./guides/android-companion.md).

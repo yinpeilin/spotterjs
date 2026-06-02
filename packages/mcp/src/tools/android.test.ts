@@ -13,10 +13,13 @@ const plugin = vi.hoisted(() => ({
     dumpTree: vi.fn(),
     tap: vi.fn(),
     swipe: vi.fn(),
+    gesture: vi.fn(),
     text: vi.fn(),
     keyevent: vi.fn(),
     back: vi.fn(),
     home: vi.fn(),
+    launchApp: vi.fn(),
+    close: vi.fn(),
   },
 }));
 
@@ -84,6 +87,7 @@ describe("android companion MCP tools", () => {
       timeoutMs: 1000,
     });
     expect(json).toEqual({
+      deviceId: "default",
       url: "ws://phone:17341",
       sessionToken: "token-1",
     });
@@ -105,9 +109,49 @@ describe("android companion MCP tools", () => {
     });
     expect(plugin.pair).not.toHaveBeenCalled();
     expect(json).toEqual({
+      deviceId: "default",
       url: "ws://phone:17341",
       sessionToken: "token-1",
     });
+  });
+
+  it("caches connected devices by deviceId for later tool calls", async () => {
+    plugin.device.status.mockResolvedValue({ running: true });
+    const tools = registerTools();
+
+    let json = parseToolJson(
+      await tools.get("android_connect")!({
+        deviceId: "phone",
+        url: "ws://phone:17341",
+        code: "123456",
+      })
+    );
+    expect(json).toEqual({
+      deviceId: "phone",
+      url: "ws://phone:17341",
+      sessionToken: "token-1",
+    });
+
+    json = parseToolJson(await tools.get("android_status")!({ deviceId: "phone" }));
+
+    expect(plugin.pair).toHaveBeenCalledTimes(1);
+    expect(plugin.connect).not.toHaveBeenCalled();
+    expect(plugin.device.status).toHaveBeenCalled();
+    expect(json).toEqual({ running: true });
+  });
+
+  it("disconnects cached devices", async () => {
+    const tools = registerTools();
+
+    await tools.get("android_connect")!({
+      deviceId: "phone",
+      url: "ws://phone:17341",
+      code: "123456",
+    });
+    const result = await tools.get("android_disconnect")!({ deviceId: "phone" });
+
+    expect(plugin.device.close).toHaveBeenCalled();
+    expect(result.content[0]?.text).toBe("ok");
   });
 
   it("uses the session token for status and heartbeat", async () => {
@@ -155,6 +199,19 @@ describe("android companion MCP tools", () => {
       to: { x: 3, y: 4 },
       durationMs: 200,
     });
+    await tools.get("android_gesture")!({
+      ...session,
+      strokes: [
+        {
+          points: [
+            { x: 10, y: 20 },
+            { x: 12, y: 22 },
+          ],
+          durationMs: 250,
+          startDelayMs: 5,
+        },
+      ],
+    });
     await tools.get("android_text")!({ ...session, text: "hello" });
     await tools.get("android_keyevent")!({ ...session, key: "BACK" });
     await tools.get("android_back")!(session);
@@ -166,6 +223,16 @@ describe("android companion MCP tools", () => {
       { x: 3, y: 4 },
       { durationMs: 200 }
     );
+    expect(plugin.device.gesture).toHaveBeenCalledWith([
+      {
+        points: [
+          { x: 10, y: 20 },
+          { x: 12, y: 22 },
+        ],
+        durationMs: 250,
+        startDelayMs: 5,
+      },
+    ]);
     expect(plugin.device.text).toHaveBeenCalledWith("hello");
     expect(plugin.device.keyevent).toHaveBeenCalledWith("BACK");
     expect(plugin.device.back).toHaveBeenCalled();
@@ -176,6 +243,27 @@ describe("android companion MCP tools", () => {
 
     json = parseToolJson(await tools.get("android_current_app")!(session));
     expect(json.packageName).toBe("com.example");
+  });
+
+  it("launches apps through the companion session", async () => {
+    plugin.device.launchApp.mockResolvedValue({
+      packageName: "com.android.settings",
+      activity: "com.android.settings.Settings",
+    });
+
+    const json = parseToolJson(
+      await registerTools().get("android_launch_app")!({
+        url: "ws://phone:17341",
+        sessionToken: "token-1",
+        packageName: "com.android.settings",
+      })
+    );
+
+    expect(plugin.device.launchApp).toHaveBeenCalledWith("com.android.settings");
+    expect(json).toEqual({
+      packageName: "com.android.settings",
+      activity: "com.android.settings.Settings",
+    });
   });
 
   it("dumps and queries accessibility tree nodes", async () => {
@@ -241,6 +329,45 @@ describe("android companion MCP tools", () => {
     );
     expect(plugin.device.text).toHaveBeenCalledWith("hello");
     expect(json.element.text).toBe("Search");
+  });
+
+  it("waits for elements with poll interval and max depth", async () => {
+    const element = {
+      text: "Settings",
+      resourceId: "android:id/title",
+      className: "android.widget.TextView",
+      packageName: "com.android.settings",
+      contentDescription: "",
+      clickable: true,
+      enabled: true,
+      checked: false,
+      selected: false,
+      scrollable: false,
+      focusable: true,
+      bounds: { left: 20, top: 30, width: 200, height: 60 },
+      center: { x: 120, y: 60 },
+      children: [],
+      depth: 1,
+      path: "0.0",
+    };
+    plugin.device.dumpTree
+      .mockResolvedValueOnce({ ...element, text: "", children: [], depth: 0, path: "0" })
+      .mockResolvedValueOnce({ ...element, text: "", children: [element], depth: 0, path: "0" });
+
+    const json = parseToolJson(
+      await registerTools().get("android_wait_for_element")!({
+        url: "ws://phone:17341",
+        sessionToken: "token-1",
+        text: "Settings",
+        waitTimeoutMs: 100,
+        pollMs: 0,
+        maxDepth: 5,
+      })
+    );
+
+    expect(plugin.device.dumpTree).toHaveBeenNthCalledWith(1, { maxDepth: 5 });
+    expect(plugin.device.dumpTree).toHaveBeenNthCalledWith(2, { maxDepth: 5 });
+    expect(json.element.text).toBe("Settings");
   });
 
   it("returns explicit MCP errors for unimplemented screen capture paths", async () => {

@@ -42,6 +42,7 @@ console.log(await phone.status());
 console.log(await phone.getDisplayInfo());
 console.log(await phone.currentApp());
 
+await phone.launchApp("com.android.settings");
 await phone.tap(320, 900);
 await phone.swipe({ x: 500, y: 1600 }, { x: 500, y: 500 }, { durationMs: 350 });
 await phone.text("hello");
@@ -77,6 +78,29 @@ depth、path 和 children。
 使用 `android_connect` 传 `{ "url": "...", "code": "..." }` 完成配对，或传
 `{ "url": "...", "sessionToken": "..." }` 复用已有 session。
 
+`android_connect` 会返回 `deviceId`，默认是 `"default"`。后续工具可以只传
+`{ "deviceId": "default" }`，也可以继续使用旧式 `{ "url": "...", "sessionToken": "..." }`。
+
+典型 MCP 闭环：
+
+```json
+{ "url": "ws://192.168.1.23:17341", "code": "123456" }
+```
+
+```json
+{ "deviceId": "default", "packageName": "com.android.settings" }
+```
+
+```json
+{
+  "deviceId": "default",
+  "textContains": "Settings",
+  "waitTimeoutMs": 5000,
+  "pollMs": 250,
+  "maxDepth": 8
+}
+```
+
 工具列表和请求形状见 [MCP Server](../MCP.md)。
 
 ## Smoke Test
@@ -88,6 +112,15 @@ npm run smoke:android
 ```
 
 如果要复用 token，设置 `SPOTTERJS_ANDROID_SESSION_TOKEN`。
+
+可选执行启动和元素等待演示：
+
+```powershell
+$env:SPOTTERJS_ANDROID_LAUNCH_PACKAGE = "com.android.settings"
+$env:SPOTTERJS_ANDROID_WAIT_TEXT_CONTAINS = "Settings"
+$env:SPOTTERJS_ANDROID_TAP_ELEMENT = "1"
+npm run smoke:android
+```
 
 ## 当前限制
 

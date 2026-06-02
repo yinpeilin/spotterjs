@@ -29,6 +29,8 @@ const samePhone = await android.connect({
   url: "ws://192.168.1.23:17341",
   sessionToken: phone.sessionToken,
 });
+
+await samePhone.launchApp("com.android.settings");
 ```
 
 ## Device API
@@ -37,6 +39,7 @@ const samePhone = await android.connect({
 - `status()`
 - `getDisplayInfo()`
 - `currentApp()`
+- `launchApp(packageName)`
 - `dumpTree({ maxDepth? })`
 - `tap(x, y)`
 - `swipe(from, to, { durationMs? })`

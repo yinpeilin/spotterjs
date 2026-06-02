@@ -193,6 +193,53 @@ describe("android companion websocket client", () => {
     device.close();
   });
 
+  it("launches apps with the authenticated session token", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2, requires: "pair" }));
+      socket.on("message", (raw) => {
+        const message = JSON.parse(String(raw)) as Json;
+        received.push(message);
+        if (message.type === "pair") {
+          socket.send(
+            JSON.stringify({
+              type: "paired",
+              protocolVersion: 2,
+              sessionToken: "token-launch",
+              state: {},
+            })
+          );
+          return;
+        }
+        if (message.type === "launchApp") {
+          socket.send(
+            JSON.stringify({
+              type: "appLaunched",
+              packageName: "com.android.settings",
+              activity: "com.android.settings.Settings",
+            })
+          );
+        }
+      });
+    });
+
+    const device = await android.pair({ url, code: "123456" });
+    const app = await device.launchApp("com.android.settings");
+
+    expect(received.slice(1)).toEqual([
+      {
+        type: "launchApp",
+        sessionToken: "token-launch",
+        packageName: "com.android.settings",
+      },
+    ]);
+    expect(app).toEqual({
+      packageName: "com.android.settings",
+      activity: "com.android.settings.Settings",
+    });
+
+    device.close();
+  });
+
   it("throws structured errors for companion error frames", async () => {
     server.on("connection", (socket) => {
       socket.send(JSON.stringify({ type: "hello", protocolVersion: 2, requires: "pair" }));
@@ -212,6 +259,73 @@ describe("android companion websocket client", () => {
       code: "PAIRING_CODE_INVALID",
       message: "pairing code is invalid",
     });
+  });
+
+  it("connects with an existing session token without pairing", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2, requires: "session" }));
+      socket.on("message", (raw) => {
+        const message = JSON.parse(String(raw)) as Json;
+        received.push(message);
+        socket.send(JSON.stringify({ type: "pong" }));
+      });
+    });
+
+    const device = await android.connect({
+      url,
+      sessionToken: "existing-token",
+    });
+
+    await device.heartbeat();
+
+    expect(received).toEqual([
+      { type: "heartbeat", sessionToken: "existing-token" },
+    ]);
+
+    device.close();
+  });
+
+  it("rejects non-object JSON companion frames as invalid messages", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify(["hello"]));
+    });
+
+    await expect(android.pair({ url, code: "123456" })).rejects.toMatchObject({
+      name: "AndroidCompanionError",
+      code: "ANDROID_COMPANION_INVALID_MESSAGE",
+    });
+  });
+
+  it("rejects unexpected response types during queued commands", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2, requires: "pair" }));
+      socket.on("message", (raw) => {
+        const message = JSON.parse(String(raw)) as Json;
+        received.push(message);
+        if (message.type === "pair") {
+          socket.send(
+            JSON.stringify({
+              type: "paired",
+              protocolVersion: 2,
+              sessionToken: "token-3",
+              state: {},
+            })
+          );
+          return;
+        }
+        socket.send(JSON.stringify({ type: "status", state: {} }));
+      });
+    });
+
+    const device = await android.pair({ url, code: "123456" });
+
+    await expect(device.heartbeat()).rejects.toMatchObject({
+      name: "AndroidCompanionError",
+      code: "ANDROID_COMPANION_INVALID_MESSAGE",
+      context: { responseType: "status" },
+    });
+
+    device.close();
   });
 
   it("times out when a response does not arrive", async () => {

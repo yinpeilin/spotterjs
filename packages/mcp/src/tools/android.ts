@@ -1,10 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { android } from "@spotterjs/plugin-android";
-import type { AndroidElementNode } from "@spotterjs/plugin-android";
+import type {
+  AndroidCompanionDevice,
+  AndroidElementNode,
+  AndroidGestureStroke,
+} from "@spotterjs/plugin-android";
 import type { CaptureArtifactDetail } from "../adapters/artifacts.js";
 import { json, ok, registerSafeTool } from "./results.js";
 
+const DEFAULT_DEVICE_ID = "default";
 const finiteNumberSchema = z.number().finite();
 const coordinateSchema = finiteNumberSchema.min(0);
 const timeoutMsSchema = finiteNumberSchema.min(0);
@@ -12,8 +17,10 @@ const positiveDurationMsSchema = finiteNumberSchema.min(0);
 const confidenceSchema = finiteNumberSchema.min(0).max(1);
 const maxDepthSchema = z.number().int().min(0).max(100);
 const captureDetailSchema = z.enum(["high", "original"]).optional();
+const deviceIdSchema = z.string().min(1).optional();
 
 const companionOptionsSchema = {
+  deviceId: deviceIdSchema,
   url: z.string(),
   sessionToken: z.string().optional(),
   code: z.string().optional(),
@@ -22,8 +29,10 @@ const companionOptionsSchema = {
 };
 
 const sessionSchema = {
-  ...companionOptionsSchema,
-  sessionToken: z.string(),
+  deviceId: deviceIdSchema,
+  url: z.string().optional(),
+  sessionToken: z.string().optional(),
+  timeoutMs: timeoutMsSchema.optional(),
 };
 
 const pointSchema = z.object({
@@ -77,6 +86,12 @@ const treeOptionsSchema = {
   maxDepth: maxDepthSchema.optional(),
 };
 
+const gestureStrokeSchema = z.object({
+  points: z.array(pointSchema).min(1),
+  durationMs: positiveDurationMsSchema.optional(),
+  startDelayMs: positiveDurationMsSchema.optional(),
+});
+
 const templateImageSchema = z.union([
   z.object({ path: z.string() }),
   z.object({
@@ -97,16 +112,8 @@ function withAndroidCoordinateSpace<T extends Record<string, unknown>>(payload: 
   };
 }
 
-function serialJson(device: { sessionToken: string; url: string }) {
-  return json({ sessionToken: device.sessionToken, url: device.url });
-}
-
-function device(args: { url: string; sessionToken: string; timeoutMs?: number }) {
-  return android.connect({
-    url: args.url,
-    sessionToken: args.sessionToken,
-    timeoutMs: args.timeoutMs,
-  });
+function serialJson(deviceId: string, device: { sessionToken: string; url: string }) {
+  return json({ deviceId, sessionToken: device.sessionToken, url: device.url });
 }
 
 function elementQuery(args: Record<string, unknown>) {
@@ -163,12 +170,12 @@ function matchesBoolean(value: boolean, expected: unknown): boolean {
 }
 
 async function waitForElement(
+  device: AndroidCompanionDevice,
   args: {
-    url: string;
-    sessionToken: string;
     timeoutMs?: number;
     waitTimeoutMs: number;
     pollMs?: number;
+    maxDepth?: number;
     [key: string]: unknown;
   }
 ): Promise<AndroidElementNode> {
@@ -177,8 +184,7 @@ async function waitForElement(
   const query = elementQuery(args);
   let lastCount = 0;
   while (Date.now() <= deadline) {
-    const d = await device(args);
-    const matches = findElements(await d.dumpTree(), query);
+    const matches = findElements(await device.dumpTree({ maxDepth: args.maxDepth }), query);
     lastCount = matches.length;
     const first = matches[0];
     if (first) return first;
@@ -188,6 +194,59 @@ async function waitForElement(
 }
 
 export function registerAndroidTools(server: McpServer): void {
+  type SessionArgs = {
+    deviceId?: string;
+    url?: string;
+    sessionToken?: string;
+    timeoutMs?: number;
+  };
+  const devices = new Map<string, AndroidCompanionDevice>();
+
+  function normalizeDeviceId(deviceId?: string): string {
+    return deviceId?.trim() || DEFAULT_DEVICE_ID;
+  }
+
+  function rememberDevice(deviceId: string, device: AndroidCompanionDevice): void {
+    devices.get(deviceId)?.close();
+    devices.set(deviceId, device);
+  }
+
+  async function resolveDevice(args: SessionArgs): Promise<{
+    device: AndroidCompanionDevice;
+    cached: boolean;
+  }> {
+    const deviceId = normalizeDeviceId(args.deviceId);
+    const cached = devices.get(deviceId);
+    if (cached) return { device: cached, cached: true };
+
+    if (args.url && args.sessionToken) {
+      return {
+        device: await android.connect({
+          url: args.url,
+          sessionToken: args.sessionToken,
+          timeoutMs: args.timeoutMs,
+        }),
+        cached: false,
+      };
+    }
+
+    throw new Error(
+      `Android device session not found: ${deviceId}; call android_connect first or pass url/sessionToken`
+    );
+  }
+
+  async function withDevice<T>(
+    args: SessionArgs,
+    action: (device: AndroidCompanionDevice) => Promise<T>
+  ): Promise<T> {
+    const resolved = await resolveDevice(args);
+    try {
+      return await action(resolved.device);
+    } finally {
+      if (!resolved.cached) resolved.device.close();
+    }
+  }
+
   registerSafeTool(
     server,
     "android_connect",
@@ -196,22 +255,25 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(companionOptionsSchema).shape,
     },
     async (args: {
+      deviceId?: string;
       url: string;
       sessionToken?: string;
       code?: string;
       clientId?: string;
       timeoutMs?: number;
     }) => {
+      const deviceId = normalizeDeviceId(args.deviceId);
       if (args.sessionToken) {
         const device = await android.connect({
           url: args.url,
           sessionToken: args.sessionToken,
           timeoutMs: args.timeoutMs,
         });
-        return serialJson(device);
+        rememberDevice(deviceId, device);
+        return serialJson(deviceId, device);
       }
       if (!args.code) {
-        return json({ url: args.url, needsPairing: true });
+        return json({ deviceId, url: args.url, needsPairing: true });
       }
       const device = await android.pair({
         url: args.url,
@@ -219,7 +281,23 @@ export function registerAndroidTools(server: McpServer): void {
         clientId: args.clientId,
         timeoutMs: args.timeoutMs,
       });
-      return serialJson(device);
+      rememberDevice(deviceId, device);
+      return serialJson(deviceId, device);
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_disconnect",
+    {
+      description: "Close a cached Android companion session",
+      inputSchema: z.object({ deviceId: deviceIdSchema }).shape,
+    },
+    async (args: { deviceId?: string }) => {
+      const deviceId = normalizeDeviceId(args.deviceId);
+      devices.get(deviceId)?.close();
+      devices.delete(deviceId);
+      return ok();
     }
   );
 
@@ -231,12 +309,12 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(sessionSchema).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
     }) => {
-      const d = await device(args);
-      await d.heartbeat();
+      await withDevice(args, (device) => device.heartbeat());
       return ok();
     }
   );
@@ -249,10 +327,11 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(sessionSchema).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
-    }) => json(await (await device(args)).status())
+    }) => json(await withDevice(args, (device) => device.status()))
   );
 
   registerSafeTool(
@@ -263,10 +342,11 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(sessionSchema).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
-    }) => json(await (await device(args)).getDisplayInfo())
+    }) => json(await withDevice(args, (device) => device.getDisplayInfo()))
   );
 
   registerSafeTool(
@@ -277,10 +357,27 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(sessionSchema).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
-    }) => json(await (await device(args)).currentApp())
+    }) => json(await withDevice(args, (device) => device.currentApp()))
+  );
+
+  registerSafeTool(
+    server,
+    "android_launch_app",
+    {
+      description: "Launch an Android app by package name through the companion app",
+      inputSchema: z.object({ ...sessionSchema, packageName: z.string() }).shape,
+    },
+    async (args: {
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
+      packageName: string;
+      timeoutMs?: number;
+    }) => json(await withDevice(args, (device) => device.launchApp(args.packageName)))
   );
 
   registerSafeTool(
@@ -291,13 +388,15 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object({ ...sessionSchema, ...treeOptionsSchema }).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
       maxDepth?: number;
     }) => {
-      const d = await device(args);
-      const tree = await d.dumpTree({ maxDepth: args.maxDepth });
+      const tree = await withDevice(args, (device) =>
+        device.dumpTree({ maxDepth: args.maxDepth })
+      );
       return json(withAndroidCoordinateSpace({ tree }));
     }
   );
@@ -310,13 +409,14 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object({ ...sessionSchema, x: coordinateSchema, y: coordinateSchema }).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       x: number;
       y: number;
       timeoutMs?: number;
     }) => {
-      await (await device(args)).tap(args.x, args.y);
+      await withDevice(args, (device) => device.tap(args.x, args.y));
       return ok();
     }
   );
@@ -336,16 +436,36 @@ export function registerAndroidTools(server: McpServer): void {
         .shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       from: { x: number; y: number };
       to: { x: number; y: number };
       durationMs?: number;
       timeoutMs?: number;
     }) => {
-      await (await device(args)).swipe(args.from, args.to, {
+      await withDevice(args, (device) => device.swipe(args.from, args.to, {
         durationMs: args.durationMs,
-      });
+      }));
+      return ok();
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_gesture",
+    {
+      description: "Run a multi-stroke Android gesture through the companion app",
+      inputSchema: z.object({ ...sessionSchema, strokes: z.array(gestureStrokeSchema).min(1) }).shape,
+    },
+    async (args: {
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
+      strokes: AndroidGestureStroke[];
+      timeoutMs?: number;
+    }) => {
+      await withDevice(args, (device) => device.gesture(args.strokes));
       return ok();
     }
   );
@@ -358,12 +478,13 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object({ ...sessionSchema, text: z.string() }).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       text: string;
       timeoutMs?: number;
     }) => {
-      await (await device(args)).text(args.text);
+      await withDevice(args, (device) => device.text(args.text));
       return ok();
     }
   );
@@ -376,12 +497,13 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object({ ...sessionSchema, key: z.union([z.string(), finiteNumberSchema]) }).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       key: string | number;
       timeoutMs?: number;
     }) => {
-      await (await device(args)).keyevent(args.key);
+      await withDevice(args, (device) => device.keyevent(args.key));
       return ok();
     }
   );
@@ -394,11 +516,12 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(sessionSchema).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
     }) => {
-      await (await device(args)).back();
+      await withDevice(args, (device) => device.back());
       return ok();
     }
   );
@@ -411,11 +534,12 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object(sessionSchema).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
     }) => {
-      await (await device(args)).home();
+      await withDevice(args, (device) => device.home());
       return ok();
     }
   );
@@ -430,15 +554,15 @@ export function registerAndroidTools(server: McpServer): void {
         .shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
       [key: string]: unknown;
     }) => {
-      const d = await device(args);
-      const tree = await d.dumpTree({
+      const tree = await withDevice(args, (device) => device.dumpTree({
         maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
-      });
+      }));
       const element = findElements(tree, elementQuery(args))[0];
       if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
       return json(withAndroidCoordinateSpace({ element }));
@@ -454,18 +578,23 @@ export function registerAndroidTools(server: McpServer): void {
         .object({
           ...sessionSchema,
           ...elementQuerySchema,
+          ...treeOptionsSchema,
           waitTimeoutMs: timeoutMsSchema,
+          pollMs: timeoutMsSchema.optional(),
         })
         .shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
       waitTimeoutMs: number;
+      pollMs?: number;
+      maxDepth?: number;
       [key: string]: unknown;
     }) => {
-      const element = await waitForElement(args);
+      const element = await withDevice(args, (device) => waitForElement(device, args));
       return json(withAndroidCoordinateSpace({ element }));
     }
   );
@@ -480,19 +609,21 @@ export function registerAndroidTools(server: McpServer): void {
         .shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
       [key: string]: unknown;
     }) => {
-      const d = await device(args);
-      const tree = await d.dumpTree({
-        maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
+      return withDevice(args, async (device) => {
+        const tree = await device.dumpTree({
+          maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
+        });
+        const element = findElements(tree, elementQuery(args))[0];
+        if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
+        await device.tap(element.center.x, element.center.y);
+        return json(withAndroidCoordinateSpace({ element }));
       });
-      const element = findElements(tree, elementQuery(args))[0];
-      if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
-      await d.tap(element.center.x, element.center.y);
-      return json(withAndroidCoordinateSpace({ element }));
     }
   );
 
@@ -511,21 +642,23 @@ export function registerAndroidTools(server: McpServer): void {
         .shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       textToType: string;
       timeoutMs?: number;
       [key: string]: unknown;
     }) => {
-      const d = await device(args);
-      const tree = await d.dumpTree({
+      return withDevice(args, async (device) => {
+        const tree = await device.dumpTree({
         maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
       });
-      const element = findElements(tree, elementQuery(args))[0];
-      if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
-      await d.tap(element.center.x, element.center.y);
-      await d.text(args.textToType);
-      return json(withAndroidCoordinateSpace({ element }));
+        const element = findElements(tree, elementQuery(args))[0];
+        if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
+        await device.tap(element.center.x, element.center.y);
+        await device.text(args.textToType);
+        return json(withAndroidCoordinateSpace({ element }));
+      });
     }
   );
 
@@ -544,8 +677,9 @@ export function registerAndroidTools(server: McpServer): void {
         .shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       image: z.infer<typeof templateImageSchema>;
       all?: boolean;
       timeoutMs?: number;
@@ -567,8 +701,9 @@ export function registerAndroidTools(server: McpServer): void {
       inputSchema: z.object({ ...sessionSchema, detail: captureDetailSchema }).shape,
     },
     async (args: {
-      url: string;
-      sessionToken: string;
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
       timeoutMs?: number;
       detail?: CaptureArtifactDetail;
     }) => {

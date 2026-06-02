@@ -45,6 +45,7 @@ console.log(await phone.status());
 console.log(await phone.getDisplayInfo());
 console.log(await phone.currentApp());
 
+await phone.launchApp("com.android.settings");
 await phone.tap(320, 900);
 await phone.swipe({ x: 500, y: 1600 }, { x: 500, y: 500 }, { durationMs: 350 });
 await phone.text("hello");
@@ -80,6 +81,30 @@ Enable Android tools in the MCP server:
 Use `android_connect` with `{ "url": "...", "code": "..." }` to pair, or with
 `{ "url": "...", "sessionToken": "..." }` to reuse an existing session.
 
+`android_connect` returns a `deviceId` (`"default"` unless provided). Later
+tools can pass only `{ "deviceId": "default" }`, while the old
+`{ "url": "...", "sessionToken": "..." }` shape remains supported.
+
+Typical MCP loop:
+
+```json
+{ "url": "ws://192.168.1.23:17341", "code": "123456" }
+```
+
+```json
+{ "deviceId": "default", "packageName": "com.android.settings" }
+```
+
+```json
+{
+  "deviceId": "default",
+  "textContains": "Settings",
+  "waitTimeoutMs": 5000,
+  "pollMs": 250,
+  "maxDepth": 8
+}
+```
+
 Tool names and request shapes are documented in [MCP server](../MCP.md).
 
 ## Smoke Test
@@ -92,6 +117,15 @@ npm run smoke:android
 
 To reuse a token instead of pairing again, set
 `SPOTTERJS_ANDROID_SESSION_TOKEN`.
+
+Optionally run a launch and element-wait demo:
+
+```powershell
+$env:SPOTTERJS_ANDROID_LAUNCH_PACKAGE = "com.android.settings"
+$env:SPOTTERJS_ANDROID_WAIT_TEXT_CONTAINS = "Settings"
+$env:SPOTTERJS_ANDROID_TAP_ELEMENT = "1"
+npm run smoke:android
+```
 
 ## Current Limits
 

@@ -98,6 +98,7 @@ export interface AndroidCompanionDevice {
   keyevent(key: string | number): Promise<void>;
   back(): Promise<void>;
   home(): Promise<void>;
+  launchApp(packageName: string): Promise<AndroidCurrentApp>;
   getDisplayInfo(): Promise<AndroidDisplayInfo>;
   currentApp(): Promise<AndroidCurrentApp>;
 }
@@ -313,6 +314,17 @@ class CompanionDevice implements AndroidCompanionDevice {
 
   home(): Promise<void> {
     return this.keyevent("HOME");
+  }
+
+  async launchApp(packageName: string): Promise<AndroidCurrentApp> {
+    const response = await this.request(
+      { type: "launchApp", sessionToken: this.sessionToken, packageName },
+      "appLaunched"
+    );
+    return {
+      packageName: readOptionalString(response, "packageName"),
+      activity: readOptionalString(response, "activity"),
+    };
   }
 
   async getDisplayInfo(): Promise<AndroidDisplayInfo> {

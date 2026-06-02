@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 class PairingWebSocketServerTest {
     @Test
     fun acceptsCurrentPairingCodeWithoutTimerExpiry() {
-        withServer(isPairingCodeValid = { it == "123456" }) { port, pairedClients ->
+        withServer(isPairingCodeValid = { it == "123456" }) { port, pairedClients, _ ->
             TestClient(URI("ws://127.0.0.1:$port")).use { client ->
                 assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
 
@@ -39,7 +39,7 @@ class PairingWebSocketServerTest {
 
     @Test
     fun rejectsOnlyInvalidPairingCodes() {
-        withServer(isPairingCodeValid = { it == "123456" }) { port, _ ->
+        withServer(isPairingCodeValid = { it == "123456" }) { port, _, _ ->
             TestClient(URI("ws://127.0.0.1:$port")).use { client ->
                 assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
 
@@ -67,7 +67,7 @@ class PairingWebSocketServerTest {
             isPairingCodeValid = { it == "123456" },
             text = { textCommands.add(it) },
             gesture = { gestures.add(it) }
-        ) { port, _ ->
+        ) { port, _, _ ->
             TestClient(URI("ws://127.0.0.1:$port")).use { client ->
                 assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
                 assertEquals("hello", client.nextJson().getString("type"))
@@ -142,8 +142,103 @@ class PairingWebSocketServerTest {
     }
 
     @Test
+    fun reusesSessionTokenOnNewWebSocketConnection() {
+        withServer(isPairingCodeValid = { it == "123456" }) { port, _, _ ->
+            val token = TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "pair",
+                    "protocolVersion" to 2,
+                    "clientId" to "desktop-dev",
+                    "code" to "123456"
+                )
+                client.nextJson().getString("sessionToken")
+            }
+
+            TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "heartbeat",
+                    "sessionToken" to token
+                )
+                assertEquals("pong", client.nextJson().getString("type"))
+            }
+        }
+    }
+
+    @Test
+    fun invalidatesSessionTokensOnRequest() {
+        withServer(isPairingCodeValid = { it == "123456" }) { port, _, server ->
+            val token = TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "pair",
+                    "protocolVersion" to 2,
+                    "clientId" to "desktop-dev",
+                    "code" to "123456"
+                )
+                client.nextJson().getString("sessionToken")
+            }
+
+            server.invalidateSessions("test invalidation")
+
+            TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "heartbeat",
+                    "sessionToken" to token
+                )
+                val error = client.nextJson()
+                assertEquals("error", error.getString("type"))
+                assertEquals("SESSION_UNAUTHORIZED", error.getString("code"))
+            }
+        }
+    }
+
+    @Test
+    fun routesLaunchAppCommand() {
+        val launchedPackages = LinkedBlockingQueue<String>()
+        withServer(
+            isPairingCodeValid = { it == "123456" },
+            launchApp = { packageName ->
+                launchedPackages.add(packageName)
+                mapOf(
+                    "packageName" to packageName,
+                    "activity" to "com.android.settings.Settings"
+                )
+            }
+        ) { port, _, _ ->
+            TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "pair",
+                    "protocolVersion" to 2,
+                    "clientId" to "desktop-dev",
+                    "code" to "123456"
+                )
+                val token = client.nextJson().getString("sessionToken")
+
+                client.sendJson(
+                    "type" to "launchApp",
+                    "sessionToken" to token,
+                    "packageName" to "com.android.settings"
+                )
+                val launched = client.nextJson()
+                assertEquals("appLaunched", launched.getString("type"))
+                assertEquals("com.android.settings", launched.getString("packageName"))
+                assertEquals("com.android.settings", launchedPackages.poll(2, TimeUnit.SECONDS))
+            }
+        }
+    }
+
+    @Test
     fun rejectsUnsupportedProtocolVersion() {
-        withServer(isPairingCodeValid = { it == "123456" }) { port, _ ->
+        withServer(isPairingCodeValid = { it == "123456" }) { port, _, _ ->
             TestClient(URI("ws://127.0.0.1:$port")).use { client ->
                 assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
                 assertEquals("hello", client.nextJson().getString("type"))
@@ -162,9 +257,10 @@ class PairingWebSocketServerTest {
 
     private fun withServer(
         isPairingCodeValid: (String) -> Boolean,
-        test: (Int, LinkedBlockingQueue<String>) -> Unit,
+        test: (Int, LinkedBlockingQueue<String>, PairingWebSocketServer) -> Unit,
         text: (String) -> Unit = {},
-        gesture: (List<GestureStrokeSpec>) -> Unit = {}
+        gesture: (List<GestureStrokeSpec>) -> Unit = {},
+        launchApp: (String) -> Map<String, Any?> = { mapOf("packageName" to it) }
     ) {
         val port = freePort()
         val pairedClients = LinkedBlockingQueue<String>()
@@ -189,13 +285,14 @@ class PairingWebSocketServerTest {
             text,
             { _ -> },
             {},
-            {}
+            {},
+            launchApp
         )
 
         try {
             server.start()
             waitForServer(events)
-            test(port, pairedClients)
+            test(port, pairedClients, server)
         } finally {
             server.stop(1000)
         }
