@@ -117,11 +117,29 @@ mod tests {
     }
 
     #[test]
+    fn clamp_region_keeps_partial_overlap() {
+        let r = Region {
+            left: -5,
+            top: 8,
+            width: 12,
+            height: 10,
+        };
+        let c = r.clamp_to_screen(20, 12);
+        assert_eq!(c.left, 0);
+        assert_eq!(c.top, 8);
+        assert_eq!(c.width, 7);
+        assert_eq!(c.height, 4);
+    }
+
+    #[test]
     fn window_id_from_decimal_and_hex() {
         assert_eq!(WindowId::from_str("123").map(|w| w.0), Some(123));
+        assert_eq!(WindowId::from_str(" 123 ").map(|w| w.0), Some(123));
         assert_eq!(WindowId::from_str("0x1A").map(|w| w.0), Some(26));
         assert_eq!(WindowId::from_str("0X1a").map(|w| w.0), Some(26));
+        assert_eq!(WindowId(26).to_hex(), "0x1A");
         assert!(WindowId::from_str("not-a-id").is_none());
+        assert!(WindowId::from_str("").is_none());
     }
 
     #[test]
@@ -141,5 +159,16 @@ mod tests {
             height: 11,
         };
         assert_eq!(odd.center(), (5, 5));
+    }
+
+    #[test]
+    fn match_options_defaults_are_stable() {
+        let opts = MatchOptions::default();
+        assert_eq!(opts.confidence, 0.9);
+        assert!(opts.search_region.is_none());
+        assert!(!opts.multi_scale);
+        assert_eq!(opts.scale_min, 0.8);
+        assert_eq!(opts.scale_max, 1.2);
+        assert_eq!(opts.scale_step, 0.1);
     }
 }

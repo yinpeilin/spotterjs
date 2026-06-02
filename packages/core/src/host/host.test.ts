@@ -17,6 +17,56 @@ describe("host", () => {
     expect(host.readFile("a.txt")).toBe("hello");
   });
 
+  it("reads raw buffers and reports directory metadata", () => {
+    host.writeFile("nested/bin.dat", Buffer.from([1, 2, 3]));
+    host.writeFile("nested/readme.txt", "hello");
+
+    const raw = host.readFile("nested/bin.dat", { encoding: null });
+    const entries = host.listDir("nested");
+    const meta = host.stat("nested/readme.txt");
+
+    expect(Buffer.isBuffer(raw)).toBe(true);
+    expect([...Buffer.from(raw as Buffer)]).toEqual([1, 2, 3]);
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "bin.dat",
+          path: "nested/bin.dat",
+          isFile: true,
+          isDirectory: false,
+          size: 3,
+        }),
+        expect.objectContaining({
+          name: "readme.txt",
+          path: "nested/readme.txt",
+          isFile: true,
+          isDirectory: false,
+          size: 5,
+        }),
+      ])
+    );
+    expect(meta).toMatchObject({
+      path: "nested/readme.txt",
+      isFile: true,
+      isDirectory: false,
+      size: 5,
+    });
+  });
+
+  it("rejects writes to denylisted filenames", () => {
+    expect(() => host.writeFile(".env", "SECRET=1")).toThrow(HostPathError);
+
+    try {
+      host.writeFile(".env", "SECRET=1");
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: "HostPathError",
+        code: "HOST_WRITE_DENIED",
+        context: { basename: ".env" },
+      });
+    }
+  });
+
   it("rejects path outside workspace", () => {
     expect(() => host.readFile("../../../etc/passwd")).toThrow(HostPathError);
     try {
@@ -38,6 +88,13 @@ describe("host", () => {
     await expect(
       host.exec("echo should-not-run", { cwd: path.dirname(tmp) })
     ).rejects.toThrow(HostPathError);
+  });
+
+  it("rejects shell execution when disabled", async () => {
+    await expect(host.exec("echo no-shell")).rejects.toMatchObject({
+      name: "HostPathError",
+      code: "HOST_SHELL_DISABLED",
+    });
   });
 
   it("rejects shell output that exceeds maxBytes", async () => {

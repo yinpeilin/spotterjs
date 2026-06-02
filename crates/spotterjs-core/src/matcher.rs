@@ -417,4 +417,23 @@ mod tests {
         assert_eq!(t.left, 11);
         assert_eq!(t.top, 22);
     }
+
+    #[test]
+    fn resolve_needle_requires_path_or_buffer() {
+        let err = resolve_needle_optional(Path::new(""), None).unwrap_err();
+        assert!(matches!(err, SpotterError::Image(_)));
+        assert!(format!("{err}").contains("needle path empty"));
+    }
+
+    #[test]
+    fn wait_for_template_buffers_times_out_when_no_match_reaches_confidence() {
+        let hay = haystack_with_patch(32, 32, 8, 8, 6, 6, [20, 20, 20], [200, 50, 50]);
+        let needle = needle_from_hay(&hay, 32, 8, 8, 6, 6);
+        let mut opts = MatchOptions::default();
+        opts.confidence = 2.0;
+
+        let err = wait_for_template_buffers(&hay, &needle, 0, opts, Some(0)).unwrap_err();
+
+        assert!(matches!(err, SpotterError::MatchTimeout { timeout_ms: 0 }));
+    }
 }

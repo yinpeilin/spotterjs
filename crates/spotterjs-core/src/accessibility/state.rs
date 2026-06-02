@@ -110,3 +110,35 @@ pub fn element_id_from_string(s: &str) -> crate::error::Result<A11yElementId> {
         .map_err(|_| crate::error::SpotterError::ElementNotFound(format!("invalid id: {s}")))?;
     Ok(A11yElementId(n))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::SpotterError;
+
+    #[test]
+    fn require_enabled_reflects_current_state() {
+        set_enabled(false);
+        assert!(matches!(
+            require_enabled(),
+            Err(SpotterError::AccessibilityDisabled)
+        ));
+
+        set_enabled(true);
+        assert!(require_enabled().is_ok());
+
+        set_enabled(false);
+    }
+
+    #[test]
+    fn element_ids_roundtrip_through_strings() {
+        let id = A11yElementId(42);
+
+        assert_eq!(element_id_to_string(id), "42");
+        assert_eq!(element_id_from_string("42").unwrap(), id);
+        assert!(matches!(
+            element_id_from_string("not-an-id"),
+            Err(SpotterError::ElementNotFound(_))
+        ));
+    }
+}
