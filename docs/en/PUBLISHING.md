@@ -86,6 +86,13 @@ npm publish ./crates/spotterjs-node/linux-x64-gnu
 
 ### JavaScript Loader
 
+After the platform packages are published, verify the exact optional dependency
+versions exist on npm:
+
+```bash
+npm run verify:native-published
+```
+
 ```bash
 npm publish -w @spotterjs/node
 ```

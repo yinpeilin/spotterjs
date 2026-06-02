@@ -49,8 +49,9 @@
     "changeset": "changeset",
     "sync:native-versions": "node scripts/sync-native-package-versions.mjs",
     "version-packages": "changeset version && npm run sync:native-versions",
-    "release": "npm run sync-license && changeset publish",
+    "release": "npm run sync-license && npm run verify:native-published && changeset publish",
     "verify-pack": "node scripts/verify-pack.mjs",
+    "verify:native-published": "node scripts/verify-native-registry.mjs",
     "verify:native-install": "node scripts/verify-local-native-install.mjs"
   },
   "workspaces": [
