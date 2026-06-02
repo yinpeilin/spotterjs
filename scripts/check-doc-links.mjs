@@ -2,9 +2,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 const ignoredDirs = new Set([
   ".git",
   "node_modules",
@@ -92,12 +94,42 @@ function existsAsMarkdownTarget(resolved) {
   return false;
 }
 
+function readMarkdownUtf8(file, failures) {
+  const relativeFile = path.relative(repoRoot, file);
+  let content;
+
+  try {
+    content = utf8Decoder.decode(fs.readFileSync(file));
+  } catch {
+    failures.push({
+      file: relativeFile,
+      reason: "contains invalid UTF-8 bytes",
+    });
+    return null;
+  }
+
+  if (content.includes("\uFFFD")) {
+    failures.push({
+      file: relativeFile,
+      reason: "contains U+FFFD replacement characters",
+    });
+    return null;
+  }
+
+  return content;
+}
+
 const markdownFiles = walk(repoRoot);
-const failures = [];
+const encodingFailures = [];
+const linkFailures = [];
 const linkPattern = /!?\[[^\]]*]\(([^)]+)\)/g;
 
 for (const file of markdownFiles) {
-  const content = fs.readFileSync(file, "utf8");
+  const content = readMarkdownUtf8(file, encodingFailures);
+  if (content === null) {
+    continue;
+  }
+
   for (const match of content.matchAll(linkPattern)) {
     const target = normalizeTarget(match[1]);
     if (isIgnoredTarget(target)) {
@@ -106,7 +138,7 @@ for (const file of markdownFiles) {
 
     const resolved = resolveTarget(file, target);
     if (!existsAsMarkdownTarget(resolved)) {
-      failures.push({
+      linkFailures.push({
         file: path.relative(repoRoot, file),
         target,
       });
@@ -114,11 +146,21 @@ for (const file of markdownFiles) {
   }
 }
 
-if (failures.length > 0) {
+if (encodingFailures.length > 0) {
+  console.error("Markdown UTF-8 check failed:");
+  for (const failure of encodingFailures) {
+    console.error(`- ${failure.file}: ${failure.reason}`);
+  }
+}
+
+if (linkFailures.length > 0) {
   console.error("Markdown link check failed:");
-  for (const failure of failures) {
+  for (const failure of linkFailures) {
     console.error(`- ${failure.file}: ${failure.target}`);
   }
+}
+
+if (encodingFailures.length > 0 || linkFailures.length > 0) {
   process.exit(1);
 }
 
