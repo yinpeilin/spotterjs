@@ -46,5 +46,6 @@ npm run docs:check
 npm run build:ts
 ```
 
-`docs:check` verifies local Markdown links in both language trees. External
-links, mail links, and anchor-only links are ignored.
+`docs:check` verifies Markdown files are valid UTF-8 and checks local links in
+both language trees. External links, mail links, and anchor-only links are
+ignored.

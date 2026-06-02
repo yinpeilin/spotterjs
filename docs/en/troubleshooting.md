@@ -91,12 +91,12 @@ Check:
 
 See [MCP server](./MCP.md).
 
-## Markdown Link Check Fails
+## Markdown Check Fails
 
 ```bash
 npm run docs:check
 ```
 
-The checker validates local Markdown links. Fix relative paths, directory
-targets, and filename casing. External links, mail links, and anchor-only links
-are ignored.
+The checker validates Markdown UTF-8 encoding and local Markdown links. Fix
+encoding damage, relative paths, directory targets, and filename casing.
+External links, mail links, and anchor-only links are ignored.

@@ -164,4 +164,4 @@ if (encodingFailures.length > 0 || linkFailures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Markdown link check passed (${markdownFiles.length} files).`);
+console.log(`Markdown document check passed (${markdownFiles.length} files).`);

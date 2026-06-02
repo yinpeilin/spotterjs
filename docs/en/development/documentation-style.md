@@ -69,7 +69,8 @@ APIs that are exported only for local composition.
   Chinese page should link back to English.
 - Package README files should link to English docs by default and expose a
   visible Chinese docs link.
-- Run `npm run docs:check` after moving or adding Markdown files.
+- Run `npm run docs:check` after moving, adding, or editing Markdown files.
+  The check rejects invalid UTF-8 and validates local Markdown links.
 
 ## Update Checklist
 
@@ -78,4 +79,5 @@ APIs that are exported only for local composition.
 - [ ] Public API comments are English and mention coordinate spaces where relevant.
 - [ ] MCP tool changes are reflected in `docs/en/MCP.md` and `docs/zh-CN/MCP.md`.
 - [ ] Package README links still point to valid files.
+- [ ] Markdown files are valid UTF-8 and contain no replacement characters.
 - [ ] `npm run docs:check` passes.
