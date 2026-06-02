@@ -1,4 +1,9 @@
-import type { CaptureImage, Point, Region } from "@spotterjs/base";
+import type {
+  CaptureImage,
+  Point,
+  Region,
+  TextMatchEvaluation,
+} from "@spotterjs/base";
 import type { InferenceSession } from "onnxruntime-node";
 
 /** OCR input image: raw capture, encoded image bytes, or an image file path. */
@@ -17,6 +22,9 @@ export type OcrTextLine = {
   /** Center point of {@link region}. */
   center: Point;
 };
+
+/** OCR text line enriched with query match diagnostics. */
+export type OcrTextMatch = OcrTextLine & TextMatchEvaluation;
 
 /** Options applied before OCR reads text. */
 export type OcrReadOptions = {
@@ -163,11 +171,11 @@ export type OcrClient = {
     image: OcrImage,
     text: string,
     options?: OcrFindOptions
-  ): Promise<OcrTextLine>;
+  ): Promise<OcrTextMatch>;
   /** Find all matching text lines. */
   findAllText(
     image: OcrImage,
     text: string,
     options?: OcrFindOptions
-  ): Promise<OcrTextLine[]>;
+  ): Promise<OcrTextMatch[]>;
 };

@@ -34,7 +34,11 @@ first use unless local models are provided.
 - `ocr.findAllText(image, text, options?)`: return all matching lines.
 
 `image` can be a `CaptureImage`, encoded image `Buffer`, or image file path.
-Results include `text`, `score`, `region`, `box`, and `center`.
+Read results include `text`, `score`, `region`, `box`, and `center`.
+For read results, `score` is OCR recognition confidence. Text lookup results
+also include `matchScore`, `matchAlgorithm`, `matchKind`, `query`, and
+`matched`. `score` remains OCR recognition confidence; `matchScore` is the
+normalized text-query match score.
 
 GPU acceleration uses the same OCR API by passing ONNX Runtime execution
 providers:

@@ -1,4 +1,9 @@
-import type { CaptureImage, Point, Region } from "@spotterjs/base";
+import type {
+  CaptureImage,
+  Point,
+  Region,
+  TextMatchEvaluation,
+} from "@spotterjs/base";
 import { OcrError } from "./errors";
 import {
   cropImage,
@@ -32,6 +37,7 @@ import type {
   OcrPreprocessOptions,
   OcrReadOptions,
   OcrSession,
+  OcrTextMatch,
   OcrTextLine,
 } from "./types";
 
@@ -64,6 +70,7 @@ export type {
   OcrPreprocessOptions,
   OcrReadOptions,
   OcrSession,
+  OcrTextMatch,
   OcrTextLine,
 };
 export type { OcrErrorCode, OcrErrorContext } from "./errors";
@@ -109,7 +116,12 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
 
     async findAllText(image, text, findOptions) {
       const lines = await client.read(image, findOptions);
-      return lines.filter((line: OcrTextLine) => textMatches(line.text, text, findOptions));
+      return lines
+        .map((line: OcrTextLine) => ({
+          ...line,
+          ...scoreOcrText(line.text, text, findOptions),
+        }))
+        .filter((line): line is OcrTextMatch => line.matched);
     },
   };
   return client;
@@ -211,13 +223,45 @@ function translateLine(line: OcrTextLine, offset: Point): OcrTextLine {
   };
 }
 
-function textMatches(actual: string, expected: string, options?: OcrFindOptions): boolean {
+export function scoreOcrText(
+  actual: string,
+  expected: string,
+  options?: Pick<OcrFindOptions, "exact" | "caseSensitive" | "minSimilarity">
+): TextMatchEvaluation {
   const left = options?.caseSensitive ? actual : actual.toLowerCase();
   const right = options?.caseSensitive ? expected : expected.toLowerCase();
-  if (options?.exact) return left === right;
-  if (left.includes(right)) return true;
-  if (options?.minSimilarity === undefined) return false;
-  return textSimilarity(left, right) >= options.minSimilarity;
+  if (options?.exact) {
+    const matched = left === right;
+    return textEvaluation(expected, matched ? 1 : 0, matched, "exact");
+  }
+  if (left.includes(right)) {
+    return textEvaluation(expected, 1, true, "contains");
+  }
+  if (options?.minSimilarity !== undefined) {
+    const matchScore = textSimilarity(left, right);
+    return textEvaluation(
+      expected,
+      matchScore,
+      matchScore >= options.minSimilarity,
+      "similarity"
+    );
+  }
+  return textEvaluation(expected, 0, false, "none");
+}
+
+function textEvaluation(
+  query: string,
+  matchScore: number,
+  matched: boolean,
+  matchKind: TextMatchEvaluation["matchKind"]
+): TextMatchEvaluation {
+  return {
+    query,
+    matched,
+    matchAlgorithm: "ocr-text",
+    matchKind,
+    matchScore,
+  };
 }
 
 function textSimilarity(actual: string, expected: string): number {

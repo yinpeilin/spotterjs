@@ -32,7 +32,7 @@ const send = await ocr.findText(cap, "Send", {
   exact: false,
 });
 
-console.log(send.center);
+console.log(send.center, send.score, send.matchScore);
 ```
 
 Common API:
@@ -59,6 +59,17 @@ const line = await ocr.findText(cap, "Settings", {
 
 `minSimilarity` uses normalized edit distance from `0` to `1`. Higher values
 are stricter. `exact: true` still takes priority.
+
+`ocr.read` returns recognized lines where `score` is OCR recognition
+confidence. `ocr.findText` and `ocr.findAllText` return OCR lines enriched with
+text match diagnostics:
+
+- `score`: OCR recognition confidence.
+- `matchScore`: normalized query match score.
+- `matchAlgorithm`: `"ocr-text"`.
+- `matchKind`: `"exact"`, `"contains"`, or `"similarity"`.
+- `query` and `matched`: the query text and whether the line passed the
+  requested matching options.
 
 ## Error Handling
 

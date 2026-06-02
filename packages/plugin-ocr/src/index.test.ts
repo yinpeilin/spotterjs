@@ -15,6 +15,7 @@ import {
   resolveOcrModelProfile,
   OcrError,
   isOcrError,
+  scoreOcrText,
   type OcrEngine,
   type OcrModelProfile,
   type OcrSession,
@@ -400,6 +401,63 @@ describe("OCR engine", () => {
     await expect(
       ocr.findAllText(image, "Settings", { minSimilarity: 0.95 })
     ).resolves.toHaveLength(0);
+  });
+
+  it("returns OCR text match metadata for matched lines", async () => {
+    const ocr = await createOcr({
+      engine: fakeEngine([
+        {
+          text: "Setting",
+          score: 0.8,
+          region: { left: 0, top: 0, width: 1, height: 1 },
+          box: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 1, y: 1 },
+            { x: 0, y: 1 },
+          ],
+          center: { x: 0, y: 0 },
+        },
+      ]),
+    });
+
+    const matches = await ocr.findAllText(image, "Settings", {
+      minSimilarity: 0.85,
+    });
+
+    expect(matches[0]).toMatchObject({
+      text: "Setting",
+      score: 0.8,
+      query: "Settings",
+      matched: true,
+      matchAlgorithm: "ocr-text",
+      matchKind: "similarity",
+      matchScore: 0.875,
+    });
+  });
+
+  it("scores OCR text candidates without running OCR", () => {
+    expect(scoreOcrText("Settings", "Settings", { exact: true })).toEqual({
+      query: "Settings",
+      matched: true,
+      matchAlgorithm: "ocr-text",
+      matchKind: "exact",
+      matchScore: 1,
+    });
+    expect(scoreOcrText("Setting", "Settings", { minSimilarity: 0.95 })).toEqual({
+      query: "Settings",
+      matched: false,
+      matchAlgorithm: "ocr-text",
+      matchKind: "similarity",
+      matchScore: 0.875,
+    });
+    expect(scoreOcrText("Cancel", "Send")).toEqual({
+      query: "Send",
+      matched: false,
+      matchAlgorithm: "ocr-text",
+      matchKind: "none",
+      matchScore: 0,
+    });
   });
 
   it("rejects malformed CaptureImage input before OCR", async () => {
