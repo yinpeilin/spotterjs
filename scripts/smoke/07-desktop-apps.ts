@@ -2,23 +2,29 @@
  * Smoke: desktop app discovery (process metadata on windows).
  */
 import { desktop, windows } from "@spotterjs/core";
+import { info, runSmokeScript } from "../lib/log";
 
-function main() {
+export async function run(): Promise<void> {
   const allWindows = windows.list();
-  console.log(`windows: ${allWindows.length}`);
+  info(`windows: ${allWindows.length}`);
   if (allWindows.length > 0) {
     const w = allWindows[0];
-    console.log(
+    info(
       `sample: title=${w.title} pid=${w.processId} process=${w.processName}`
     );
   }
 
   const apps = desktop.listApps();
-  console.log(`apps: ${apps.length}`);
+  info(`apps: ${apps.length}`);
   const fg = desktop.getForegroundApp();
-  console.log(
+  info(
     `foreground: ${fg.processName} (pid=${fg.processId}) windows=${fg.windows.length}`
   );
 }
 
-main();
+const isDirect =
+  process.argv[1]?.replace(/\\/g, "/").includes("07-desktop-apps") ?? false;
+
+if (isDirect) {
+  void runSmokeScript("07-desktop-apps", run);
+}

@@ -6,16 +6,22 @@ import {
   accessibility,
   clipboard,
   desktop,
+  image as coreImage,
   keyboard,
   mouse,
   screen,
   windows,
 } from "@spotterjs/core";
+import { centerOf, type MatchResult, type Point, type Region } from "@spotterjs/base";
 import {
   captureActiveArtifact,
   captureScreenArtifact,
   captureWindowArtifact,
 } from "../adapters/capture.js";
+import {
+  type DebugAnnotation,
+  writeDebugCapture,
+} from "../adapters/debug-draw.js";
 import { json, ok, registerSafeTool } from "./results.js";
 
 const finiteNumber = z.number().finite();
@@ -57,6 +63,10 @@ const templateImageSchema = z.union([
 
 const captureDetailOptionsSchema = {
   detail: captureDetailSchema,
+};
+
+const debugImageOptionsSchema = {
+  debugImage: z.boolean().optional(),
 };
 
 const keyboardOptionsSchema = {
@@ -175,10 +185,27 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     {
       inputSchema: z.object({
         button: z.enum(["left", "right", "middle"]).optional(),
+        ...debugImageOptionsSchema,
       }),
     },
-    async ({ button }) => {
+    async ({ button, debugImage }) => {
+      const tapPoint = debugImage ? mouse.getPosition() : undefined;
+      const capture = debugImage ? screen.capture() : undefined;
       mouse.click(button);
+      if (debugImage && tapPoint && capture) {
+        const debug = writeDebugCapture(
+          capture,
+          [{ kind: "point", point: tapPoint }],
+          { prefix: "desktop-mouse-click-debug" }
+        );
+        return json({
+          status: "ok",
+          tapPoint,
+          button: button ?? "left",
+          coordinateSpace: "screen",
+          debugImagePath: debug.imagePath,
+        });
+      }
       return ok();
     }
   );
@@ -191,10 +218,27 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
         x: finiteNumber,
         y: finiteNumber,
         button: z.enum(["left", "right", "middle"]).optional(),
+        ...debugImageOptionsSchema,
       }),
     },
-    async ({ x, y, button }) => {
+    async ({ x, y, button, debugImage }) => {
+      const tapPoint = { x, y };
+      const capture = debugImage ? screen.capture() : undefined;
       mouse.tap(x, y, button);
+      if (debugImage && capture) {
+        const debug = writeDebugCapture(
+          capture,
+          [{ kind: "point", point: tapPoint }],
+          { prefix: "desktop-mouse-tap-debug" }
+        );
+        return json({
+          status: "ok",
+          tapPoint,
+          button: button ?? "left",
+          coordinateSpace: "screen",
+          debugImagePath: debug.imagePath,
+        });
+      }
       return ok();
     }
   );
@@ -256,10 +300,35 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
         image: templateImageSchema,
         ...matchOptionsSchema,
         all: z.boolean().optional(),
-      }),
+        ...debugImageOptionsSchema,
+      }).shape,
     },
-    async ({ image, all, ...options }) => {
+    async ({ image, all, debugImage, ...options }) => {
       const needle = decodeTemplateImage(image);
+      if (debugImage) {
+        const capture = screen.capture(options.region);
+        const origin = regionOrigin(options.region);
+        const localOptions = {
+          confidence: options.confidence,
+          region: undefined,
+          scale: options.scale,
+        };
+        const localMatches = all
+          ? await coreImage.findAll(capture, needle, localOptions)
+          : [await coreImage.find(capture, needle, localOptions)];
+        const matches = localMatches.map((match) => translateMatch(match, origin));
+        const debug = writeDebugCapture(
+          capture,
+          matchAnnotations(localMatches),
+          { prefix: "desktop-find-template-debug" }
+        );
+        return json({
+          matches,
+          coordinateSpace: "screen",
+          debugImagePath: debug.imagePath,
+        });
+      }
+
       const matches = all
         ? await screen.findAll(needle, options)
         : [await screen.find(needle, options)];
@@ -317,9 +386,27 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   registerSafeTool(
     server,
     "desktop_a11y_tap_element",
-    { inputSchema: z.object({ elementId: z.string() }) },
-    async ({ elementId }) => {
+    { inputSchema: z.object({ elementId: z.string(), ...debugImageOptionsSchema }) },
+    async ({ elementId, debugImage }) => {
+      const capture = debugImage ? screen.capture() : undefined;
       const region = accessibility.quick.click(elementId);
+      if (debugImage && capture) {
+        const tapPoint = centerOf(region);
+        const debug = writeDebugCapture(
+          capture,
+          [
+            { kind: "region", region },
+            { kind: "point", point: tapPoint },
+          ],
+          { prefix: "desktop-a11y-tap-debug" }
+        );
+        return json({
+          region,
+          tapPoint,
+          coordinateSpace: "screen",
+          debugImagePath: debug.imagePath,
+        });
+      }
       return json(region);
     }
   );
@@ -352,4 +439,36 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       return json(info);
     }
   );
+}
+
+function regionOrigin(region?: Region): Point {
+  return {
+    x: region?.left ?? 0,
+    y: region?.top ?? 0,
+  };
+}
+
+function translateMatch(match: MatchResult, origin: Point): MatchResult {
+  return {
+    ...match,
+    region: {
+      left: match.region.left + origin.x,
+      top: match.region.top + origin.y,
+      width: match.region.width,
+      height: match.region.height,
+    },
+    center: {
+      x: match.center.x + origin.x,
+      y: match.center.y + origin.y,
+    },
+  };
+}
+
+function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
+  const annotations: DebugAnnotation[] = [];
+  for (const match of matches) {
+    annotations.push({ kind: "region", region: match.region });
+    annotations.push({ kind: "point", point: match.center });
+  }
+  return annotations;
 }

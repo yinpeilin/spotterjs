@@ -3,12 +3,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const core = vi.hoisted(() => ({
   find: vi.fn(),
   findAll: vi.fn(),
+  imageFind: vi.fn(),
+  imageFindAll: vi.fn(),
 }));
 
 const artifacts = vi.hoisted(() => ({
   captureScreenArtifact: vi.fn(),
   captureWindowArtifact: vi.fn(),
   captureActiveArtifact: vi.fn(),
+}));
+
+const debugDraw = vi.hoisted(() => ({
+  writeDebugCapture: vi.fn(() => ({
+    imagePath: ".spotter/artifacts/desktop-debug.png",
+    width: 100,
+    height: 80,
+    originalWidth: 100,
+    originalHeight: 80,
+    format: "png",
+    isDownscaled: false,
+    detail: "original",
+  })),
 }));
 
 vi.mock("@spotterjs/core", () => ({
@@ -37,11 +52,12 @@ vi.mock("@spotterjs/core", () => ({
   },
   mouse: {
     click: vi.fn(),
+    getPosition: vi.fn(() => ({ x: 44, y: 55 })),
     move: vi.fn(),
     tap: vi.fn(),
   },
   screen: {
-    capture: vi.fn(() => ({ data: Buffer.alloc(0), width: 0, height: 0 })),
+    capture: vi.fn(() => ({ data: Buffer.alloc(100 * 80 * 4), width: 100, height: 80 })),
     captureActive: vi.fn(() => ({ data: Buffer.alloc(0), width: 0, height: 0 })),
     captureWindow: vi.fn(() => ({ data: Buffer.alloc(0), width: 0, height: 0 })),
     find: core.find,
@@ -52,9 +68,14 @@ vi.mock("@spotterjs/core", () => ({
     focus: vi.fn(),
     list: vi.fn(),
   },
+  image: {
+    find: core.imageFind,
+    findAll: core.imageFindAll,
+  },
 }));
 
 vi.mock("../adapters/capture.js", () => artifacts);
+vi.mock("../adapters/debug-draw.js", () => debugDraw);
 
 import { registerDesktopTools } from "./desktop.js";
 
@@ -86,11 +107,15 @@ function parseToolJson(result: Awaited<ReturnType<ToolHandler>>) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   core.find.mockReset();
   core.findAll.mockReset();
+  core.imageFind.mockReset();
+  core.imageFindAll.mockReset();
   artifacts.captureScreenArtifact.mockReset();
   artifacts.captureWindowArtifact.mockReset();
   artifacts.captureActiveArtifact.mockReset();
+  debugDraw.writeDebugCapture.mockClear();
 });
 
 describe("desktop MCP error handling", () => {
@@ -117,6 +142,8 @@ describe("desktop_find_template", () => {
       region: { left: 10, top: 20, width: 6, height: 8 },
       center: { x: 13, y: 24 },
       score: 0.94,
+      matchScore: 0.94,
+      matchAlgorithm: "ncc",
     });
 
     const handler = registerTools().get("desktop_find_template");
@@ -141,6 +168,8 @@ describe("desktop_find_template", () => {
           region: { left: 10, top: 20, width: 6, height: 8 },
           center: { x: 13, y: 24 },
           score: 0.94,
+          matchScore: 0.94,
+          matchAlgorithm: "ncc",
         },
       ],
       coordinateSpace: "screen",
@@ -152,6 +181,8 @@ describe("desktop_find_template", () => {
       region: { left: 1, top: 2, width: 3, height: 4 },
       center: { x: 2, y: 4 },
       score: 0.91,
+      matchScore: 0.91,
+      matchAlgorithm: "ncc",
     });
 
     const handler = registerTools().get("desktop_find_template");
@@ -174,11 +205,15 @@ describe("desktop_find_template", () => {
         region: { left: 10, top: 20, width: 6, height: 8 },
         center: { x: 13, y: 24 },
         score: 0.94,
+        matchScore: 0.94,
+        matchAlgorithm: "ncc",
       },
       {
         region: { left: 30, top: 40, width: 10, height: 12 },
         center: { x: 35, y: 46 },
         score: 0.9,
+        matchScore: 0.9,
+        matchAlgorithm: "ncc",
       },
     ]);
 
@@ -199,12 +234,130 @@ describe("desktop_find_template", () => {
     expect(json.matches).toHaveLength(2);
   });
 
+  it("captures once and returns a debug image for template matching", async () => {
+    const { screen } = await import("@spotterjs/core");
+    const capture = { data: Buffer.alloc(100 * 80 * 4), width: 100, height: 80 };
+    vi.mocked(screen.capture).mockReturnValue(capture);
+    core.imageFind.mockResolvedValue({
+      region: { left: 9, top: 18, width: 6, height: 8 },
+      center: { x: 12, y: 22 },
+      score: 0.93,
+      matchScore: 0.93,
+      matchAlgorithm: "ncc",
+    });
+
+    const json = parseToolJson(
+      await registerTools().get("desktop_find_template")!({
+        image: { path: "button.png" },
+        confidence: 0.9,
+        region: { left: 1, top: 2, width: 100, height: 80 },
+        debugImage: true,
+      })
+    );
+
+    expect(screen.capture).toHaveBeenCalledWith({
+      left: 1,
+      top: 2,
+      width: 100,
+      height: 80,
+    });
+    expect(core.imageFind).toHaveBeenCalledWith(capture, "button.png", {
+      confidence: 0.9,
+      region: undefined,
+      scale: undefined,
+    });
+    expect(core.find).not.toHaveBeenCalled();
+    expect(json.matches[0]).toMatchObject({
+      region: { left: 10, top: 20, width: 6, height: 8 },
+      center: { x: 13, y: 24 },
+      score: 0.93,
+      matchScore: 0.93,
+      matchAlgorithm: "ncc",
+    });
+    expect(json.debugImagePath).toBe(".spotter/artifacts/desktop-debug.png");
+    expect(debugDraw.writeDebugCapture).toHaveBeenCalledWith(
+      capture,
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "region" }),
+        expect.objectContaining({ kind: "point" }),
+      ]),
+      { prefix: "desktop-find-template-debug" }
+    );
+  });
+
   it("uses bounded schemas for regions and scale", () => {
     const schema = registerToolEntries().get("desktop_find_template")!.config.inputSchema;
 
     expect(() => schema.region.parse({ left: 0, top: 0, width: 0, height: 10 })).toThrow();
     expect(() => schema.confidence.parse(Number.POSITIVE_INFINITY)).toThrow();
     expect(() => schema.scale._def.options[1].shape.step.parse(-0.1)).toThrow();
+    expect(schema.debugImage.parse(true)).toBe(true);
+  });
+});
+
+describe("desktop debug input tools", () => {
+  it("marks the intended mouse tap point when debug images are requested", async () => {
+    const { mouse, screen } = await import("@spotterjs/core");
+    const capture = { data: Buffer.alloc(100 * 80 * 4), width: 100, height: 80 };
+    vi.mocked(screen.capture).mockReturnValue(capture);
+
+    const json = parseToolJson(
+      await registerTools().get("desktop_mouse_tap")!({
+        x: 10,
+        y: 20,
+        debugImage: true,
+      })
+    );
+
+    expect(screen.capture).toHaveBeenCalledWith();
+    expect(mouse.tap).toHaveBeenCalledWith(10, 20, undefined);
+    expect(json).toMatchObject({
+      status: "ok",
+      tapPoint: { x: 10, y: 20 },
+      coordinateSpace: "screen",
+      debugImagePath: ".spotter/artifacts/desktop-debug.png",
+    });
+  });
+
+  it("marks the current cursor point for mouse click debug images", async () => {
+    const { mouse } = await import("@spotterjs/core");
+
+    const json = parseToolJson(
+      await registerTools().get("desktop_mouse_click")!({
+        button: "right",
+        debugImage: true,
+      })
+    );
+
+    expect(mouse.getPosition).toHaveBeenCalled();
+    expect(mouse.click).toHaveBeenCalledWith("right");
+    expect(json.tapPoint).toEqual({ x: 44, y: 55 });
+    expect(json.debugImagePath).toBe(".spotter/artifacts/desktop-debug.png");
+  });
+
+  it("marks accessibility tap bounds and center when debug images are requested", async () => {
+    const { accessibility } = await import("@spotterjs/core");
+    vi.mocked(accessibility.quick.click).mockReturnValue({
+      left: 20,
+      top: 30,
+      width: 40,
+      height: 20,
+    });
+
+    const json = parseToolJson(
+      await registerToolEntries(true).get("desktop_a11y_tap_element")!.handler({
+        elementId: "element-1",
+        debugImage: true,
+      })
+    );
+
+    expect(accessibility.quick.click).toHaveBeenCalledWith("element-1");
+    expect(json).toMatchObject({
+      region: { left: 20, top: 30, width: 40, height: 20 },
+      tapPoint: { x: 40, y: 40 },
+      coordinateSpace: "screen",
+      debugImagePath: ".spotter/artifacts/desktop-debug.png",
+    });
   });
 });
 

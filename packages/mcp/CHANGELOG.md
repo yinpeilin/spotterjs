@@ -6,6 +6,9 @@
 
 - Add per-call keyboard delay options, numeric key taps, clipboard-backed text
   writing, and the `desktop_keyboard_tap` MCP tool.
+- Add opt-in `debugImage` artifacts for Desktop OCR, template matching, mouse
+  clicks, mouse taps, and accessibility taps. OCR text matches now expose
+  normalized `matchScore` diagnostics alongside the OCR recognition `score`.
 
 ### Patch Changes
 
