@@ -1,4 +1,4 @@
-import type { MatchOptions } from "../src";
+import type { MatchOptions, MatchResult } from "../src";
 
 const opts: MatchOptions = {
   confidence: 0.9,
@@ -7,6 +7,16 @@ const opts: MatchOptions = {
 };
 
 void opts;
+
+const result: MatchResult = {
+  region: { left: 1, top: 2, width: 3, height: 4 },
+  center: { x: 2, y: 4 },
+  score: 0.9,
+  matchScore: 0.9,
+  matchAlgorithm: "ncc",
+};
+
+void result;
 
 // @ts-expect-error searchRegion was removed from the public API.
 const legacyRegion: MatchOptions = { searchRegion: { left: 0, top: 0, width: 1, height: 1 } };

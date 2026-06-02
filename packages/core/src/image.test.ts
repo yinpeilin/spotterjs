@@ -122,6 +122,8 @@ describe("image.find", () => {
       region: { left: 4, top: 8, width: 10, height: 6 },
       center: { x: 9, y: 11 },
       score: 0.94,
+      matchScore: 0.94,
+      matchAlgorithm: "ncc",
     });
   });
 
@@ -138,6 +140,8 @@ describe("image.find", () => {
         region: { left: 4, top: 8, width: 10, height: 6 },
         center: { x: 9, y: 11 },
         score: 0.94,
+        matchScore: 0.94,
+        matchAlgorithm: "ncc",
       },
     ]);
   });

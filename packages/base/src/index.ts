@@ -31,6 +31,31 @@ export interface Point {
  */
 export type TemplateImage = string | Buffer;
 
+/** Matching algorithm that produced a normalized match score. */
+export type MatchAlgorithm = "ncc" | "ocr-text";
+
+/** Text matching strategy used for OCR text lookup diagnostics. */
+export type TextMatchKind = "exact" | "contains" | "similarity" | "none";
+
+/** Normalized match score shared by visual and text matching results. */
+export interface MatchScore {
+  /** Normalized match score from 0 to 1. Higher values are stronger matches. */
+  matchScore: number;
+  /** Algorithm that produced {@link matchScore}. */
+  matchAlgorithm: MatchAlgorithm;
+}
+
+/** Text match evaluation for one recognized text candidate. */
+export interface TextMatchEvaluation extends MatchScore {
+  matchAlgorithm: "ocr-text";
+  /** Query text used for the comparison. */
+  query: string;
+  /** Whether this candidate satisfies the requested matching options. */
+  matched: boolean;
+  /** Matching strategy that produced the candidate score. */
+  matchKind: TextMatchKind;
+}
+
 /**
  * Result from one template match.
  *
@@ -43,8 +68,12 @@ export interface MatchResult {
   region: Region;
   /** Center point of {@link region}. */
   center: Point;
-  /** NCC score. Higher values are stronger matches. */
+  /** NCC match score. Higher values are stronger matches. */
   score: number;
+  /** Normalized match score. For NCC this is the same value as {@link score}. */
+  matchScore: number;
+  /** Match algorithm used to produce this result. */
+  matchAlgorithm: "ncc";
 }
 
 /**

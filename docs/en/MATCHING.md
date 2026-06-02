@@ -43,7 +43,9 @@ Screen / window capture       -> spotterjs-core::capture [platform GDI / X11]
 - `CaptureImage`: raw RGBA capture data from `screen.capture`,
   `screen.captureWindow`, Android capture, or native buffer APIs.
 - `Region`: `{ left, top, width, height }`.
-- `MatchResult`: `{ region, center, score }`.
+- `MatchResult`: `{ region, center, score, matchScore, matchAlgorithm }`.
+  `score` remains the NCC score; `matchScore` is the normalized match score
+  shared with other match APIs and is the same value for NCC results.
 
 High-level desktop APIs return screen coordinates. Android APIs return Android
 device screenshot coordinates. `image.find` returns coordinates relative to the

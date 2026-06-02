@@ -52,6 +52,8 @@ describe("screen.find", () => {
       region: { left: 10, top: 20, width: 5, height: 5 },
       center: { x: 12, y: 22 },
       score: 0.93,
+      matchScore: 0.93,
+      matchAlgorithm: "ncc",
     });
   });
 
@@ -88,6 +90,8 @@ describe("screen.findAll", () => {
         region: { left: 4, top: 6, width: 8, height: 10 },
         center: { x: 8, y: 11 },
         score: 0.88,
+        matchScore: 0.88,
+        matchAlgorithm: "ncc",
       },
     ]);
   });
@@ -139,6 +143,8 @@ describe("screen.tap", () => {
       region: { left: 10, top: 20, width: 6, height: 8 },
       center: { x: 13, y: 24 },
       score: 0.92,
+      matchScore: 0.92,
+      matchAlgorithm: "ncc",
     });
   });
 });

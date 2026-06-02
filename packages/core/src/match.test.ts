@@ -134,6 +134,8 @@ describe("findNeedle", () => {
       region: { left: 10, top: 20, width: 5, height: 7 },
       center: { x: 12, y: 23 },
       score: 0.91,
+      matchScore: 0.91,
+      matchAlgorithm: "ncc",
     });
   });
 
@@ -183,6 +185,8 @@ describe("findAllNeedle", () => {
         region: { left: 4, top: 8, width: 10, height: 6 },
         center: { x: 9, y: 11 },
         score: 0.95,
+        matchScore: 0.95,
+        matchAlgorithm: "ncc",
       },
     ]);
   });
@@ -214,6 +218,8 @@ describe("waitForNeedle", () => {
       region: { left: 1, top: 2, width: 10, height: 10 },
       center: { x: 6, y: 7 },
       score: 0.96,
+      matchScore: 0.96,
+      matchAlgorithm: "ncc",
     });
   });
 });
@@ -240,6 +246,8 @@ describe("findNeedleInWindow", () => {
       region: { left: 12, top: 24, width: 8, height: 10 },
       center: { x: 16, y: 29 },
       score: 0.94,
+      matchScore: 0.94,
+      matchAlgorithm: "ncc",
     });
   });
 
@@ -257,6 +265,8 @@ describe("findNeedleInWindow", () => {
         region: { left: 14, top: 28, width: 8, height: 10 },
         center: { x: 18, y: 33 },
         score: 0.93,
+        matchScore: 0.93,
+        matchAlgorithm: "ncc",
       },
     ]);
   });
@@ -280,12 +290,16 @@ describe("capture image matching helpers", () => {
       region: { left: 2, top: 4, width: 8, height: 10 },
       center: { x: 6, y: 9 },
       score: 0.92,
+      matchScore: 0.92,
+      matchAlgorithm: "ncc",
     });
     await expect(findAllNeedleInCapture(haystack, "button.png")).resolves.toEqual([
       {
         region: { left: 6, top: 8, width: 8, height: 10 },
         center: { x: 10, y: 13 },
         score: 0.91,
+        matchScore: 0.91,
+        matchAlgorithm: "ncc",
       },
     ]);
   });

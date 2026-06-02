@@ -31,5 +31,7 @@ export function toMatchResult(native: NativeMatchResult): MatchResult {
     region: native.region,
     center: centerOf(native.region),
     score: native.score,
+    matchScore: native.score,
+    matchAlgorithm: "ncc",
   };
 }

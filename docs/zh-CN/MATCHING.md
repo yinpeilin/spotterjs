@@ -39,7 +39,7 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 - `TemplateImage`: a template input. A `string` is always a file path; a `Buffer` is always encoded image bytes (PNG/JPEG/WebP).
 - `CaptureImage`: raw RGBA capture data from `screen.capture`, `captureWindow`, or native buffer APIs.
 - `Region`: `{ left, top, width, height }`; high-level APIs use screen coordinates.
-- `MatchResult`: `{ region, center, score }`; `region` and `center` are screen coordinates.
+- `MatchResult`: `{ region, center, score, matchScore, matchAlgorithm }`; `score` remains the NCC score, `matchScore` is the normalized match score, and `region` / `center` are screen coordinates.
 
 ## Search region
 

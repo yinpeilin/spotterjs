@@ -47,6 +47,7 @@
     "scripts": {
         "build": "tsc",
         "test": "vitest run",
+        "test:types": "tsc -p tsconfig.type-tests.json --noEmit",
         "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
     },
     "dependencies": {
