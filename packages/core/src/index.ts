@@ -250,16 +250,20 @@ function normalizeTapKey(key: TapKeyInput): string {
 function pasteText(text: string, options?: KeyboardWriteOptions) {
   const shouldRestore = options?.restoreClipboard !== false;
   const n = loadNative();
-  let previous = "";
+  let previous: string | undefined;
   if (shouldRestore) {
-    previous = n.clipboardGet();
+    try {
+      previous = n.clipboardGet();
+    } catch {
+      previous = undefined;
+    }
   }
   n.clipboardSet(text);
   try {
     keyboard.hotkey(["Ctrl", "V"], options);
     sleepSync(effectiveKeyboardDelayMs(options));
   } finally {
-    if (shouldRestore) {
+    if (shouldRestore && previous !== undefined) {
       n.clipboardSet(previous);
     }
   }

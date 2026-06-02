@@ -47,9 +47,114 @@ describe("keyboard", () => {
     expect(keyboardTypeText).not.toHaveBeenCalled();
   });
 
+  it("still writes text when the previous clipboard text is unavailable", () => {
+    clipboardGet.mockImplementation(() => {
+      throw new Error("[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty");
+    });
+
+    keyboard.write("hello");
+
+    expect(clipboardSet).toHaveBeenCalledTimes(1);
+    expect(clipboardSet).toHaveBeenCalledWith("hello");
+    expect(keyboardPressKeys).toHaveBeenCalledWith(["Ctrl"]);
+    expect(keyboardTypeKey).toHaveBeenCalledWith("V");
+    expect(keyboardReleaseKeys).toHaveBeenCalledWith(["Ctrl"]);
+  });
+
+  it("restores an empty previous clipboard text", () => {
+    clipboardGet.mockReturnValue("");
+
+    keyboard.write("hello");
+
+    expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
+    expect(clipboardSet).toHaveBeenNthCalledWith(2, "");
+  });
+
+  it("can skip reading and restoring the clipboard in paste mode", () => {
+    clipboardGet.mockImplementation(() => {
+      throw new Error("clipboard_get should not be called");
+    });
+
+    keyboard.write("hello", { restoreClipboard: false });
+
+    expect(clipboardGet).not.toHaveBeenCalled();
+    expect(clipboardSet).toHaveBeenCalledTimes(1);
+    expect(clipboardSet).toHaveBeenCalledWith("hello");
+    expect(keyboardTypeKey).toHaveBeenCalledWith("V");
+  });
+
+  it("restores the previous clipboard when paste hotkey typing fails", () => {
+    clipboardGet.mockReturnValue("previous");
+    keyboardTypeKey.mockImplementation(() => {
+      throw new Error("native key failed");
+    });
+
+    expect(() => keyboard.write("hello")).toThrow("native key failed");
+
+    expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
+    expect(keyboardPressKeys).toHaveBeenCalledWith(["Ctrl"]);
+    expect(keyboardReleaseKeys).toHaveBeenCalledWith(["Ctrl"]);
+    expect(clipboardSet).toHaveBeenNthCalledWith(2, "previous");
+  });
+
+  it("does not restore clipboard text that was unavailable when paste fails", () => {
+    clipboardGet.mockImplementation(() => {
+      throw new Error("[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty");
+    });
+    keyboardTypeKey.mockImplementation(() => {
+      throw new Error("native key failed");
+    });
+
+    expect(() => keyboard.write("hello")).toThrow("native key failed");
+
+    expect(clipboardSet).toHaveBeenCalledTimes(1);
+    expect(clipboardSet).toHaveBeenCalledWith("hello");
+    expect(keyboardReleaseKeys).toHaveBeenCalledWith(["Ctrl"]);
+  });
+
+  it("propagates clipboard set failures without sending the paste hotkey", () => {
+    clipboardGet.mockReturnValue("previous");
+    clipboardSet.mockImplementationOnce(() => {
+      throw new Error("clipboard_set failed");
+    });
+
+    expect(() => keyboard.write("hello")).toThrow("clipboard_set failed");
+
+    expect(clipboardSet).toHaveBeenCalledTimes(1);
+    expect(keyboardPressKeys).not.toHaveBeenCalled();
+    expect(keyboardTypeKey).not.toHaveBeenCalled();
+    expect(keyboardReleaseKeys).not.toHaveBeenCalled();
+  });
+
+  it("passes per-call delay through paste-mode hotkey calls", () => {
+    clipboardGet.mockReturnValue("previous");
+
+    keyboard.write("hello", { autoDelayMs: 30 });
+
+    expect(keyboardPressKeys).toHaveBeenCalledWith(["Ctrl"], { autoDelayMs: 30 });
+    expect(keyboardTypeKey).toHaveBeenCalledWith("V", { autoDelayMs: 30 });
+    expect(keyboardReleaseKeys).toHaveBeenCalledWith(["Ctrl"], { autoDelayMs: 30 });
+  });
+
   it("can write text through the native text input API with per-call delay", () => {
     keyboard.write("hello", { mode: "native", autoDelayMs: 30 });
     expect(keyboardTypeText).toHaveBeenCalledWith("hello", { autoDelayMs: 30 });
+  });
+
+  it("does not touch the clipboard in native text input mode", () => {
+    clipboardGet.mockImplementation(() => {
+      throw new Error("clipboard_get should not be called");
+    });
+    clipboardSet.mockImplementation(() => {
+      throw new Error("clipboard_set should not be called");
+    });
+
+    keyboard.write("hello", { mode: "native" });
+
+    expect(keyboardTypeText).toHaveBeenCalledWith("hello");
+    expect(clipboardGet).not.toHaveBeenCalled();
+    expect(clipboardSet).not.toHaveBeenCalled();
+    expect(keyboardTypeKey).not.toHaveBeenCalled();
   });
 
   it("exposes writeText as an alias of write", () => {
