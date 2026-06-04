@@ -6,7 +6,7 @@ import {
   type DebugAnnotation,
   writeDebugImageFromPath,
 } from "../adapters/debug-draw.js";
-import { errorResult, json } from "./results.js";
+import { json, registerSafeTool } from "./results.js";
 
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
@@ -55,7 +55,8 @@ async function getOcr(args: { modelDir?: string; modelProfile?: "server" | "mobi
 }
 
 export function registerOcrTools(server: McpServer): void {
-  server.registerTool(
+  registerSafeTool(
+    server,
     "ocr_read_image",
     {
       description:
@@ -69,30 +70,27 @@ export function registerOcrTools(server: McpServer): void {
         .shape,
     },
     async (args) => {
-      try {
-        const ocr = await getOcr(args);
-        const lines = await ocr.read(args.imagePath, {
-          searchRegion: args.searchRegion,
-          origin: args.origin,
-        });
-        const debug = args.debugImage
-          ? writeDebugImageFromPath(args.imagePath, ocrLineAnnotations(lines), {
-              prefix: "ocr-read-image-debug",
-              origin: args.origin,
-            })
-          : undefined;
-        return json({
-          imagePath: args.imagePath,
-          lines,
-          ...(debug ? { debugImagePath: debug.imagePath } : {}),
-        });
-      } catch (error) {
-        return errorResult("ocr_read_image", error);
-      }
+      const ocr = await getOcr(args);
+      const lines = await ocr.read(args.imagePath, {
+        searchRegion: args.searchRegion,
+        origin: args.origin,
+      });
+      const debug = args.debugImage
+        ? writeDebugImageFromPath(args.imagePath, ocrLineAnnotations(lines), {
+            prefix: "ocr-read-image-debug",
+            origin: args.origin,
+          })
+        : undefined;
+      return json({
+        imagePath: args.imagePath,
+        lines,
+        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+      });
     }
   );
 
-  server.registerTool(
+  registerSafeTool(
+    server,
     "ocr_find_text",
     {
       description:
@@ -110,51 +108,47 @@ export function registerOcrTools(server: McpServer): void {
         .shape,
     },
     async (args) => {
-      try {
-        const ocr = await getOcr(args);
-        if (args.debugImage) {
-          const lines = await ocr.read(args.imagePath, {
-            searchRegion: args.searchRegion,
-            origin: args.origin,
-          });
-          const candidates = lines.map((line) => ({
-            ...line,
-            ...scoreOcrText(line.text, args.text, {
-              exact: args.exact,
-              caseSensitive: args.caseSensitive,
-              minSimilarity: args.minSimilarity,
-            }),
-          }));
-          const matches = candidates.filter((line): line is OcrTextMatch => line.matched);
-          const debug = writeDebugImageFromPath(
-            args.imagePath,
-            ocrLineAnnotations(candidates),
-            {
-              prefix: "ocr-find-text-debug",
-              origin: args.origin,
-            }
-          );
-          return json({
-            imagePath: args.imagePath,
-            matches,
-            candidates,
-            debugImagePath: debug.imagePath,
-          });
-        }
-
-        return json({
-          imagePath: args.imagePath,
-          matches: await ocr.findAllText(args.imagePath, args.text, {
+      const ocr = await getOcr(args);
+      if (args.debugImage) {
+        const lines = await ocr.read(args.imagePath, {
+          searchRegion: args.searchRegion,
+          origin: args.origin,
+        });
+        const candidates = lines.map((line) => ({
+          ...line,
+          ...scoreOcrText(line.text, args.text, {
             exact: args.exact,
             caseSensitive: args.caseSensitive,
             minSimilarity: args.minSimilarity,
-            searchRegion: args.searchRegion,
-            origin: args.origin,
           }),
+        }));
+        const matches = candidates.filter((line): line is OcrTextMatch => line.matched);
+        const debug = writeDebugImageFromPath(
+          args.imagePath,
+          ocrLineAnnotations(candidates),
+          {
+            prefix: "ocr-find-text-debug",
+            origin: args.origin,
+          }
+        );
+        return json({
+          imagePath: args.imagePath,
+          matches,
+          candidates,
+          debugImagePath: debug.imagePath,
         });
-      } catch (error) {
-        return errorResult("ocr_find_text", error);
       }
+
+      return json({
+        imagePath: args.imagePath,
+        matches: await ocr.findAllText(args.imagePath, args.text, {
+          exact: args.exact,
+          caseSensitive: args.caseSensitive,
+          minSimilarity: args.minSimilarity,
+          searchRegion: args.searchRegion,
+          origin: args.origin,
+        }),
+      });
     }
   );
 }

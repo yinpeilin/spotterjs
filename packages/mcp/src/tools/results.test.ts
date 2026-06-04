@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { SpotterError } from "@spotterjs/base";
 import { errorResult, json, ok, registerSafeTool } from "./results";
 
 describe("MCP tool results", () => {
@@ -11,23 +12,22 @@ describe("MCP tool results", () => {
   });
 
   it("includes stable code and summarized context in error results", () => {
-    const error = new Error("boom") as Error & {
-      code?: string;
-      context?: unknown;
-    };
-    error.code = "NATIVE_CAPTURE_FAILED";
-    error.context = {
-      path: "x".repeat(220),
-      attempts: [1, 2, 3, 4, 5, 6],
-      nested: { a: { b: { c: "too deep" } } },
-    };
+    const error = new SpotterError("SPOTTER_NATIVE_CAPTURE_FAILED", "boom", {
+      domain: "native",
+      context: {
+        path: "x".repeat(220),
+        attempts: [1, 2, 3, 4, 5, 6],
+        nested: { a: { b: { c: "too deep" } } },
+      },
+    });
 
     const result = errorResult("desktop_capture", error);
     const text = result.content[0].text;
 
     expect(result.isError).toBe(true);
     expect(text).toContain("desktop_capture failed: boom");
-    expect(text).toContain("code=NATIVE_CAPTURE_FAILED");
+    expect(text).toContain("code=SPOTTER_NATIVE_CAPTURE_FAILED");
+    expect(text).toContain("domain=native");
     expect(text).toContain(`${"x".repeat(177)}...`);
     expect(text).toContain('"attempts":[1,2,3,4,5]');
     expect(text).toContain('"a":"[object]"');

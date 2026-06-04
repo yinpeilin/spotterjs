@@ -37,6 +37,7 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.12.0",
+        "@spotterjs/base": "1.0.3",
         "@spotterjs/core": "1.0.3",
         "@spotterjs/plugin-android": "1.0.3",
         "@spotterjs/plugin-ocr": "1.0.3",

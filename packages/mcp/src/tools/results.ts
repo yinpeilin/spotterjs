@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { isSpotterError } from "@spotterjs/base";
 import type { z } from "zod";
 
 export type ToolResult = {
@@ -21,28 +22,20 @@ export function json(data: unknown): ToolResult {
 /** Convert a thrown error into a structured MCP tool error result. */
 export function errorResult(toolName: string, error: unknown): ToolResult {
   const message = error instanceof Error ? error.message : String(error);
-  const code = errorCode(error);
-  const context = errorContext(error);
+  const spotterError = isSpotterError(error) ? error : undefined;
+  const context = spotterError?.context === undefined
+    ? undefined
+    : summarizeContext(spotterError.context);
   const details = [
-    code ? `code=${code}` : undefined,
+    spotterError?.code ? `code=${spotterError.code}` : undefined,
     context ? `context=${JSON.stringify(context)}` : undefined,
+    spotterError?.domain ? `domain=${spotterError.domain}` : undefined,
   ].filter(Boolean);
   const suffix = details.length ? ` (${details.join(" ")})` : "";
   return {
     content: [{ type: "text", text: `${toolName} failed: ${message}${suffix}` }],
     isError: true,
   };
-}
-
-function errorCode(error: unknown): string | undefined {
-  return typeof error === "object" && error !== null && "code" in error
-    ? String((error as { code?: unknown }).code)
-    : undefined;
-}
-
-function errorContext(error: unknown): unknown {
-  if (typeof error !== "object" || error === null || !("context" in error)) return undefined;
-  return summarizeContext((error as { context?: unknown }).context);
 }
 
 function summarizeContext(value: unknown, depth = 0): unknown {
