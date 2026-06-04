@@ -6,6 +6,7 @@ import {
   type NativeTreeNodeDump,
 } from "./native";
 import { centerOf, type Region } from "@spotterjs/base";
+import { callNative } from "./errors";
 
 /** Accessibility tree view mode. */
 export type TreeViewMode = "auto" | "raw" | "control" | "content";
@@ -102,16 +103,22 @@ const accessibilityBase = {
    * Calling this again updates the configuration.
    */
   enable(config?: A11yConfig): void {
-    loadNative().accessibilityEnable(configToNative(config));
+    callNative("accessibility.enable", { config }, () =>
+      loadNative().accessibilityEnable(configToNative(config))
+    );
   },
 
   /** Release accessibility resources. */
   disable(): void {
-    loadNative().accessibilityDisable();
+    callNative("accessibility.disable", {}, () =>
+      loadNative().accessibilityDisable()
+    );
   },
 
   isEnabled(): boolean {
-    return loadNative().accessibilityIsEnabled();
+    return callNative("accessibility.isEnabled", {}, () =>
+      loadNative().accessibilityIsEnabled()
+    );
   },
 
   /**
@@ -119,7 +126,9 @@ const accessibilityBase = {
    * @param windowId {@link WindowInfo.id}
    */
   attachWindow(windowId: string): string {
-    return loadNative().accessibilityAttachWindow(windowId);
+    return callNative("accessibility.attachWindow", { windowId }, () =>
+      loadNative().accessibilityAttachWindow(windowId)
+    );
   },
 
   /**
@@ -127,13 +136,19 @@ const accessibilityBase = {
    * @returns Tree health, selected element ID, and diagnostic metadata.
    */
   attachWindowReport(windowId: string, maxDepth = 12): AttachReport {
-    const r = loadNative().accessibilityAttachWindowReport(windowId, maxDepth);
+    const r = callNative(
+      "accessibility.attachWindowReport",
+      { windowId, maxDepth },
+      () => loadNative().accessibilityAttachWindowReport(windowId, maxDepth)
+    );
     return attachReportFromNative(r);
   },
 
   /** Attach the current foreground window and return the root element ID. */
   attachActive(): string {
-    return loadNative().accessibilityAttachActive();
+    return callNative("accessibility.attachActive", {}, () =>
+      loadNative().accessibilityAttachActive()
+    );
   },
 
   /**
@@ -143,7 +158,9 @@ const accessibilityBase = {
    * @throws When no element matches the query.
    */
   find(rootId: string, query: A11yQuery, maxDepth = 12): string {
-    return loadNative().accessibilityFind(rootId, queryToNative(query), maxDepth);
+    return callNative("accessibility.find", { rootId, query, maxDepth }, () =>
+      loadNative().accessibilityFind(rootId, queryToNative(query), maxDepth)
+    );
   },
 
   /**
@@ -156,38 +173,53 @@ const accessibilityBase = {
     timeoutMs: number,
     opts?: { maxDepth?: number; pollMs?: number }
   ): string {
-    return loadNative().accessibilityWaitFor(
-      rootId,
-      queryToNative(query),
-      timeoutMs,
-      opts?.maxDepth ?? 12,
-      opts?.pollMs ?? 200
+    return callNative(
+      "accessibility.waitFor",
+      { rootId, query, timeoutMs, ...opts },
+      () =>
+        loadNative().accessibilityWaitFor(
+          rootId,
+          queryToNative(query),
+          timeoutMs,
+          opts?.maxDepth ?? 12,
+          opts?.pollMs ?? 200
+        )
     );
   },
 
   /** Return element bounds in screen coordinates. */
   getBounds(elementId: string): Region {
-    return loadNative().accessibilityGetBounds(elementId);
+    return callNative("accessibility.getBounds", { elementId }, () =>
+      loadNative().accessibilityGetBounds(elementId)
+    );
   },
 
   /** Return metadata for one element without dumping the whole tree. */
   getElementInfo(elementId: string): ElementInfo {
-    return loadNative().accessibilityGetElementInfo(elementId);
+    return callNative("accessibility.getElementInfo", { elementId }, () =>
+      loadNative().accessibilityGetElementInfo(elementId)
+    );
   },
 
   /** Refresh the root reference after UI changes. */
   refreshRoot(elementId: string): void {
-    loadNative().accessibilityRefreshRoot(elementId);
+    callNative("accessibility.refreshRoot", { elementId }, () =>
+      loadNative().accessibilityRefreshRoot(elementId)
+    );
   },
 
   /** Invoke the element, typically for buttons and menu items. */
   invoke(elementId: string): void {
-    loadNative().accessibilityInvoke(elementId);
+    callNative("accessibility.invoke", { elementId }, () =>
+      loadNative().accessibilityInvoke(elementId)
+    );
   },
 
   /** Set element value text where the native accessibility provider supports it. */
   setValue(elementId: string, text: string): void {
-    loadNative().accessibilitySetValue(elementId, text);
+    callNative("accessibility.setValue", { elementId }, () =>
+      loadNative().accessibilitySetValue(elementId, text)
+    );
   },
 
   /** Dump a subtree as a JSON string for diagnostics. */
@@ -196,10 +228,15 @@ const accessibilityBase = {
       typeof maxDepthOrOpts === "number"
         ? { maxDepth: maxDepthOrOpts }
         : maxDepthOrOpts;
-    return loadNative().accessibilityDumpTree(
-      rootId,
-      opts.maxDepth ?? 12,
-      opts.treeView
+    return callNative(
+      "accessibility.dumpTree",
+      { rootId, maxDepth: opts.maxDepth ?? 12, treeView: opts.treeView },
+      () =>
+        loadNative().accessibilityDumpTree(
+          rootId,
+          opts.maxDepth ?? 12,
+          opts.treeView
+        )
     );
   },
 
@@ -212,10 +249,15 @@ const accessibilityBase = {
       typeof maxDepthOrOpts === "number"
         ? { maxDepth: maxDepthOrOpts }
         : maxDepthOrOpts;
-    return loadNative().accessibilityDumpTreeObject(
-      rootId,
-      opts.maxDepth ?? 12,
-      opts.treeView
+    return callNative(
+      "accessibility.dumpTreeObject",
+      { rootId, maxDepth: opts.maxDepth ?? 12, treeView: opts.treeView },
+      () =>
+        loadNative().accessibilityDumpTreeObject(
+          rootId,
+          opts.maxDepth ?? 12,
+          opts.treeView
+        )
     );
   },
 
@@ -225,7 +267,11 @@ const accessibilityBase = {
     maxDepth = 12,
     treeView?: TreeViewMode
   ): TreeHealth {
-    const h = loadNative().accessibilityTreeHealth(rootId, maxDepth, treeView);
+    const h = callNative(
+      "accessibility.treeHealth",
+      { rootId, maxDepth, treeView },
+      () => loadNative().accessibilityTreeHealth(rootId, maxDepth, treeView)
+    );
     return healthFromNative(h);
   },
 
@@ -239,10 +285,15 @@ const accessibilityBase = {
     minListItems: number,
     maxDepth = 12
   ): TreeHealth {
-    const h = loadNative().accessibilityCheckTreeHealth(
-      rootId,
-      maxDepth,
-      minListItems
+    const h = callNative(
+      "accessibility.checkTreeHealth",
+      { rootId, minListItems, maxDepth },
+      () =>
+        loadNative().accessibilityCheckTreeHealth(
+          rootId,
+          maxDepth,
+          minListItems
+        )
     );
     return healthFromNative(h);
   },
@@ -305,7 +356,9 @@ export type A11yDebugApi = {
 function clickElement(elementId: string): Region {
   const region = accessibilityBase.getBounds(elementId);
   const { x, y } = centerOf(region);
-  loadNative().tapAt(x, y);
+  callNative("accessibility.click", { elementId, x, y }, () =>
+    loadNative().tapAt(x, y)
+  );
   return region;
 }
 

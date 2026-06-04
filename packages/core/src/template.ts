@@ -1,4 +1,5 @@
 import { type MatchOptions, type MatchResult, type TemplateImage } from "@spotterjs/base";
+import { callNative } from "./errors";
 import { findAllNeedleInWindow, findNeedleInWindow } from "./match";
 import { loadNative } from "./native";
 
@@ -49,6 +50,8 @@ export function tapInWindow(
 ): MatchResult {
   const match = findInWindow(windowId, needle, options);
   const { x, y } = match.center;
-  loadNative().tapAt(x, y);
+  callNative("template.tapInWindow", { windowId, x, y }, () =>
+    loadNative().tapAt(x, y)
+  );
   return match;
 }

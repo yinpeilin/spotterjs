@@ -7,7 +7,7 @@ import {
   type TemplateImage,
 } from "@spotterjs/base";
 
-import { wrapNativeError, type SpotterErrorContext } from "./errors";
+import { callNative, type SpotterErrorContext } from "./errors";
 import { loadNative } from "./native";
 import { image } from "./image";
 import { toMatchResult, toNativeOpts } from "./match-shared";
@@ -27,14 +27,6 @@ function matchContext(needle: TemplateImage, options?: MatchOptions): SpotterErr
     region: options?.region,
     scale: options?.scale,
   };
-}
-
-function callNative<T>(api: string, context: SpotterErrorContext, fn: () => T): T {
-  try {
-    return fn();
-  } catch (error) {
-    throw wrapNativeError(api, error, context);
-  }
 }
 
 export function loadNeedleCapture(needle: TemplateImage): CaptureImage {

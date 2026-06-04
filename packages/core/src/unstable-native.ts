@@ -6,6 +6,7 @@
  * `accessibility` for normal scripts. This entrypoint is for low-level
  * integrations or unwrapped native capabilities.
  */
+import { SpotterError } from "@spotterjs/base";
 import type * as Node from "@spotterjs/node";
 
 /** Full generated N-API module type. */
@@ -58,26 +59,31 @@ function platformLabel(): string {
   return `${process.platform}/${process.arch}`;
 }
 
-function nativeLoadError(error: unknown): Error {
+function nativeLoadError(error: unknown): SpotterError {
   const missing = missingModuleName(error);
   const nodeVersion = packageVersion("@spotterjs/node");
 
   if (missing === "@spotterjs/node") {
-    const wrapped = new Error(
+    return new SpotterError(
+      "SPOTTER_NATIVE_PACKAGE_MISSING",
       [
         "spotterjs could not load @spotterjs/node.",
         "@spotterjs/core depends on @spotterjs/node, so the installation is incomplete.",
         "Run `npm install @spotterjs/core --include=optional` or reinstall dependencies.",
         `Original error: ${errorMessage(error)}`,
       ].join("\n"),
+      {
+        cause: error,
+        context: { missingPackage: missing },
+        domain: "native",
+      }
     );
-    (wrapped as Error & { cause?: unknown }).cause = error;
-    return wrapped;
   }
 
   if (missing?.startsWith("@spotterjs/node-")) {
     const expected = nodeVersion ? `${missing}@${nodeVersion}` : missing;
-    const wrapped = new Error(
+    return new SpotterError(
+      "SPOTTER_NATIVE_PACKAGE_MISSING",
       [
         `spotterjs native package is missing for ${platformLabel()}.`,
         `Expected optional package: ${expected}.`,
@@ -88,12 +94,29 @@ function nativeLoadError(error: unknown): Error {
           : "Maintainers: publish the matching native optional package before publishing @spotterjs/node.",
         `Original error: ${errorMessage(error)}`,
       ].join("\n"),
+      {
+        cause: error,
+        context: {
+          missingPackage: missing,
+          expectedPackage: expected,
+          platform: process.platform,
+          arch: process.arch,
+          nodeVersion,
+        },
+        domain: "native",
+      }
     );
-    (wrapped as Error & { cause?: unknown }).cause = error;
-    return wrapped;
   }
 
-  return error instanceof Error ? error : new Error(String(error));
+  return new SpotterError("SPOTTER_NATIVE_LOAD_FAILED", errorMessage(error), {
+    cause: error,
+    context: {
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion,
+    },
+    domain: "native",
+  });
 }
 
 /**

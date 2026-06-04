@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { getHostConfig } from "./config";
-import { HostPathError, resolveWorkspacePath } from "./paths";
+import { hostError, resolveWorkspacePath } from "./paths";
 
 export type ShellKind = "powershell" | "bash" | "custom";
 
@@ -77,9 +77,9 @@ export function execCommand(
   const { allowShell, workspaceRoot, execTimeoutMs } = getHostConfig();
   if (!allowShell) {
     return Promise.reject(
-      new HostPathError(
+      hostError(
         "shell execution disabled; set SPOTTERJS_ALLOW_SHELL=1 to enable host.exec",
-        "HOST_SHELL_DISABLED"
+        "SPOTTER_HOST_SHELL_DISABLED"
       )
     );
   }
@@ -114,7 +114,7 @@ export function execCommand(
       const text = chunk?.toString() ?? "";
       const nextBytes = Buffer.byteLength(stream === "stdout" ? stdout + text : stderr + text);
       if (nextBytes > maxBytes) {
-        fail(new HostPathError(`command ${stream} output exceeds limit ${maxBytes}`, "HOST_SHELL_OUTPUT_LIMIT", {
+        fail(hostError(`command ${stream} output exceeds limit ${maxBytes}`, "SPOTTER_HOST_SHELL_OUTPUT_LIMIT", {
           stream,
           maxBytes,
         }));
@@ -130,7 +130,7 @@ export function execCommand(
       append("stderr", d);
     });
     const timer = setTimeout(() => {
-      fail(new HostPathError(`command timed out after ${timeout}ms`, "HOST_SHELL_TIMEOUT", {
+      fail(hostError(`command timed out after ${timeout}ms`, "SPOTTER_HOST_SHELL_TIMEOUT", {
         timeoutMs: timeout,
       }));
     }, timeout);

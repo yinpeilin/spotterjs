@@ -5,6 +5,7 @@ import {
   type MatchOptions,
   type MatchResult,
 } from "@spotterjs/base";
+import { callNative, SpotterError } from "./errors";
 import { loadNative } from "./native";
 import { toMatchResult, toNativeOpts } from "./match-shared";
 
@@ -48,36 +49,64 @@ function isCaptureImage(source: unknown): source is CaptureImage {
 
 function assertPngFormat(format: string | undefined): void {
   if (format !== undefined && format !== "png") {
-    throw new Error("image.encode only supports png output");
+    throw new SpotterError(
+      "SPOTTER_CORE_IMAGE_FORMAT_UNSUPPORTED",
+      "image.encode only supports png output",
+      { context: { format }, domain: "core" }
+    );
   }
 }
 
 function load(source: ImageSource): CaptureImage {
   const native = loadNative();
-  if (typeof source === "string") return native.loadImageFromPath(source);
-  if (Buffer.isBuffer(source)) return native.loadImageFromBuffer(source);
+  if (typeof source === "string") {
+    return callNative("image.load", { source: "path", path: source }, () =>
+      native.loadImageFromPath(source)
+    );
+  }
+  if (Buffer.isBuffer(source)) {
+    return callNative("image.load", { source: "buffer" }, () =>
+      native.loadImageFromBuffer(source)
+    );
+  }
   if (isCaptureImage(source)) return source;
-  if ("path" in source) return native.loadImageFromPath(source.path);
-  if ("bytes" in source) return native.loadImageFromBuffer(source.bytes);
+  if ("path" in source) {
+    return callNative("image.load", { source: "path", path: source.path }, () =>
+      native.loadImageFromPath(source.path)
+    );
+  }
+  if ("bytes" in source) {
+    return callNative("image.load", { source: "buffer", mimeType: source.mimeType }, () =>
+      native.loadImageFromBuffer(source.bytes)
+    );
+  }
   return source.capture;
 }
 
 function read(imagePath: string): CaptureImage {
-  return loadNative().loadImageFromPath(imagePath);
+  return callNative("image.read", { path: imagePath }, () =>
+    loadNative().loadImageFromPath(imagePath)
+  );
 }
 
 function decode(bytes: Buffer): CaptureImage {
-  return loadNative().loadImageFromBuffer(bytes);
+  return callNative("image.decode", { source: "buffer" }, () =>
+    loadNative().loadImageFromBuffer(bytes)
+  );
 }
 
 function encode(capture: CaptureImage, options?: { format?: "png" }): Buffer {
   assertPngFormat(options?.format);
-  return loadNative().encodeCapturePng(capture);
+  return callNative("image.encode", { format: options?.format ?? "png" }, () =>
+    loadNative().encodeCapturePng(capture)
+  );
 }
 
 function encodeBase64(capture: CaptureImage, options?: { format?: "png" }): string {
   assertPngFormat(options?.format);
-  return loadNative().encodeCapturePngBase64(capture);
+  return callNative("image.encodeBase64", { format: options?.format ?? "png" }, () =>
+    loadNative().encodeCapturePngBase64(capture)
+  );
 }
 
 function save(
@@ -87,7 +116,11 @@ function save(
 ): ImageArtifact {
   assertPngFormat(options?.format);
   if (fs.existsSync(targetPath) && options?.overwrite !== true) {
-    throw new Error(`image already exists: ${targetPath}`);
+    throw new SpotterError(
+      "SPOTTER_CORE_IMAGE_ALREADY_EXISTS",
+      `image already exists: ${targetPath}`,
+      { context: { path: targetPath }, domain: "core" }
+    );
   }
 
   const png = encode(capture, { format: "png" });
@@ -103,7 +136,11 @@ function save(
 }
 
 function size(source: string | Buffer | CaptureImage): ImageSize {
-  if (typeof source === "string") return loadNative().getImageSize(source);
+  if (typeof source === "string") {
+    return callNative("image.size", { source: "path", path: source }, () =>
+      loadNative().getImageSize(source)
+    );
+  }
   if (Buffer.isBuffer(source)) {
     const decoded = decode(source);
     return { width: decoded.width, height: decoded.height };
@@ -117,8 +154,10 @@ async function find(
   options?: MatchOptions
 ): Promise<MatchResult> {
   const loadedNeedle = load(needle);
-  return toMatchResult(
-    loadNative().findTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
+  return callNative("image.find", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
+    toMatchResult(
+      loadNative().findTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
+    )
   );
 }
 
@@ -128,9 +167,11 @@ async function findAll(
   options?: MatchOptions
 ): Promise<MatchResult[]> {
   const loadedNeedle = load(needle);
-  return loadNative()
-    .findAllTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
-    .map(toMatchResult);
+  return callNative("image.findAll", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
+    loadNative()
+      .findAllTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
+      .map(toMatchResult)
+  );
 }
 
 export const image = {

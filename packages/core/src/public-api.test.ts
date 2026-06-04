@@ -17,9 +17,9 @@ describe("public API surface", () => {
     expect(core.image).toBeDefined();
     expect(core.mouse).toBeDefined();
     expect(core.keyboard).toBeDefined();
-    expect(core.SpotterJsError).toBeDefined();
-    expect(core.NativeSpotterError).toBeDefined();
-    expect(core.isSpotterJsError).toBeDefined();
+    expect(core.SpotterError).toBeDefined();
+    expect(core.isSpotterError).toBeDefined();
+    expect(core.toSpotterError).toBeDefined();
   });
 
   it("does not export removed root-level escape hatches or legacy helpers", () => {
@@ -37,6 +37,9 @@ describe("public API surface", () => {
     expect("encodePng" in core).toBe(false);
     expect("encodePngBase64" in core).toBe(false);
     expect("captureToBase64" in core).toBe(false);
+    expect("SpotterJsError" in core).toBe(false);
+    expect("NativeSpotterError" in core).toBe(false);
+    expect("isSpotterJsError" in core).toBe(false);
   });
 
   it("publishes native bindings only through explicit unstable subpaths", () => {

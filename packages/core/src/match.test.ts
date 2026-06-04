@@ -34,7 +34,7 @@ import {
   loadNeedleCapture,
   waitForNeedle,
 } from "./match";
-import { NativeSpotterError } from "./errors";
+import { SpotterError } from "./errors";
 
 beforeEach(() => {
   findTemplate.mockReset();
@@ -140,23 +140,30 @@ describe("findNeedle", () => {
   });
 
   it("wraps native matching errors with stable code and context", async () => {
-    const error = new Error("template not found");
-    (error as Error & { code?: string }).code = "MATCH_NOT_FOUND";
+    const error = new Error(
+      `SPOTTER_ERROR_JSON:${JSON.stringify({
+        code: "SPOTTER_NATIVE_MATCH_NOT_FOUND",
+        message: "template not found",
+        domain: "native",
+        context: { confidence: 0.99 },
+      })}`
+    );
     findTemplate.mockImplementation(() => {
       throw error;
     });
 
     await expect(findNeedle("missing.png", { confidence: 0.99 })).rejects.toMatchObject({
-      name: "NativeSpotterError",
-      code: "NATIVE_MATCH_NOT_FOUND",
+      name: "SpotterError",
+      code: "SPOTTER_NATIVE_MATCH_NOT_FOUND",
       message: "findNeedle failed: template not found",
+      domain: "native",
       context: {
         api: "findNeedle",
         confidence: 0.99,
         needle: "path",
       },
     });
-    await expect(findNeedle("missing.png")).rejects.toBeInstanceOf(NativeSpotterError);
+    await expect(findNeedle("missing.png")).rejects.toBeInstanceOf(SpotterError);
   });
 });
 

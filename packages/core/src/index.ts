@@ -1,5 +1,6 @@
 import { loadNative } from "./native";
 import { centerOf } from "@spotterjs/base";
+import { callNative, SpotterError } from "./errors";
 
 type LetterKey =
   | "A"
@@ -211,36 +212,48 @@ function sleepSync(ms: number) {
 
 function callKeyboardTypeText(text: string, options?: KeyboardTapOptions) {
   const config = nativeKeyboardConfig(options);
-  const n = nativeKeyboard();
-  if (config) n.keyboardTypeText(text, config);
-  else n.keyboardTypeText(text);
+  callNative("keyboard.write", { config }, () => {
+    const n = nativeKeyboard();
+    if (config) n.keyboardTypeText(text, config);
+    else n.keyboardTypeText(text);
+  });
 }
 
 function callKeyboardTypeKey(key: string, options?: KeyboardTapOptions) {
   const config = nativeKeyboardConfig(options);
-  const n = nativeKeyboard();
-  if (config) n.keyboardTypeKey(key, config);
-  else n.keyboardTypeKey(key);
+  callNative("keyboard.tap", { key, config }, () => {
+    const n = nativeKeyboard();
+    if (config) n.keyboardTypeKey(key, config);
+    else n.keyboardTypeKey(key);
+  });
 }
 
 function callKeyboardPressKeys(keys: string[], options?: KeyboardTapOptions) {
   const config = nativeKeyboardConfig(options);
-  const n = nativeKeyboard();
-  if (config) n.keyboardPressKeys(keys, config);
-  else n.keyboardPressKeys(keys);
+  callNative("keyboard.down", { keys, config }, () => {
+    const n = nativeKeyboard();
+    if (config) n.keyboardPressKeys(keys, config);
+    else n.keyboardPressKeys(keys);
+  });
 }
 
 function callKeyboardReleaseKeys(keys: string[], options?: KeyboardTapOptions) {
   const config = nativeKeyboardConfig(options);
-  const n = nativeKeyboard();
-  if (config) n.keyboardReleaseKeys(keys, config);
-  else n.keyboardReleaseKeys(keys);
+  callNative("keyboard.up", { keys, config }, () => {
+    const n = nativeKeyboard();
+    if (config) n.keyboardReleaseKeys(keys, config);
+    else n.keyboardReleaseKeys(keys);
+  });
 }
 
 function normalizeTapKey(key: TapKeyInput): string {
   if (typeof key === "number") {
     if (!Number.isInteger(key) || key < 0 || key > 9) {
-      throw new RangeError(`keyboard.tap number key must be an integer from 0 to 9: ${key}`);
+      throw new SpotterError(
+        "SPOTTER_CORE_INVALID_ARGUMENT",
+        `keyboard.tap number key must be an integer from 0 to 9: ${key}`,
+        { context: { key }, domain: "core" }
+      );
     }
     return String(key);
   }
@@ -258,13 +271,13 @@ function pasteText(text: string, options?: KeyboardWriteOptions) {
       previous = undefined;
     }
   }
-  n.clipboardSet(text);
+  callNative("keyboard.write.clipboardSet", {}, () => n.clipboardSet(text));
   try {
     keyboard.hotkey(["Ctrl", "V"], options);
     sleepSync(effectiveKeyboardDelayMs(options));
   } finally {
     if (shouldRestore && previous !== undefined) {
-      n.clipboardSet(previous);
+      callNative("keyboard.write.restoreClipboard", {}, () => n.clipboardSet(previous));
     }
   }
 }
@@ -278,47 +291,53 @@ function pasteText(text: string, options?: KeyboardWriteOptions) {
 export const mouse = {
   /** Return the current cursor position in screen coordinates. */
   getPosition() {
-    return loadNative().getPosition();
+    return callNative("mouse.getPosition", {}, () => loadNative().getPosition());
   },
 
   /** Move the cursor to `(x, y)` using native movement settings. */
   move(x: number, y: number) {
-    loadNative().mouseMove(x, y);
+    callNative("mouse.move", { x, y }, () => loadNative().mouseMove(x, y));
   },
 
   /** Move the cursor through each point in order. */
   movePath(points: Array<{ x: number; y: number }>) {
-    loadNative().mouseMovePath(points);
+    callNative("mouse.movePath", { points }, () => loadNative().mouseMovePath(points));
   },
 
   /** Move directly to `(x, y)` with a straight-line native movement. */
   moveStraight(x: number, y: number) {
-    loadNative().mouseMoveStraight(x, y);
+    callNative("mouse.moveStraight", { x, y }, () =>
+      loadNative().mouseMoveStraight(x, y)
+    );
   },
 
   /** Click a mouse button. Defaults to the left button. */
   click(button?: "left" | "right" | "middle") {
-    loadNative().mouseClick(button);
+    callNative("mouse.click", { button }, () => loadNative().mouseClick(button));
   },
 
   /** Double-click a mouse button. Defaults to the left button. */
   doubleClick(button?: "left" | "right" | "middle") {
-    loadNative().mouseDoubleClick(button);
+    callNative("mouse.doubleClick", { button }, () =>
+      loadNative().mouseDoubleClick(button)
+    );
   },
 
   /** Press and hold a mouse button. */
   press(button?: "left" | "right" | "middle") {
-    loadNative().mousePress(button);
+    callNative("mouse.press", { button }, () => loadNative().mousePress(button));
   },
 
   /** Release a mouse button. */
   release(button?: "left" | "right" | "middle") {
-    loadNative().mouseRelease(button);
+    callNative("mouse.release", { button }, () => loadNative().mouseRelease(button));
   },
 
   /** Drag to `(x, y)` while holding a mouse button. */
   drag(x: number, y: number, button?: "left" | "right" | "middle") {
-    loadNative().mouseDrag(x, y, button);
+    callNative("mouse.drag", { x, y, button }, () =>
+      loadNative().mouseDrag(x, y, button)
+    );
   },
 
   /**
@@ -327,26 +346,28 @@ export const mouse = {
    * @param amount Scroll amount. Defaults to `1`.
    */
   scroll(direction: "up" | "down" | "left" | "right", amount = 1) {
-    const n = loadNative();
-    switch (direction) {
-      case "up":
-        n.mouseScrollUp(amount);
-        break;
-      case "down":
-        n.mouseScrollDown(amount);
-        break;
-      case "left":
-        n.mouseScrollLeft(amount);
-        break;
-      case "right":
-        n.mouseScrollRight(amount);
-        break;
-    }
+    callNative("mouse.scroll", { direction, amount }, () => {
+      const n = loadNative();
+      switch (direction) {
+        case "up":
+          n.mouseScrollUp(amount);
+          break;
+        case "down":
+          n.mouseScrollDown(amount);
+          break;
+        case "left":
+          n.mouseScrollLeft(amount);
+          break;
+        case "right":
+          n.mouseScrollRight(amount);
+          break;
+      }
+    });
   },
 
   /** Move to `(x, y)` and click. */
   tap(x: number, y: number, button?: "left" | "right" | "middle") {
-    loadNative().tapAt(x, y, button);
+    callNative("mouse.tap", { x, y, button }, () => loadNative().tapAt(x, y, button));
   },
 
   /**
@@ -355,10 +376,12 @@ export const mouse = {
    * @param config.mouseSpeed Native mouse movement speed.
    */
   setConfig(config: { autoDelayMs?: number; mouseSpeed?: number }) {
-    loadNative().setMouseConfig({
-      autoDelayMs: config.autoDelayMs,
-      mouseSpeed: config.mouseSpeed,
-    });
+    callNative("mouse.setConfig", { config }, () =>
+      loadNative().setMouseConfig({
+        autoDelayMs: config.autoDelayMs,
+        mouseSpeed: config.mouseSpeed,
+      })
+    );
   },
 };
 
@@ -440,17 +463,19 @@ export const keyboard = {
   /** @param config.autoDelayMs Delay between key events. */
   setConfig(config: { autoDelayMs?: number }) {
     keyboardDefaultAutoDelayMs = config.autoDelayMs ?? 10;
-    loadNative().setKeyboardConfig({ autoDelayMs: config.autoDelayMs });
+    callNative("keyboard.setConfig", { config }, () =>
+      loadNative().setKeyboardConfig({ autoDelayMs: config.autoDelayMs })
+    );
   },
 };
 
 /** System clipboard text helpers. */
 export const clipboard = {
   set(text: string) {
-    loadNative().clipboardSet(text);
+    callNative("clipboard.set", {}, () => loadNative().clipboardSet(text));
   },
   get(): string {
-    return loadNative().clipboardGet();
+    return callNative("clipboard.get", {}, () => loadNative().clipboardGet());
   },
 };
 
@@ -473,10 +498,10 @@ export type {
   TreeNodeDump,
 } from "./accessibility";
 export { desktop } from "./desktop";
-export { host, configureHost, HostPathError } from "./host";
+export { host, configureHost } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";
-export { SpotterJsError, NativeSpotterError, isSpotterJsError } from "./errors";
-export type { SpotterErrorContext } from "./errors";
+export { SpotterError, isSpotterError, toSpotterError } from "./errors";
+export type { SpotterErrorCode, SpotterErrorContext } from "./errors";
 export {
   image,
   type ImageArtifact,

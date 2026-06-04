@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { configureHost, host, HostPathError } from "./index";
+import { SpotterError } from "../errors";
+import { configureHost, host } from "./index";
 
 describe("host", () => {
   let tmp: string;
@@ -54,27 +55,29 @@ describe("host", () => {
   });
 
   it("rejects writes to denylisted filenames", () => {
-    expect(() => host.writeFile(".env", "SECRET=1")).toThrow(HostPathError);
+    expect(() => host.writeFile(".env", "SECRET=1")).toThrow(SpotterError);
 
     try {
       host.writeFile(".env", "SECRET=1");
     } catch (error) {
       expect(error).toMatchObject({
-        name: "HostPathError",
-        code: "HOST_WRITE_DENIED",
+        name: "SpotterError",
+        code: "SPOTTER_HOST_WRITE_DENIED",
+        domain: "host",
         context: { basename: ".env" },
       });
     }
   });
 
   it("rejects path outside workspace", () => {
-    expect(() => host.readFile("../../../etc/passwd")).toThrow(HostPathError);
+    expect(() => host.readFile("../../../etc/passwd")).toThrow(SpotterError);
     try {
       host.readFile("../../../etc/passwd");
     } catch (error) {
       expect(error).toMatchObject({
-        name: "HostPathError",
-        code: "HOST_PATH_OUTSIDE_WORKSPACE",
+        name: "SpotterError",
+        code: "SPOTTER_HOST_PATH_OUTSIDE_WORKSPACE",
+        domain: "host",
         context: {
           userPath: "../../../etc/passwd",
         },
@@ -87,13 +90,14 @@ describe("host", () => {
 
     await expect(
       host.exec("echo should-not-run", { cwd: path.dirname(tmp) })
-    ).rejects.toThrow(HostPathError);
+    ).rejects.toThrow(SpotterError);
   });
 
   it("rejects shell execution when disabled", async () => {
     await expect(host.exec("echo no-shell")).rejects.toMatchObject({
-      name: "HostPathError",
-      code: "HOST_SHELL_DISABLED",
+      name: "SpotterError",
+      code: "SPOTTER_HOST_SHELL_DISABLED",
+      domain: "host",
     });
   });
 

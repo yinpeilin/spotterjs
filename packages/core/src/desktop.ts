@@ -1,4 +1,5 @@
 import type { DesktopApp, WindowInfo } from "@spotterjs/base";
+import { callNative } from "./errors";
 import { loadNative, type NativeDesktopApp, type NativeWindow } from "./native";
 
 function mapWindow(w: NativeWindow): WindowInfo {
@@ -36,25 +37,31 @@ export const desktop = {
    * List current desktop applications and their top-level windows.
    *
    * The result is a snapshot at call time.
-   */
+  */
   listApps(): DesktopApp[] {
-    return loadNative().listDesktopApps().map(mapApp);
+    return callNative("desktop.listApps", {}, () =>
+      loadNative().listDesktopApps().map(mapApp)
+    );
   },
 
   /**
    * Find applications by process name or executable path substring.
    * @param substring Process name or path fragment, such as `"notepad"`.
-   */
+  */
   findApps(substring: string): DesktopApp[] {
-    return loadNative().findDesktopApps(substring).map(mapApp);
+    return callNative("desktop.findApps", { substring }, () =>
+      loadNative().findDesktopApps(substring).map(mapApp)
+    );
   },
 
   /**
    * Find top-level windows by title substring.
    * @param substring Title fragment.
-   */
+  */
   findWindows(substring: string): WindowInfo[] {
-    return loadNative().findWindowsByTitle(substring).map(mapWindow);
+    return callNative("desktop.findWindows", { substring }, () =>
+      loadNative().findWindowsByTitle(substring).map(mapWindow)
+    );
   },
 
   /**
@@ -70,13 +77,17 @@ export const desktop = {
     timeoutMs: number,
     pollMs?: number
   ): WindowInfo {
-    return mapWindow(
-      loadNative().waitForWindowByTitle(substring, timeoutMs, pollMs)
+    return callNative(
+      "desktop.waitForWindow",
+      { substring, timeoutMs, pollMs },
+      () => mapWindow(loadNative().waitForWindowByTitle(substring, timeoutMs, pollMs))
     );
   },
 
   /** Return the application that owns the current foreground window. */
   getForegroundApp(): DesktopApp {
-    return mapApp(loadNative().getForegroundApp());
+    return callNative("desktop.getForegroundApp", {}, () =>
+      mapApp(loadNative().getForegroundApp())
+    );
   },
 };

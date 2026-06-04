@@ -12,6 +12,7 @@ import {
   findNeedle,
   waitForNeedle,
 } from "./match";
+import { callNative } from "./errors";
 import { loadNative } from "./native";
 
 /**
@@ -30,17 +31,17 @@ import { loadNative } from "./native";
 export const screen = {
   /** Return the primary screen width in pixels. */
   width(): number {
-    return loadNative().getScreenWidth();
+    return callNative("screen.width", {}, () => loadNative().getScreenWidth());
   },
 
   /** Return the primary screen height in pixels. */
   height(): number {
-    return loadNative().getScreenHeight();
+    return callNative("screen.height", {}, () => loadNative().getScreenHeight());
   },
 
   /** Return the primary screen size. */
   size(): { width: number; height: number } {
-    return loadNative().getScreenSize();
+    return callNative("screen.size", {}, () => loadNative().getScreenSize());
   },
 
   /**
@@ -59,13 +60,18 @@ export const screen = {
    * @param windowId {@link WindowInfo.id}
    */
   captureWindow(windowId: string): CaptureImage {
-    return loadNative().captureWindow(windowId);
+    return callNative("screen.captureWindow", { windowId }, () =>
+      loadNative().captureWindow(windowId)
+    );
   },
 
   /** Capture the current foreground window. */
   captureActive(): CaptureImage {
-    const active = loadNative().getActiveWindow();
-    return loadNative().captureWindow(active.id);
+    return callNative("screen.captureActive", {}, () => {
+      const native = loadNative();
+      const active = native.getActiveWindow();
+      return native.captureWindow(active.id);
+    });
   },
 
   /**
@@ -79,7 +85,7 @@ export const screen = {
     const native = loadNative();
     const match = await findNeedle(needle, options);
     const { x, y } = match.center;
-    native.tapAt(x, y);
+    callNative("screen.tap", { x, y }, () => native.tapAt(x, y));
     return match;
   },
 

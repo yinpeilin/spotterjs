@@ -1,5 +1,5 @@
 export { configureHost, getHostConfig, type HostConfig } from "./config";
-export { HostPathError, resolveWorkspacePath } from "./paths";
+export { resolveWorkspacePath } from "./paths";
 export { getShellInfo, execCommand, type ShellInfo, type ShellKind, type ExecResult } from "./shell";
 export {
   readFile,
