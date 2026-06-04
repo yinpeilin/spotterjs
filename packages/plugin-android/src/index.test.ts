@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocketServer } from "ws";
-import { android, AndroidCompanionError } from "./index";
+import * as androidPlugin from "./index";
+import { android, isSpotterError, SpotterError } from "./index";
 
 type Json = Record<string, unknown>;
 
@@ -255,9 +256,11 @@ describe("android companion websocket client", () => {
     });
 
     await expect(android.pair({ url, code: "000000" })).rejects.toMatchObject({
-      name: "AndroidCompanionError",
-      code: "PAIRING_CODE_INVALID",
+      name: "SpotterError",
+      code: "SPOTTER_ANDROID_COMPANION_ERROR",
       message: "pairing code is invalid",
+      context: { remoteCode: "PAIRING_CODE_INVALID" },
+      domain: "android",
     });
   });
 
@@ -291,8 +294,9 @@ describe("android companion websocket client", () => {
     });
 
     await expect(android.pair({ url, code: "123456" })).rejects.toMatchObject({
-      name: "AndroidCompanionError",
-      code: "ANDROID_COMPANION_INVALID_MESSAGE",
+      name: "SpotterError",
+      code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
+      domain: "android",
     });
   });
 
@@ -320,9 +324,10 @@ describe("android companion websocket client", () => {
     const device = await android.pair({ url, code: "123456" });
 
     await expect(device.heartbeat()).rejects.toMatchObject({
-      name: "AndroidCompanionError",
-      code: "ANDROID_COMPANION_INVALID_MESSAGE",
+      name: "SpotterError",
+      code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       context: { responseType: "status" },
+      domain: "android",
     });
 
     device.close();
@@ -336,8 +341,9 @@ describe("android companion websocket client", () => {
     await expect(
       android.pair({ url, code: "123456", timeoutMs: 25 })
     ).rejects.toMatchObject({
-      name: "AndroidCompanionError",
-      code: "ANDROID_COMPANION_TIMEOUT",
+      name: "SpotterError",
+      code: "SPOTTER_ANDROID_COMPANION_TIMEOUT",
+      domain: "android",
     });
   });
 
@@ -347,8 +353,18 @@ describe("android companion websocket client", () => {
     });
 
     await expect(android.pair({ url, code: "123456" })).rejects.toMatchObject({
-      name: "AndroidCompanionError",
-      code: "ANDROID_COMPANION_INVALID_MESSAGE",
+      name: "SpotterError",
+      code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
+      domain: "android",
     });
+  });
+
+  it("exports the shared SpotterError API", () => {
+    const error = new SpotterError("SPOTTER_ANDROID_COMPANION_TIMEOUT", "timeout", {
+      domain: "android",
+    });
+
+    expect(isSpotterError(error)).toBe(true);
+    expect("AndroidCompanionError" in androidPlugin).toBe(false);
   });
 });

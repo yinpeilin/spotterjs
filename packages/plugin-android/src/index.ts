@@ -1,29 +1,38 @@
 import WebSocket = require("ws");
-import type { Point, Region } from "@spotterjs/base";
+import {
+  isSpotterError,
+  SpotterError,
+  toSpotterError,
+  type Point,
+  type Region,
+  type SpotterErrorCode,
+  type SpotterErrorContext,
+  type SpotterErrorOptions,
+} from "@spotterjs/base";
 
 const PROTOCOL_VERSION = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-export type AndroidCompanionErrorCode =
-  | "ANDROID_COMPANION_TIMEOUT"
-  | "ANDROID_COMPANION_CONNECTION_CLOSED"
-  | "ANDROID_COMPANION_INVALID_MESSAGE"
-  | string;
+export type AndroidErrorCode = `SPOTTER_ANDROID_${string}`;
+export type AndroidErrorContext = SpotterErrorContext;
 
-export class AndroidCompanionError extends Error {
-  readonly code: AndroidCompanionErrorCode;
-  readonly context?: Record<string, unknown>;
+export {
+  isSpotterError,
+  SpotterError,
+  toSpotterError,
+  type SpotterErrorCode,
+  type SpotterErrorContext,
+};
 
-  constructor(
-    code: AndroidCompanionErrorCode,
-    message: string,
-    context?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = "AndroidCompanionError";
-    this.code = code;
-    this.context = context;
-  }
+function androidError(
+  code: AndroidErrorCode,
+  message: string,
+  options: Omit<SpotterErrorOptions, "domain"> = {}
+): SpotterError {
+  return new SpotterError(code, message, {
+    ...options,
+    domain: "android",
+  });
 }
 
 export interface AndroidPairOptions {
@@ -122,13 +131,20 @@ class SocketSession {
     socket.on("message", (raw: RawData) => this.onMessage(raw));
     socket.on("close", () =>
       this.fail(
-        new AndroidCompanionError(
-          "ANDROID_COMPANION_CONNECTION_CLOSED",
+        androidError(
+          "SPOTTER_ANDROID_COMPANION_CONNECTION_CLOSED",
           "Android companion connection closed"
         )
       )
     );
-    socket.on("error", (error) => this.fail(error));
+    socket.on("error", (error) =>
+      this.fail(
+        androidError("SPOTTER_ANDROID_COMPANION_CONNECTION_FAILED", "Android companion socket error", {
+          context: { message: error.message },
+          cause: error,
+        })
+      )
+    );
   }
 
   close(): void {
@@ -138,7 +154,14 @@ class SocketSession {
   send(message: JsonMessage): Promise<void> {
     return new Promise((resolve, reject) => {
       this.socket.send(JSON.stringify(message), (error: Error | undefined) => {
-        if (error) reject(error);
+        if (error) {
+          reject(
+            androidError("SPOTTER_ANDROID_COMPANION_SEND_FAILED", "Failed to send Android companion message", {
+              context: { messageType: message.type },
+              cause: error,
+            })
+          );
+        }
         else resolve();
       });
     });
@@ -157,10 +180,10 @@ class SocketSession {
       const timer = setTimeout(() => {
         this.removeWaiter(waiter);
         reject(
-          new AndroidCompanionError(
-            "ANDROID_COMPANION_TIMEOUT",
+          androidError(
+            "SPOTTER_ANDROID_COMPANION_TIMEOUT",
             "Timed out waiting for Android companion response",
-            { timeoutMs }
+            { context: { timeoutMs } }
           )
         );
       }, timeoutMs);
@@ -359,10 +382,10 @@ class CompanionDevice implements AndroidCompanionDevice {
         throw errorFromMessage(response);
       }
       if (response.type !== expectedType) {
-        throw new AndroidCompanionError(
-          "ANDROID_COMPANION_INVALID_MESSAGE",
+        throw androidError(
+          "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
           `Expected ${expectedType} response, got ${String(response.type)}`,
-          { responseType: response.type }
+          { context: { responseType: response.type } }
         );
       }
       return response;
@@ -413,10 +436,10 @@ function openSession(url: string, timeoutMs: number): Promise<SocketSession> {
     const timer = setTimeout(() => {
       socket.close();
       reject(
-        new AndroidCompanionError(
-          "ANDROID_COMPANION_TIMEOUT",
+        androidError(
+          "SPOTTER_ANDROID_COMPANION_TIMEOUT",
           "Timed out opening Android companion connection",
-          { timeoutMs, url }
+          { context: { timeoutMs, url } }
         )
       );
     }, timeoutMs);
@@ -426,7 +449,12 @@ function openSession(url: string, timeoutMs: number): Promise<SocketSession> {
     });
     socket.once("error", (error: Error) => {
       clearTimeout(timer);
-      reject(error);
+      reject(
+        androidError("SPOTTER_ANDROID_COMPANION_CONNECTION_FAILED", "Failed to open Android companion connection", {
+          context: { url, message: error.message },
+          cause: error,
+        })
+      );
     });
   });
 }
@@ -459,50 +487,59 @@ function pairSession(
 
 function assertMessageType(message: JsonMessage, expectedType: string): void {
   if (message.type !== expectedType) {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `Expected ${expectedType} response, got ${String(message.type)}`,
-      { responseType: message.type }
+      { context: { responseType: message.type } }
     );
   }
 }
 
 function assertProtocolVersion(message: JsonMessage): void {
   if (message.protocolVersion !== PROTOCOL_VERSION) {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `Expected protocolVersion ${PROTOCOL_VERSION}, got ${String(message.protocolVersion)}`,
-      { protocolVersion: message.protocolVersion }
+      { context: { protocolVersion: message.protocolVersion } }
     );
   }
 }
 
 function parseMessage(raw: RawData): JsonMessage {
-  const parsed = JSON.parse(String(raw)) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw)) as unknown;
+  } catch (error) {
+    throw androidError("SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE", "Android companion message must be valid JSON", {
+      context: { raw: String(raw).slice(0, 200) },
+      cause: error,
+    });
+  }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       "Android companion message must be a JSON object"
     );
   }
   return parsed as JsonMessage;
 }
 
-function errorFromMessage(message: JsonMessage): AndroidCompanionError {
-  return new AndroidCompanionError(
-    readOptionalString(message, "code") ?? "ANDROID_COMPANION_ERROR",
+function errorFromMessage(message: JsonMessage): SpotterError {
+  const remoteCode = readOptionalString(message, "code");
+  return androidError(
+    "SPOTTER_ANDROID_COMPANION_ERROR",
     readOptionalString(message, "message") ?? "Android companion returned an error",
-    { response: message }
+    { context: { response: message, ...defined({ remoteCode }) } }
   );
 }
 
 function readString(message: JsonMessage, key: string): string {
   const value = message[key];
   if (typeof value !== "string") {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a string`,
-      { key, value }
+      { context: { key, value } }
     );
   }
   return value;
@@ -512,10 +549,10 @@ function readOptionalString(message: JsonMessage, key: string): string | undefin
   const value = message[key];
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string") {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a string`,
-      { key, value }
+      { context: { key, value } }
     );
   }
   return value;
@@ -524,10 +561,10 @@ function readOptionalString(message: JsonMessage, key: string): string | undefin
 function readNumber(message: JsonMessage, key: string): number {
   const value = message[key];
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a finite number`,
-      { key, value }
+      { context: { key, value } }
     );
   }
   return value;
@@ -536,10 +573,10 @@ function readNumber(message: JsonMessage, key: string): number {
 function readObject(message: JsonMessage, key: string): Record<string, unknown> {
   const value = message[key];
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new AndroidCompanionError(
-      "ANDROID_COMPANION_INVALID_MESSAGE",
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be an object`,
-      { key, value }
+      { context: { key, value } }
     );
   }
   return value as Record<string, unknown>;
