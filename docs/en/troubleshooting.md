@@ -91,6 +91,17 @@ Check:
 
 See [MCP server](./MCP.md).
 
+## Structured Error Codes
+
+First-party libraries throw `SpotterError` with
+`SPOTTER_<DOMAIN>_<REASON>` codes. Use `isSpotterError(error)` and inspect
+`error.domain` plus `error.context` for diagnostics.
+
+Common setup codes include `SPOTTER_NATIVE_PACKAGE_MISSING`,
+`SPOTTER_NATIVE_LOAD_FAILED`, `SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`, and
+`SPOTTER_ANDROID_COMPANION_TIMEOUT`. MCP tool failures include the same
+`code`, compressed `context`, and `domain` in the text result.
+
 ## Markdown Check Fails
 
 ```bash

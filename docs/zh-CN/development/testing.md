@@ -117,12 +117,13 @@ npm run docs:check
 
 ```typescript
 await expect(ocr.findText(image, "Missing")).rejects.toMatchObject({
-  name: "OcrError",
-  code: "OCR_TEXT_NOT_FOUND",
+  name: "SpotterError",
+  code: "SPOTTER_OCR_TEXT_NOT_FOUND",
   context: { text: "Missing" },
+  domain: "ocr",
 });
 ```
 
-应用代码需要可编程 catch 时，优先使用 `isSpotterJsError`、`isOcrError`、
-稳定的 `code` 字段。不要快照整个
-错误对象，因为 `cause` 和平台错误消息可能随环境变化。
+应用代码需要可编程 catch 时，优先使用 `isSpotterError` 或稳定的
+`SPOTTER_<DOMAIN>_<REASON>` code。不要快照整个错误对象，因为 `cause`
+和平台错误消息可能随环境变化。

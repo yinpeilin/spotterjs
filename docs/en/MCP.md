@@ -65,15 +65,15 @@ or a custom shell.
 
 Tool failures still return MCP `isError: true` text responses for compatibility.
 When the underlying library exposes structured diagnostics, the text includes a
-stable `code` and a short serialized `context` summary:
+stable `code`, a short serialized `context` summary, and `domain`:
 
 ```text
-ocr_find_text failed: OCR text not found: Send (code=OCR_TEXT_NOT_FOUND context={"text":"Send","exact":true})
+ocr_find_text failed: OCR text not found: Send (code=SPOTTER_OCR_TEXT_NOT_FOUND context={"text":"Send","exact":true} domain=ocr)
 ```
 
-Use `code` for retry and troubleshooting logic. Context values are intentionally
-small, serializable, and should not contain large binary data or sensitive file
-contents.
+Use `code` and `domain` for retry and troubleshooting logic. Context values are
+intentionally small, serializable, and should not contain large binary data or
+sensitive file contents.
 
 ## Capture Artifacts
 

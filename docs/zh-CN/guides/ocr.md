@@ -194,22 +194,25 @@ npm run test -w @spotterjs/plugin-ocr -- src/onnx.integration.test.ts
 更多排障见 [排障指南](../troubleshooting.md)。
 ## Error handling
 
-`@spotterjs/plugin-ocr` 导出 `OcrError`、`OcrErrorCode` 和 `isOcrError`。
-API 仍然抛出普通 `Error` 实例，但错误会带稳定 `code` 和短小 `context`：
+`@spotterjs/plugin-ocr` 重新导出 `SpotterError`、`isSpotterError` 和
+`toSpotterError`。OCR 错误使用稳定的 `SPOTTER_OCR_*` code、`domain:
+"ocr"` 和短小 `context`：
 
 ```typescript
-import { createOcr, isOcrError } from "@spotterjs/plugin-ocr";
+import { createOcr, isSpotterError } from "@spotterjs/plugin-ocr";
 
 try {
   const ocr = await createOcr({ modelProfile: "server" });
   await ocr.findText(cap, "Send", { exact: true });
 } catch (error) {
-  if (isOcrError(error) && error.code === "OCR_TEXT_NOT_FOUND") {
+  if (isSpotterError(error) && error.code === "SPOTTER_OCR_TEXT_NOT_FOUND") {
     console.log(error.context);
   }
 }
 ```
 
-常见 code 包括 `OCR_MODEL_PROFILE_UNKNOWN`、`OCR_MODEL_DOWNLOAD_FAILED`、
-`OCR_MODEL_SHA256_MISMATCH`、`OCR_MODEL_FILE_MISSING`、`OCR_IMAGE_INVALID`、
-`OCR_INVALID_ARGUMENT`、`OCR_TEXT_NOT_FOUND` 和 `OCR_ONNX_INVALID_OUTPUT`。
+常见 code 包括 `SPOTTER_OCR_MODEL_PROFILE_UNKNOWN`、
+`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`、`SPOTTER_OCR_MODEL_SHA256_MISMATCH`、
+`SPOTTER_OCR_MODEL_FILE_MISSING`、`SPOTTER_OCR_IMAGE_INVALID`、
+`SPOTTER_OCR_INVALID_ARGUMENT`、`SPOTTER_OCR_TEXT_NOT_FOUND` 和
+`SPOTTER_OCR_ONNX_INVALID_OUTPUT`。

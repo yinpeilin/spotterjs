@@ -50,13 +50,14 @@ stable `code` and only the diagnostic `context` fields the caller needs:
 
 ```typescript
 await expect(ocr.findText(image, "Missing")).rejects.toMatchObject({
-  name: "OcrError",
-  code: "OCR_TEXT_NOT_FOUND",
+  name: "SpotterError",
+  code: "SPOTTER_OCR_TEXT_NOT_FOUND",
   context: { text: "Missing" },
+  domain: "ocr",
 });
 ```
 
-Prefer `isSpotterJsError`, `isOcrError`, or stable `code` fields when
+Prefer `isSpotterError` or stable `SPOTTER_<DOMAIN>_<REASON>` codes when
 application code needs programmable catch behavior. Avoid snapshotting whole
 error objects because `cause` and platform messages may vary.
 

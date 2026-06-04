@@ -62,13 +62,13 @@ npm run build -w @spotterjs/mcp
 ## 错误诊断
 
 工具失败时仍返回兼容 MCP 的 `isError: true` 文本结果。底层库提供结构化诊断时，
-文本会包含稳定的 `code` 和短小的 `context` 摘要：
+文本会包含稳定的 `code`、短小的 `context` 摘要和 `domain`：
 
 ```text
-ocr_find_text failed: OCR text not found: Send (code=OCR_TEXT_NOT_FOUND context={"text":"Send","exact":true})
+ocr_find_text failed: OCR text not found: Send (code=SPOTTER_OCR_TEXT_NOT_FOUND context={"text":"Send","exact":true} domain=ocr)
 ```
 
-重试和排障逻辑可以依赖 `code`。`context` 只包含短小、可序列化的信息，
+重试和排障逻辑可以依赖 `code` 和 `domain`。`context` 只包含短小、可序列化的信息，
 不应包含大型二进制数据或敏感文件内容。
 
 ## 截图产物

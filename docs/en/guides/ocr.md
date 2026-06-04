@@ -73,27 +73,28 @@ text match diagnostics:
 
 ## Error Handling
 
-`@spotterjs/plugin-ocr` exports `OcrError`, `OcrErrorCode`, and `isOcrError`.
-OCR APIs still throw normal `Error` instances, but structured failures include
-stable `code` values and small diagnostic `context` objects.
+`@spotterjs/plugin-ocr` re-exports `SpotterError`, `isSpotterError`, and
+`toSpotterError`. OCR failures use stable `SPOTTER_OCR_*` codes, `domain:
+"ocr"`, and small diagnostic `context` objects.
 
 ```typescript
-import { createOcr, isOcrError } from "@spotterjs/plugin-ocr";
+import { createOcr, isSpotterError } from "@spotterjs/plugin-ocr";
 
 try {
   const ocr = await createOcr({ modelProfile: "server" });
   await ocr.findText(cap, "Send", { exact: true });
 } catch (error) {
-  if (isOcrError(error) && error.code === "OCR_TEXT_NOT_FOUND") {
+  if (isSpotterError(error) && error.code === "SPOTTER_OCR_TEXT_NOT_FOUND") {
     console.log(error.context);
   }
 }
 ```
 
-Common codes include `OCR_MODEL_PROFILE_UNKNOWN`,
-`OCR_MODEL_DOWNLOAD_FAILED`, `OCR_MODEL_SHA256_MISMATCH`,
-`OCR_MODEL_FILE_MISSING`, `OCR_IMAGE_INVALID`, `OCR_INVALID_ARGUMENT`,
-`OCR_TEXT_NOT_FOUND`, and `OCR_ONNX_INVALID_OUTPUT`.
+Common codes include `SPOTTER_OCR_MODEL_PROFILE_UNKNOWN`,
+`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`, `SPOTTER_OCR_MODEL_SHA256_MISMATCH`,
+`SPOTTER_OCR_MODEL_FILE_MISSING`, `SPOTTER_OCR_IMAGE_INVALID`,
+`SPOTTER_OCR_INVALID_ARGUMENT`, `SPOTTER_OCR_TEXT_NOT_FOUND`, and
+`SPOTTER_OCR_ONNX_INVALID_OUTPUT`.
 
 ## Coordinates and Cropping
 

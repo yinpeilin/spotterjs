@@ -52,6 +52,28 @@ await phone.home();
 
 坐标使用 Android 设备屏幕坐标。
 
+## 错误处理
+
+`@spotterjs/plugin-android` 重新导出 `SpotterError`、`isSpotterError` 和
+`toSpotterError`。Companion 错误使用 `SPOTTER_ANDROID_*` code 和
+`domain: "android"`。
+
+```typescript
+import { android, isSpotterError } from "@spotterjs/plugin-android";
+
+try {
+  await android.pair({ url, code, timeoutMs: 5000 });
+} catch (error) {
+  if (isSpotterError(error) && error.code === "SPOTTER_ANDROID_COMPANION_TIMEOUT") {
+    console.log(error.context);
+  }
+}
+```
+
+手机端返回业务错误 code 时，对外 code 固定为
+`SPOTTER_ANDROID_COMPANION_ERROR`，设备返回的原始值放在
+`context.remoteCode`。
+
 ## Accessibility Tree
 
 ```typescript

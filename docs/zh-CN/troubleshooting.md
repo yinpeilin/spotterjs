@@ -10,11 +10,6 @@
 
 - `Cannot find module @spotterjs/node-*`
 - `Failed to load native binding`
-- Windows 上缺少 MSVC runtime 或 linker 工具
-
-检查清单：
-
-1. 确认平台是 Windows x64 (MSVC) 或 Linux x64 (glibc)。
 2. 使用 `npm ci` 重新安装依赖。
 3. 源码开发时运行 `npm run build:native`。
 4. 发布前确认 optional native packages 已按顺序构建并发布。
@@ -90,6 +85,17 @@ npm run smoke:match-tap
 
 更多说明见 [MCP Server](./MCP.md)。
 
+## 结构化错误 code
+
+first-party 库统一抛出 `SpotterError`，code 形如
+`SPOTTER_<DOMAIN>_<REASON>`。应用代码可以用 `isSpotterError(error)` 判断，
+并读取 `error.domain` 和 `error.context` 做诊断。
+
+常见安装和环境 code 包括 `SPOTTER_NATIVE_PACKAGE_MISSING`、
+`SPOTTER_NATIVE_LOAD_FAILED`、`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED` 和
+`SPOTTER_ANDROID_COMPANION_TIMEOUT`。MCP 工具失败时也会在文本结果中带上同一套
+`code`、压缩后的 `context` 和 `domain`。
+
 ## Markdown 检查失败
 
 ```bash
@@ -98,3 +104,9 @@ npm run docs:check
 
 该命令会检查 Markdown 是否是有效 UTF-8，并验证本地 Markdown 链接。
 修复损坏编码、相对路径、目录和文件名大小写后重新运行即可。
+
+- Windows 上缺少 MSVC runtime 或 linker 工具
+
+检查清单：
+
+1. 确认平台是 Windows x64 (MSVC) 或 Linux x64 (glibc)。

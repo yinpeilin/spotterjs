@@ -55,6 +55,28 @@ await phone.home();
 
 Coordinates use Android device screen coordinates.
 
+## Error Handling
+
+`@spotterjs/plugin-android` re-exports `SpotterError`, `isSpotterError`, and
+`toSpotterError`. Companion failures use `SPOTTER_ANDROID_*` codes and
+`domain: "android"`.
+
+```typescript
+import { android, isSpotterError } from "@spotterjs/plugin-android";
+
+try {
+  await android.pair({ url, code, timeoutMs: 5000 });
+} catch (error) {
+  if (isSpotterError(error) && error.code === "SPOTTER_ANDROID_COMPANION_TIMEOUT") {
+    console.log(error.context);
+  }
+}
+```
+
+When the phone returns a business error code, the public code is
+`SPOTTER_ANDROID_COMPANION_ERROR` and the device-provided value is stored in
+`context.remoteCode`.
+
 ## Accessibility Tree
 
 ```typescript
