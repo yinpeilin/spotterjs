@@ -4,7 +4,7 @@ import type {
   Region,
   TextMatchEvaluation,
 } from "@spotterjs/base";
-import { OcrError } from "./errors";
+import { ocrError, SpotterError } from "./errors";
 import {
   cropImage,
   loadImage,
@@ -45,7 +45,7 @@ const DEFAULT_RECOGNITION_CONCURRENCY = 2;
 const engineCache = new Map<string, Promise<OcrEngine>>();
 
 export {
-  OcrError,
+  SpotterError,
   defaultModelDir,
   ensureOcrModels,
   ocrModelBaseUrl,
@@ -56,7 +56,7 @@ export {
   resolveOcrModelProfile,
   resolveLocalOcrModels,
 };
-export { isOcrError } from "./errors";
+export { isSpotterError, toSpotterError } from "./errors";
 
 export type {
   CreateOcrOptions,
@@ -73,7 +73,7 @@ export type {
   OcrTextMatch,
   OcrTextLine,
 };
-export type { OcrErrorCode, OcrErrorContext } from "./errors";
+export type { SpotterErrorCode, SpotterErrorContext } from "./errors";
 
 /**
  * Create a high-level OCR client.
@@ -102,7 +102,7 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
     async findText(image, text, findOptions) {
       const matches = await this.findAllText(image, text, findOptions);
       if (!matches.length) {
-        throw new OcrError("OCR_TEXT_NOT_FOUND", `OCR text not found: ${text}`, {
+        throw ocrError("SPOTTER_OCR_TEXT_NOT_FOUND", `OCR text not found: ${text}`, {
           context: {
             text,
             exact: findOptions?.exact,
@@ -185,8 +185,8 @@ async function createCachedOnnxEngine(options: CreateOcrOptions): Promise<OcrEng
 function normalizeConcurrency(value: number | undefined): number {
   if (value === undefined) return DEFAULT_RECOGNITION_CONCURRENCY;
   if (!Number.isInteger(value) || value < 1 || value > 16) {
-    throw new OcrError(
-      "OCR_INVALID_ARGUMENT",
+    throw ocrError(
+      "SPOTTER_OCR_INVALID_ARGUMENT",
       "recognitionConcurrency must be an integer between 1 and 16",
       { context: { label: "recognitionConcurrency", value } }
     );
@@ -196,12 +196,12 @@ function normalizeConcurrency(value: number | undefined): number {
 
 function validatePoint(point: Point, label: string): void {
   if (!Number.isFinite(point.x)) {
-    throw new OcrError("OCR_INVALID_ARGUMENT", `${label}.x must be a finite number`, {
+    throw ocrError("SPOTTER_OCR_INVALID_ARGUMENT", `${label}.x must be a finite number`, {
       context: { label: `${label}.x`, value: point.x },
     });
   }
   if (!Number.isFinite(point.y)) {
-    throw new OcrError("OCR_INVALID_ARGUMENT", `${label}.y must be a finite number`, {
+    throw ocrError("SPOTTER_OCR_INVALID_ARGUMENT", `${label}.y must be a finite number`, {
       context: { label: `${label}.y`, value: point.y },
     });
   }

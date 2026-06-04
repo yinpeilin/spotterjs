@@ -2,7 +2,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { OcrError } from "./errors";
+import { isSpotterError, ocrError } from "./errors";
 import type {
   OcrBuiltInModelProfileName,
   EnsureOcrModelsOptions,
@@ -173,7 +173,7 @@ export function resolveOcrModelProfile(
   if (profile === "mobile" || profile === "ppocrv5-mobile") {
     return PPOCRV5_MOBILE_PROFILE;
   }
-  throw new OcrError("OCR_MODEL_PROFILE_UNKNOWN", `unknown OCR model profile: ${profile}`, {
+  throw ocrError("SPOTTER_OCR_MODEL_PROFILE_UNKNOWN", `unknown OCR model profile: ${profile}`, {
     context: { profile },
   });
 }
@@ -281,8 +281,8 @@ export function resolveLocalOcrModels(
 
   for (const file of Object.values(files)) {
     if (!fs.existsSync(file)) {
-      throw new OcrError(
-        "OCR_MODEL_FILE_MISSING",
+      throw ocrError(
+        "SPOTTER_OCR_MODEL_FILE_MISSING",
         `OCR local model file does not exist: ${file}`,
         { context: { file } }
       );
@@ -321,8 +321,8 @@ export function resolveLocalOcrModels(
 async function defaultFetchFile(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new OcrError(
-      "OCR_MODEL_DOWNLOAD_FAILED",
+    throw ocrError(
+      "SPOTTER_OCR_MODEL_DOWNLOAD_FAILED",
       `failed to download OCR model: ${url} (${response.status})`,
       { context: { url, status: response.status } }
     );
@@ -352,7 +352,7 @@ async function downloadModelFile(
         url,
         error: msg,
         code:
-          e instanceof OcrError
+          isSpotterError(e)
             ? e.code
             : typeof e === "object" && e !== null && "code" in e
               ? String((e as { code?: unknown }).code)
@@ -362,19 +362,21 @@ async function downloadModelFile(
   }
 
   const shaError = attempts.find((attempt) =>
-    attempt.code === "OCR_MODEL_SHA256_MISMATCH" ||
-    attempt.code === "OCR_MODEL_MANIFEST_INVALID"
+    attempt.code === "SPOTTER_OCR_MODEL_SHA256_MISMATCH" ||
+    attempt.code === "SPOTTER_OCR_MODEL_MANIFEST_INVALID"
   );
   if (shaError) {
-    throw new OcrError(
-      shaError.code as "OCR_MODEL_SHA256_MISMATCH" | "OCR_MODEL_MANIFEST_INVALID",
+    throw ocrError(
+      shaError.code as
+        | "SPOTTER_OCR_MODEL_SHA256_MISMATCH"
+        | "SPOTTER_OCR_MODEL_MANIFEST_INVALID",
       shaError.error,
       { context: { source, attempts } }
     );
   }
 
-  throw new OcrError(
-    "OCR_MODEL_DOWNLOAD_FAILED",
+  throw ocrError(
+    "SPOTTER_OCR_MODEL_DOWNLOAD_FAILED",
     `failed to download OCR model from ${source} source(s): ${errors.join("; ")}`,
     { context: { source, attempts } }
   );
@@ -412,8 +414,8 @@ function verifySha256(bytes: Buffer, expected: string, label: string): void {
   if (expected === "skip") return;
 
   if (/^0+$/.test(expected)) {
-    throw new OcrError(
-      "OCR_MODEL_SHA256_MISMATCH",
+    throw ocrError(
+      "SPOTTER_OCR_MODEL_SHA256_MISMATCH",
       `OCR model sha256 mismatch for ${label}: expected ${expected}`,
       { context: { label, expected } }
     );
@@ -421,8 +423,8 @@ function verifySha256(bytes: Buffer, expected: string, label: string): void {
 
   const actual = crypto.createHash("sha256").update(bytes).digest("hex");
   if (actual.toLowerCase() !== expected.toLowerCase()) {
-    throw new OcrError(
-      "OCR_MODEL_SHA256_MISMATCH",
+    throw ocrError(
+      "SPOTTER_OCR_MODEL_SHA256_MISMATCH",
       `OCR model sha256 mismatch for ${label}: expected ${expected}, got ${actual}`,
       { context: { label, expected, actual } }
     );

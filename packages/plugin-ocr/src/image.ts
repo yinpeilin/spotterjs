@@ -1,6 +1,6 @@
 import type { CaptureImage, Region } from "@spotterjs/base";
 import { image as coreImage } from "@spotterjs/core";
-import { OcrError } from "./errors";
+import { ocrError } from "./errors";
 import type { OcrImage, OcrPreprocessOptions } from "./types";
 
 export async function loadImage(image: OcrImage): Promise<CaptureImage> {
@@ -9,7 +9,7 @@ export async function loadImage(image: OcrImage): Promise<CaptureImage> {
   }
 
   if (!image || typeof image !== "object" || !("data" in image)) {
-    throw new OcrError("OCR_IMAGE_INVALID", "image must be a path, Buffer, or CaptureImage", {
+    throw ocrError("SPOTTER_OCR_IMAGE_INVALID", "image must be a path, Buffer, or CaptureImage", {
       context: { label: "image" },
     });
   }
@@ -33,7 +33,7 @@ export function cropImage(image: CaptureImage, region?: Region): CaptureImage {
   const width = Math.max(0, right - left);
   const height = Math.max(0, bottom - top);
   if (width <= 0 || height <= 0) {
-    throw new OcrError("OCR_IMAGE_INVALID", "crop region is outside image bounds", {
+    throw ocrError("SPOTTER_OCR_IMAGE_INVALID", "crop region is outside image bounds", {
       context: { region, image: imageSummary(image) },
     });
   }
@@ -51,18 +51,18 @@ export function cropImage(image: CaptureImage, region?: Region): CaptureImage {
 export function validateRegion(region: Region, label: string): void {
   for (const key of ["left", "top", "width", "height"] as const) {
     if (!Number.isFinite(region[key])) {
-      throw new OcrError("OCR_INVALID_ARGUMENT", `${label}.${key} must be a finite number`, {
+      throw ocrError("SPOTTER_OCR_INVALID_ARGUMENT", `${label}.${key} must be a finite number`, {
         context: { label: `${label}.${key}`, value: region[key] },
       });
     }
   }
   if (region.width <= 0) {
-    throw new OcrError("OCR_INVALID_ARGUMENT", `${label}.width must be > 0`, {
+    throw ocrError("SPOTTER_OCR_INVALID_ARGUMENT", `${label}.width must be > 0`, {
       context: { label: `${label}.width`, value: region.width },
     });
   }
   if (region.height <= 0) {
-    throw new OcrError("OCR_INVALID_ARGUMENT", `${label}.height must be > 0`, {
+    throw ocrError("SPOTTER_OCR_INVALID_ARGUMENT", `${label}.height must be > 0`, {
       context: { label: `${label}.height`, value: region.height },
     });
   }
@@ -70,19 +70,19 @@ export function validateRegion(region: Region, label: string): void {
 
 export function validateCaptureImage(image: CaptureImage, label: string): CaptureImage {
   if (!Number.isFinite(image.width) || image.width <= 0) {
-    throw new OcrError("OCR_IMAGE_INVALID", `${label}.width must be a positive finite number`, {
+    throw ocrError("SPOTTER_OCR_IMAGE_INVALID", `${label}.width must be a positive finite number`, {
       context: { label: `${label}.width`, width: image.width },
     });
   }
   if (!Number.isFinite(image.height) || image.height <= 0) {
-    throw new OcrError("OCR_IMAGE_INVALID", `${label}.height must be a positive finite number`, {
+    throw ocrError("SPOTTER_OCR_IMAGE_INVALID", `${label}.height must be a positive finite number`, {
       context: { label: `${label}.height`, height: image.height },
     });
   }
   const expected = image.width * image.height * 4;
   if (!Number.isSafeInteger(expected) || image.data.length !== expected) {
-    throw new OcrError(
-      "OCR_IMAGE_INVALID",
+    throw ocrError(
+      "SPOTTER_OCR_IMAGE_INVALID",
       `${label} RGBA data length must equal width * height * 4`,
       {
         context: {
@@ -141,7 +141,7 @@ export async function preprocessImage(
   const cfg = options === true ? defaultPreprocessOptions() : options;
   const scale = cfg.scale ?? 1;
   if (!Number.isFinite(scale) || scale <= 0 || scale > 8) {
-    throw new OcrError("OCR_INVALID_ARGUMENT", "preprocess.scale must be > 0 and <= 8", {
+    throw ocrError("SPOTTER_OCR_INVALID_ARGUMENT", "preprocess.scale must be > 0 and <= 8", {
       context: { label: "preprocess.scale", value: scale },
     });
   }

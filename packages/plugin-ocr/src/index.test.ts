@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as ocrPlugin from "./index";
 import {
   createOcr,
   defaultModelDir,
@@ -13,8 +14,8 @@ import {
   PPOCRV5_SERVER_PROFILE,
   resolveLocalOcrModels,
   resolveOcrModelProfile,
-  OcrError,
-  isOcrError,
+  SpotterError,
+  isSpotterError,
   scoreOcrText,
   type OcrEngine,
   type OcrModelProfile,
@@ -71,6 +72,13 @@ function testProfile(files: Record<string, string>): OcrModelProfile {
 }
 
 describe("model cache", () => {
+  it("exports the shared SpotterError API without legacy error classes", () => {
+    expect("SpotterError" in ocrPlugin).toBe(true);
+    expect("isSpotterError" in ocrPlugin).toBe(true);
+    expect("OcrError" in ocrPlugin).toBe(false);
+    expect("isOcrError" in ocrPlugin).toBe(false);
+  });
+
   it("defaults to the server model profile", async () => {
     const modelDir = tmpDir();
     const fetchFile = vi.fn(async () => Buffer.from("model-bytes"));
@@ -94,14 +102,16 @@ describe("model cache", () => {
     expect(resolveOcrModelProfile("ppocrv5-mobile")).toBe(PPOCRV5_MOBILE_PROFILE);
     expect(() =>
       resolveOcrModelProfile("unknown" as Parameters<typeof resolveOcrModelProfile>[0])
-    ).toThrow(OcrError);
+    ).toThrow(SpotterError);
     try {
       resolveOcrModelProfile("unknown" as Parameters<typeof resolveOcrModelProfile>[0]);
     } catch (error) {
-      expect(isOcrError(error)).toBe(true);
+      expect(isSpotterError(error)).toBe(true);
       expect(error).toMatchObject({
-        code: "OCR_MODEL_PROFILE_UNKNOWN",
+        name: "SpotterError",
+        code: "SPOTTER_OCR_MODEL_PROFILE_UNKNOWN",
         context: { profile: "unknown" },
+        domain: "ocr",
       });
     }
   });
@@ -173,8 +183,9 @@ describe("model cache", () => {
         fetchFile: async () => Buffer.from("wrong"),
       })
     ).rejects.toMatchObject({
-      name: "OcrError",
-      code: "OCR_MODEL_SHA256_MISMATCH",
+      name: "SpotterError",
+      code: "SPOTTER_OCR_MODEL_SHA256_MISMATCH",
+      domain: "ocr",
     });
   });
 
@@ -333,9 +344,10 @@ describe("OCR engine", () => {
       text: "发送消息",
     });
     await expect(ocr.findText(image, "missing")).rejects.toMatchObject({
-      name: "OcrError",
-      code: "OCR_TEXT_NOT_FOUND",
+      name: "SpotterError",
+      code: "SPOTTER_OCR_TEXT_NOT_FOUND",
       context: { text: "missing" },
+      domain: "ocr",
     });
   });
 
@@ -466,8 +478,9 @@ describe("OCR engine", () => {
     await expect(
       ocr.read({ data: Buffer.alloc(3), width: 2, height: 2 })
     ).rejects.toMatchObject({
-      name: "OcrError",
-      code: "OCR_IMAGE_INVALID",
+      name: "SpotterError",
+      code: "SPOTTER_OCR_IMAGE_INVALID",
+      domain: "ocr",
     });
   });
 

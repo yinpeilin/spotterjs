@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import type { CaptureImage } from "@spotterjs/base";
-import { OcrError } from "./errors";
+import { ocrError } from "./errors";
 import { cropImage, resizeRgba } from "./image";
 import { centerOf, boxesFromBitmap, type DetectedBox } from "./postprocess";
 import type {
@@ -110,8 +110,8 @@ class OnnxOcrEngine implements OcrEngine {
     const dims = output.dims as number[];
     const classes = dims[dims.length - 1];
     if (!Number.isInteger(classes) || classes <= 0 || data.length % classes !== 0) {
-      throw new OcrError(
-        "OCR_ONNX_INVALID_OUTPUT",
+      throw ocrError(
+        "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
         `ONNX recognition output has invalid shape: ${dims.join("x")}`,
         { context: { label: "recognition", dims, dataLength: data.length } }
       );
@@ -144,7 +144,7 @@ function rgbaToNchw(
 function firstTensor(outputs: Record<string, unknown>): { data: unknown; dims: number[] } {
   const first = Object.values(outputs)[0] as { data?: unknown; dims?: number[] } | undefined;
   if (!first?.data || !first.dims) {
-    throw new OcrError("OCR_ONNX_INVALID_OUTPUT", "ONNX session returned no tensor output", {
+    throw ocrError("SPOTTER_OCR_ONNX_INVALID_OUTPUT", "ONNX session returned no tensor output", {
       context: { outputNames: Object.keys(outputs) },
     });
   }
@@ -153,15 +153,15 @@ function firstTensor(outputs: Record<string, unknown>): { data: unknown; dims: n
 
 function tensorData(output: { data: unknown; dims: number[] }, label: string): Float32Array {
   if (!(output.data instanceof Float32Array)) {
-    throw new OcrError(
-      "OCR_ONNX_INVALID_OUTPUT",
+    throw ocrError(
+      "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
       `ONNX ${label} output data must be Float32Array`,
       { context: { label, dataType: typeof output.data } }
     );
   }
   if (!output.dims.every((dim) => Number.isInteger(dim) && dim > 0)) {
-    throw new OcrError(
-      "OCR_ONNX_INVALID_OUTPUT",
+    throw ocrError(
+      "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
       `ONNX ${label} output has invalid shape: ${output.dims.join("x")}`,
       { context: { label, dims: output.dims } }
     );

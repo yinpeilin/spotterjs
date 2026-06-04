@@ -37,9 +37,10 @@ describe("ONNX OCR output validation", () => {
     const engine = await createOnnxOcrEngine(models());
 
     await expect(engine.read(capture())).rejects.toMatchObject({
-      name: "OcrError",
-      code: "OCR_ONNX_INVALID_OUTPUT",
+      name: "SpotterError",
+      code: "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
       context: { outputNames: [] },
+      domain: "ocr",
     });
   });
 
@@ -51,9 +52,10 @@ describe("ONNX OCR output validation", () => {
     const engine = await createOnnxOcrEngine(models());
 
     await expect(engine.read(capture())).rejects.toMatchObject({
-      name: "OcrError",
-      code: "OCR_ONNX_INVALID_OUTPUT",
+      name: "SpotterError",
+      code: "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
       context: { label: "detection", dataType: "object" },
+      domain: "ocr",
     });
   });
 
@@ -69,13 +71,14 @@ describe("ONNX OCR output validation", () => {
     const engine = await createOnnxOcrEngine(models());
 
     await expect(engine.read(capture())).rejects.toMatchObject({
-      name: "OcrError",
-      code: "OCR_ONNX_INVALID_OUTPUT",
+      name: "SpotterError",
+      code: "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
       context: {
         label: "recognition",
         dims: [1, 2],
         dataLength: 3,
       },
+      domain: "ocr",
     });
   });
 });
