@@ -15,6 +15,82 @@ export interface Region {
   height: number;
 }
 
+export type SpotterErrorCode = `SPOTTER_${string}`;
+export type SpotterErrorContext = Record<string, unknown>;
+
+export type SpotterErrorOptions = {
+  context?: SpotterErrorContext;
+  cause?: unknown;
+  domain?: string;
+};
+
+export type ToSpotterErrorOptions = SpotterErrorOptions & {
+  code?: SpotterErrorCode;
+  message?: string;
+};
+
+export class SpotterError extends Error {
+  readonly code: SpotterErrorCode;
+  readonly context?: SpotterErrorContext;
+  readonly cause?: unknown;
+  readonly domain?: string;
+
+  constructor(
+    code: SpotterErrorCode,
+    message: string,
+    options: SpotterErrorOptions = {}
+  ) {
+    super(message);
+    this.name = "SpotterError";
+    this.code = code;
+    this.context = options.context;
+    this.cause = options.cause;
+    this.domain = options.domain;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function isSpotterError(error: unknown): error is SpotterError {
+  if (error instanceof SpotterError) return true;
+  if (!isRecord(error)) return false;
+  return (
+    error.name === "SpotterError" &&
+    typeof error.message === "string" &&
+    typeof error.code === "string" &&
+    error.code.startsWith("SPOTTER_")
+  );
+}
+
+export function toSpotterError(
+  error: unknown,
+  options: ToSpotterErrorOptions = {}
+): SpotterError {
+  if (error instanceof SpotterError) return error;
+  if (isSpotterError(error)) {
+    return new SpotterError(error.code, error.message, {
+      cause: options.cause ?? error,
+      context:
+        options.context ??
+        (isRecord(error.context) ? (error.context as SpotterErrorContext) : undefined),
+      domain:
+        options.domain ??
+        (typeof error.domain === "string" ? error.domain : undefined),
+    });
+  }
+
+  const message =
+    options.message ?? (error instanceof Error ? error.message : String(error));
+  return new SpotterError(options.code ?? "SPOTTER_UNKNOWN_ERROR", message, {
+    cause: options.cause ?? error,
+    context: options.context,
+    domain: options.domain,
+  });
+}
+
 /**
  * Point in a two-dimensional coordinate space, measured in pixels.
  */
