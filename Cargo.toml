@@ -18,7 +18,7 @@ version = "1.0.3"
 edition = "2021"
 license = "LicenseRef-spotterjs-1.0"
 authors = ["spotterjs Contributors"]
-repository = "https://gitee.com/ypl0lpy/spotterjs"
+repository = "https://github.com/yinpeilin/spotterjs"
 
 [workspace.dependencies]
 thiserror = "2"

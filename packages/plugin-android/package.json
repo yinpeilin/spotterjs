@@ -21,7 +21,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/ypl0lpy/spotterjs.git",
+    "url": "https://github.com/yinpeilin/spotterjs.git",
     "directory": "packages/plugin-android"
   },
   "publishConfig": {
@@ -29,9 +29,9 @@
     "registry": "https://registry.npmjs.org/"
   },
   "bugs": {
-    "url": "https://gitee.com/ypl0lpy/spotterjs/issues"
+    "url": "https://github.com/yinpeilin/spotterjs/issues"
   },
-  "homepage": "https://gitee.com/ypl0lpy/spotterjs#readme",
+  "homepage": "https://github.com/yinpeilin/spotterjs#readme",
   "files": [
     "dist",
     "LICENSE",

@@ -6,7 +6,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/ypl0lpy/spotterjs.git",
+    "url": "https://github.com/yinpeilin/spotterjs.git",
     "directory": "crates/spotterjs-node/linux-x64-gnu"
   },
   "publishConfig": {

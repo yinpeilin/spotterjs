@@ -4,6 +4,15 @@
     "description": "spotterjs MCP server - desktop automation, workspace files, and shell",
     "license": "SEE LICENSE IN LICENSE",
     "type": "module",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yinpeilin/spotterjs.git",
+        "directory": "packages/mcp"
+    },
+    "bugs": {
+        "url": "https://github.com/yinpeilin/spotterjs/issues"
+    },
+    "homepage": "https://github.com/yinpeilin/spotterjs#readme",
     "main": "dist/server.js",
     "types": "dist/server.d.ts",
     "exports": {
