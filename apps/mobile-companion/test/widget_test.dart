@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_companion/main.dart';
@@ -19,6 +18,9 @@ void main() {
                 'port': 17341,
                 'pairingCode': '123456',
                 'connectedClient': null,
+                'manufacturer': 'Google',
+                'model': 'Pixel 8',
+                'nickname': 'lab-1',
                 'accessibilityEnabled': false,
                 'inputMethodEnabled': true,
                 'inputMethodSelected': true,
@@ -39,6 +41,7 @@ void main() {
             case 'openAccessibilitySettings':
             case 'openInputMethodSettings':
             case 'requestScreenCapture':
+            case 'setNickname':
               return null;
           }
           throw PlatformException(code: 'unimplemented');
@@ -57,6 +60,8 @@ void main() {
     expect(find.text('Spotter Companion'), findsWidgets);
     expect(find.text('ws://192.168.1.23:17341'), findsOneWidget);
     expect(find.text('123456'), findsOneWidget);
+    expect(find.text('lab-1'), findsWidgets);
+    expect(find.text('Google Pixel 8'), findsOneWidget);
     expect(find.text('Listening'), findsOneWidget);
     expect(find.text('Start listening'), findsOneWidget);
     expect(find.text('Stop listening'), findsOneWidget);

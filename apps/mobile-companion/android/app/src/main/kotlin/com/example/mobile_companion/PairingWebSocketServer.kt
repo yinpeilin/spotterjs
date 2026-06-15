@@ -25,7 +25,8 @@ class PairingWebSocketServer(
     private val keyevent: (String) -> Unit,
     private val back: () -> Unit,
     private val home: () -> Unit,
-    private val launchApp: (String) -> Map<String, Any?>
+    private val launchApp: (String) -> Map<String, Any?>,
+    private val captureScreen: () -> Map<String, Any?>
 ) : WebSocketServer(InetSocketAddress("0.0.0.0", port)) {
     private val random = SecureRandom()
     private val sessions = ConcurrentHashMap<WebSocket, String>()
@@ -125,6 +126,29 @@ class PairingWebSocketServer(
                             *launchApp(readString(request, "packageName")).toPairs()
                         ).toString()
                     )
+                }
+                "captureScreen" -> authenticated(conn, request) {
+                    try {
+                        conn.send(
+                            json(
+                                "type" to "screenCaptured",
+                                *captureScreen().toPairs()
+                            ).toString()
+                        )
+                    } catch (failure: IllegalStateException) {
+                        conn.send(
+                            error(
+                                when (failure.message) {
+                                    "screen capture permission is not granted" ->
+                                        "SCREEN_CAPTURE_UNAVAILABLE"
+                                    "screen capture frame is unavailable" ->
+                                        "SCREEN_CAPTURE_FRAME_UNAVAILABLE"
+                                    else -> "SCREEN_CAPTURE_FAILED"
+                                },
+                                failure.message ?: "screen capture failed"
+                            ).toString()
+                        )
+                    }
                 }
                 else -> conn.send(error("UNKNOWN_MESSAGE", "unsupported message type").toString())
             }

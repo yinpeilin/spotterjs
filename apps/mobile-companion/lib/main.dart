@@ -34,6 +34,8 @@ class PairingHomePage extends StatefulWidget {
 
 class _PairingHomePageState extends State<PairingHomePage> {
   final _bridge = NativeCompanionBridge();
+  final _nicknameController = TextEditingController();
+  final _nicknameFocus = FocusNode();
   PairingState? _state;
   Timer? _poller;
   bool _busy = false;
@@ -49,6 +51,8 @@ class _PairingHomePageState extends State<PairingHomePage> {
   @override
   void dispose() {
     _poller?.cancel();
+    _nicknameController.dispose();
+    _nicknameFocus.dispose();
     super.dispose();
   }
 
@@ -58,6 +62,9 @@ class _PairingHomePageState extends State<PairingHomePage> {
       if (!mounted) return;
       setState(() {
         _state = state;
+        if (!_nicknameFocus.hasFocus) {
+          _nicknameController.text = state.nickname ?? '';
+        }
         _error = null;
       });
     } on Object catch (error) {
@@ -102,6 +109,14 @@ class _PairingHomePageState extends State<PairingHomePage> {
             _HeroPanel(state: state, busy: _busy),
             const SizedBox(height: 16),
             if (_error != null) _ErrorPanel(message: _error!),
+            _IdentityPanel(
+              state: state,
+              busy: _busy,
+              nicknameController: _nicknameController,
+              nicknameFocus: _nicknameFocus,
+              onSubmitted: (value) => _run(() => _bridge.setNickname(value)),
+            ),
+            const SizedBox(height: 16),
             _PairingPanel(
               state: state,
               busy: _busy,
@@ -122,6 +137,64 @@ class _PairingHomePageState extends State<PairingHomePage> {
             _EventsPanel(events: state?.events ?? const []),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _IdentityPanel extends StatelessWidget {
+  const _IdentityPanel({
+    required this.state,
+    required this.busy,
+    required this.nicknameController,
+    required this.nicknameFocus,
+    required this.onSubmitted,
+  });
+
+  final PairingState? state;
+  final bool busy;
+  final TextEditingController nicknameController;
+  final FocusNode nicknameFocus;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final hardwareName = '${state?.manufacturer ?? ''} ${state?.model ?? ''}'
+        .trim();
+    final displayName = state?.displayName.isNotEmpty == true
+        ? state!.displayName
+        : 'Android device';
+    return _Section(
+      title: 'Device',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _InfoTile(
+            label: 'Name',
+            value: displayName,
+            icon: Icons.smartphone_outlined,
+          ),
+          _InfoTile(
+            label: 'Hardware',
+            value: hardwareName.isEmpty
+                ? 'Unknown Android device'
+                : hardwareName,
+            icon: Icons.memory_outlined,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: nicknameController,
+            focusNode: nicknameFocus,
+            enabled: !busy,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Nickname',
+              prefixIcon: Icon(Icons.edit_outlined),
+            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: onSubmitted,
+          ),
+        ],
       ),
     );
   }
@@ -157,9 +230,9 @@ class _HeroPanel extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
+                  color: accent.withAlpha((0.12 * 255).round()),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: accent.withOpacity(0.28)),
+                  border: Border.all(color: accent.withAlpha((0.28 * 255).round())),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -539,6 +612,8 @@ class NativeCompanionBridge {
       _channel.invokeMethod('openInputMethodSettings');
   Future<void> requestScreenCapture() =>
       _channel.invokeMethod('requestScreenCapture');
+  Future<void> setNickname(String? nickname) =>
+      _channel.invokeMethod('setNickname', {'nickname': nickname});
 }
 
 class PairingState {
@@ -548,6 +623,9 @@ class PairingState {
     required this.port,
     required this.pairingCode,
     required this.connectedClient,
+    required this.manufacturer,
+    required this.model,
+    required this.nickname,
     required this.accessibilityEnabled,
     required this.inputMethodEnabled,
     required this.inputMethodSelected,
@@ -561,6 +639,9 @@ class PairingState {
   final int port;
   final String pairingCode;
   final String? connectedClient;
+  final String manufacturer;
+  final String model;
+  final String? nickname;
   final bool accessibilityEnabled;
   final bool inputMethodEnabled;
   final bool inputMethodSelected;
@@ -569,6 +650,9 @@ class PairingState {
   final List<String> events;
 
   String get uri => 'ws://$host:$port';
+  String get displayName => (nickname?.isNotEmpty ?? false)
+      ? nickname!
+      : '$manufacturer $model'.trim();
 
   factory PairingState.fromMap(Map<Object?, Object?> map) {
     return PairingState(
@@ -577,6 +661,9 @@ class PairingState {
       port: (map['port'] as int?) ?? 0,
       pairingCode: (map['pairingCode'] as String?) ?? '------',
       connectedClient: map['connectedClient'] as String?,
+      manufacturer: (map['manufacturer'] as String?) ?? '',
+      model: (map['model'] as String?) ?? '',
+      nickname: map['nickname'] as String?,
       accessibilityEnabled: map['accessibilityEnabled'] == true,
       inputMethodEnabled: map['inputMethodEnabled'] == true,
       inputMethodSelected: map['inputMethodSelected'] == true,

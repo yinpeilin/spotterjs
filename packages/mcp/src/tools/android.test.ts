@@ -19,8 +19,44 @@ const plugin = vi.hoisted(() => ({
     back: vi.fn(),
     home: vi.fn(),
     launchApp: vi.fn(),
+    captureScreen: vi.fn(),
     close: vi.fn(),
   },
+}));
+
+const core = vi.hoisted(() => ({
+  decodedCapture: { data: Buffer.alloc(20 * 10 * 4), width: 20, height: 10 },
+  imageDecode: vi.fn(),
+  imageFind: vi.fn(),
+  imageFindAll: vi.fn(),
+}));
+
+const artifacts = vi.hoisted(() => ({
+  workspaceImageStore: {
+    writeCapture: vi.fn(() => ({
+      imagePath: ".spotter/artifacts/android-capture.png",
+      width: 20,
+      height: 10,
+      originalWidth: 20,
+      originalHeight: 10,
+      format: "png",
+      isDownscaled: false,
+      detail: "original",
+    })),
+  },
+}));
+
+const debugDraw = vi.hoisted(() => ({
+  writeDebugCapture: vi.fn(() => ({
+    imagePath: ".spotter/artifacts/android-debug.png",
+    width: 20,
+    height: 10,
+    originalWidth: 20,
+    originalHeight: 10,
+    format: "png",
+    isDownscaled: false,
+    detail: "original",
+  })),
 }));
 
 vi.mock("@spotterjs/plugin-android", () => ({
@@ -29,6 +65,17 @@ vi.mock("@spotterjs/plugin-android", () => ({
     connect: plugin.connect,
   },
 }));
+
+vi.mock("@spotterjs/core", () => ({
+  image: {
+    decode: core.imageDecode,
+    find: core.imageFind,
+    findAll: core.imageFindAll,
+  },
+}));
+
+vi.mock("../adapters/artifacts.js", () => artifacts);
+vi.mock("../adapters/debug-draw.js", () => debugDraw);
 
 import { registerAndroidTools } from "./android.js";
 
@@ -65,8 +112,22 @@ beforeEach(() => {
   for (const fn of Object.values(plugin.device)) {
     if (typeof fn === "function") fn.mockReset();
   }
+  core.imageDecode.mockReset();
+  core.imageFind.mockReset();
+  core.imageFindAll.mockReset();
+  artifacts.workspaceImageStore.writeCapture.mockClear();
+  debugDraw.writeDebugCapture.mockClear();
+  core.imageDecode.mockReturnValue(core.decodedCapture);
   plugin.pair.mockResolvedValue(plugin.device);
   plugin.connect.mockResolvedValue(plugin.device);
+  plugin.device.status.mockResolvedValue({});
+  plugin.device.captureScreen.mockResolvedValue({
+    mimeType: "image/png",
+    width: 20,
+    height: 10,
+    density: 420,
+    bytes: Buffer.from("png bytes"),
+  });
 });
 
 describe("android companion MCP tools", () => {
@@ -152,6 +213,111 @@ describe("android companion MCP tools", () => {
 
     expect(plugin.device.close).toHaveBeenCalled();
     expect(result.content[0]?.text).toBe("ok");
+  });
+
+  it("lists cached Android devices with identity captured at connect time", async () => {
+    const phoneA = {
+      ...plugin.device,
+      sessionToken: "token-a",
+      url: "ws://phone-a:17341",
+      status: vi.fn().mockResolvedValue({
+        manufacturer: "Google",
+        model: "Pixel 8",
+        nickname: "lab-1",
+      }),
+      close: vi.fn(),
+    };
+    const phoneB = {
+      ...plugin.device,
+      sessionToken: "token-b",
+      url: "ws://phone-b:17341",
+      status: vi.fn().mockResolvedValue({
+        manufacturer: "Samsung",
+        model: "SM-S921U",
+        nickname: "lab-2",
+      }),
+      close: vi.fn(),
+    };
+    plugin.pair.mockResolvedValueOnce(phoneA).mockResolvedValueOnce(phoneB);
+    const tools = registerTools();
+
+    await tools.get("android_connect")!({
+      deviceId: "a",
+      url: "ws://phone-a:17341",
+      code: "111111",
+    });
+    await tools.get("android_connect")!({
+      deviceId: "b",
+      url: "ws://phone-b:17341",
+      code: "222222",
+    });
+
+    const json = parseToolJson(await tools.get("android_list_devices")!({}));
+
+    expect(json.devices).toEqual([
+      {
+        deviceId: "a",
+        url: "ws://phone-a:17341",
+        manufacturer: "Google",
+        model: "Pixel 8",
+        nickname: "lab-1",
+      },
+      {
+        deviceId: "b",
+        url: "ws://phone-b:17341",
+        manufacturer: "Samsung",
+        model: "SM-S921U",
+        nickname: "lab-2",
+      },
+    ]);
+  });
+
+  it("omits Android device identity fields missing from old companions", async () => {
+    plugin.device.status.mockResolvedValue({ running: true });
+    const tools = registerTools();
+
+    await tools.get("android_connect")!({
+      deviceId: "legacy",
+      url: "ws://phone:17341",
+      code: "123456",
+    });
+
+    expect(parseToolJson(await tools.get("android_list_devices")!({}))).toEqual({
+      devices: [
+        {
+          deviceId: "legacy",
+          url: "ws://phone:17341",
+        },
+      ],
+    });
+  });
+
+  it("keeps connected Android devices listable when identity status fails", async () => {
+    plugin.device.status.mockRejectedValue(new Error("status unavailable"));
+    const tools = registerTools();
+
+    const connected = parseToolJson(
+      await tools.get("android_connect")!({
+        deviceId: "phone",
+        url: "ws://phone:17341",
+        code: "123456",
+      })
+    );
+    const listed = parseToolJson(await tools.get("android_list_devices")!({}));
+
+    expect(connected).toEqual({
+      deviceId: "phone",
+      url: "ws://phone:17341",
+      sessionToken: "token-1",
+    });
+    expect(listed).toEqual({
+      devices: [
+        {
+          deviceId: "phone",
+          url: "ws://phone:17341",
+        },
+      ],
+    });
   });
 
   it("uses the session token for status and heartbeat", async () => {
@@ -370,16 +536,107 @@ describe("android companion MCP tools", () => {
     expect(json.element.text).toBe("Settings");
   });
 
-  it("returns explicit MCP errors for unimplemented screen capture paths", async () => {
-    const result = await registerTools().get("android_capture_screen")!({
+  it("captures Android screens as workspace artifacts", async () => {
+    const json = parseToolJson(await registerTools().get("android_capture_screen")!({
       url: "ws://phone:17341",
       sessionToken: "token-1",
+      detail: "high",
+    }));
+
+    expect(plugin.device.captureScreen).toHaveBeenCalled();
+    expect(core.imageDecode).toHaveBeenCalledWith(Buffer.from("png bytes"));
+    expect(artifacts.workspaceImageStore.writeCapture).toHaveBeenCalledWith(
+      core.decodedCapture,
+      { prefix: "android-screen", detail: "high" }
+    );
+    expect(json).toMatchObject({
+      imagePath: ".spotter/artifacts/android-capture.png",
+      origin: { x: 0, y: 0 },
+      coordinateSpace: "android-device",
+      density: 420,
+    });
+  });
+
+  it("finds Android templates on a captured screen artifact", async () => {
+    const template = Buffer.from("template bytes");
+    core.imageFindAll.mockResolvedValue([
+      {
+        region: { left: 2, top: 3, width: 4, height: 5 },
+        center: { x: 4, y: 5 },
+        score: 0.91,
+        matchScore: 0.91,
+        matchAlgorithm: "ncc",
+      },
+    ]);
+
+    const json = parseToolJson(
+      await registerTools().get("android_find_template")!({
+        url: "ws://phone:17341",
+        sessionToken: "token-1",
+        image: { base64: template.toString("base64"), mimeType: "image/png" },
+        confidence: 0.9,
+        region: { left: 1, top: 2, width: 10, height: 8 },
+        scale: true,
+        all: true,
+        debugImage: true,
+      })
+    );
+
+    expect(core.imageFindAll).toHaveBeenCalledWith(core.decodedCapture, template, {
+      confidence: 0.9,
+      region: { left: 1, top: 2, width: 10, height: 8 },
+      scale: true,
+    });
+    expect(json).toMatchObject({
+      coordinateSpace: "android-device",
+      matches: [
+        {
+          region: { left: 2, top: 3, width: 4, height: 5 },
+          center: { x: 4, y: 5 },
+        },
+      ],
+      debugImagePath: ".spotter/artifacts/android-debug.png",
+    });
+  });
+
+  it("taps only after Android template matching succeeds", async () => {
+    core.imageFind.mockResolvedValue({
+      region: { left: 2, top: 3, width: 4, height: 5 },
+      center: { x: 4, y: 5 },
+      score: 0.91,
+      matchScore: 0.91,
+      matchAlgorithm: "ncc",
     });
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain(
-      "Android companion screen capture is not implemented yet"
+    const json = parseToolJson(
+      await registerTools().get("android_find_template_and_tap")!({
+        url: "ws://phone:17341",
+        sessionToken: "token-1",
+        image: { path: "button.png" },
+      })
     );
+
+    expect(core.imageFind).toHaveBeenCalledWith(core.decodedCapture, "button.png", {
+      confidence: undefined,
+      region: undefined,
+      scale: undefined,
+    });
+    expect(plugin.device.tap).toHaveBeenCalledWith(4, 5);
+    expect(json).toMatchObject({
+      coordinateSpace: "android-device",
+      tapPoint: { x: 4, y: 5 },
+      match: { center: { x: 4, y: 5 } },
+    });
+
+    core.imageFind.mockRejectedValueOnce(new Error("no match"));
+    const failed = await registerTools().get("android_find_template_and_tap")!({
+      url: "ws://phone:17341",
+      sessionToken: "token-1",
+      image: { path: "missing.png" },
+    });
+
+    expect(failed.isError).toBe(true);
+    expect(plugin.device.tap).toHaveBeenCalledTimes(1);
   });
 
   it("uses bounded numeric schemas for coordinates and timeouts", () => {

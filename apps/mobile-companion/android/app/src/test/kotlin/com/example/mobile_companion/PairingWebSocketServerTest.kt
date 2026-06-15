@@ -38,6 +38,38 @@ class PairingWebSocketServerTest {
     }
 
     @Test
+    fun pairedResponseIncludesDeviceIdentity() {
+        withServer(
+            isPairingCodeValid = { it == "123456" },
+            snapshot = {
+                mapOf(
+                    "running" to true,
+                    "manufacturer" to "Google",
+                    "model" to "Pixel 8",
+                    "nickname" to "lab-1",
+                    "capabilities" to mapOf("displayInfo" to true)
+                )
+            }
+        ) { port, _, _ ->
+            TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "pair",
+                    "protocolVersion" to 2,
+                    "clientId" to "desktop-dev",
+                    "code" to "123456"
+                )
+
+                val state = client.nextJson().getJSONObject("state")
+                assertEquals("Google", state.getString("manufacturer"))
+                assertEquals("Pixel 8", state.getString("model"))
+                assertEquals("lab-1", state.getString("nickname"))
+            }
+        }
+    }
+
+    @Test
     fun rejectsOnlyInvalidPairingCodes() {
         withServer(isPairingCodeValid = { it == "123456" }) { port, _, _ ->
             TestClient(URI("ws://127.0.0.1:$port")).use { client ->
@@ -237,6 +269,80 @@ class PairingWebSocketServerTest {
     }
 
     @Test
+    fun routesCaptureScreenCommand() {
+        withServer(
+            isPairingCodeValid = { it == "123456" },
+            captureScreen = {
+                mapOf(
+                    "mimeType" to "image/png",
+                    "width" to 1080,
+                    "height" to 2400,
+                    "density" to 420,
+                    "base64" to "cG5n"
+                )
+            }
+        ) { port, _, _ ->
+            TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "pair",
+                    "protocolVersion" to 2,
+                    "clientId" to "desktop-dev",
+                    "code" to "123456"
+                )
+                val token = client.nextJson().getString("sessionToken")
+
+                client.sendJson(
+                    "type" to "captureScreen",
+                    "sessionToken" to token
+                )
+
+                val captured = client.nextJson()
+                assertEquals("screenCaptured", captured.getString("type"))
+                assertEquals("image/png", captured.getString("mimeType"))
+                assertEquals(1080, captured.getInt("width"))
+                assertEquals("cG5n", captured.getString("base64"))
+            }
+        }
+    }
+
+    @Test
+    fun reportsCaptureScreenErrors() {
+        withServer(
+            isPairingCodeValid = { it == "123456" },
+            captureScreen = {
+                throw IllegalStateException("screen capture permission is not granted")
+            }
+        ) { port, _, _ ->
+            TestClient(URI("ws://127.0.0.1:$port")).use { client ->
+                assertTrue(client.connectBlocking(2, TimeUnit.SECONDS))
+                assertEquals("hello", client.nextJson().getString("type"))
+                client.sendJson(
+                    "type" to "pair",
+                    "protocolVersion" to 2,
+                    "clientId" to "desktop-dev",
+                    "code" to "123456"
+                )
+                val token = client.nextJson().getString("sessionToken")
+
+                client.sendJson(
+                    "type" to "captureScreen",
+                    "sessionToken" to token
+                )
+
+                val error = client.nextJson()
+                assertEquals("error", error.getString("type"))
+                assertEquals("SCREEN_CAPTURE_UNAVAILABLE", error.getString("code"))
+                assertEquals(
+                    "screen capture permission is not granted",
+                    error.getString("message")
+                )
+            }
+        }
+    }
+
+    @Test
     fun rejectsUnsupportedProtocolVersion() {
         withServer(isPairingCodeValid = { it == "123456" }) { port, _, _ ->
             TestClient(URI("ws://127.0.0.1:$port")).use { client ->
@@ -258,9 +364,23 @@ class PairingWebSocketServerTest {
     private fun withServer(
         isPairingCodeValid: (String) -> Boolean,
         test: (Int, LinkedBlockingQueue<String>, PairingWebSocketServer) -> Unit,
+        snapshot: () -> Map<String, Any?> = {
+            mapOf(
+                "running" to true,
+                "capabilities" to mapOf("displayInfo" to true)
+            )
+        },
         text: (String) -> Unit = {},
         gesture: (List<GestureStrokeSpec>) -> Unit = {},
-        launchApp: (String) -> Map<String, Any?> = { mapOf("packageName" to it) }
+        launchApp: (String) -> Map<String, Any?> = { mapOf("packageName" to it) },
+        captureScreen: () -> Map<String, Any?> = {
+            mapOf(
+                "mimeType" to "image/png",
+                "width" to 1,
+                "height" to 1,
+                "base64" to "AA=="
+            )
+        }
     ) {
         val port = freePort()
         val pairedClients = LinkedBlockingQueue<String>()
@@ -268,12 +388,7 @@ class PairingWebSocketServerTest {
         val server = PairingWebSocketServer(
             port,
             isPairingCodeValid,
-            {
-                mapOf(
-                    "running" to true,
-                    "capabilities" to mapOf("displayInfo" to true)
-                )
-            },
+            snapshot,
             { pairedClients.add(it) },
             { events.add(it) },
             { mapOf("width" to 1080, "height" to 2400, "density" to 420) },
@@ -286,7 +401,8 @@ class PairingWebSocketServerTest {
             { _ -> },
             {},
             {},
-            launchApp
+            launchApp,
+            captureScreen
         )
 
         try {

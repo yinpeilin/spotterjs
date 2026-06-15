@@ -1,53 +1,85 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { CaptureImage, MatchResult } from "@spotterjs/base";
+import { image as coreImage } from "@spotterjs/core";
 import { android } from "@spotterjs/plugin-android";
 import type {
   AndroidCompanionDevice,
   AndroidElementNode,
   AndroidGestureStroke,
 } from "@spotterjs/plugin-android";
-import type { CaptureArtifactDetail } from "../adapters/artifacts.js";
+import {
+  type CaptureArtifact,
+  type CaptureArtifactDetail,
+  workspaceImageStore,
+} from "../adapters/artifacts.js";
+import {
+  type DebugAnnotation,
+  writeDebugCapture,
+} from "../adapters/debug-draw.js";
 import { json, ok, registerSafeTool } from "./results.js";
 
 const DEFAULT_DEVICE_ID = "default";
 const finiteNumberSchema = z.number().finite();
-const coordinateSchema = finiteNumberSchema.min(0);
-const timeoutMsSchema = finiteNumberSchema.min(0);
-const positiveDurationMsSchema = finiteNumberSchema.min(0);
-const confidenceSchema = finiteNumberSchema.min(0).max(1);
-const maxDepthSchema = z.number().int().min(0).max(100);
-const captureDetailSchema = z.enum(["high", "original"]).optional();
-const deviceIdSchema = z.string().min(1).optional();
+const coordinateSchema = finiteNumberSchema
+  .min(0)
+  .describe("Android device coordinate in physical screenshot pixels.");
+const timeoutMsSchema = finiteNumberSchema
+  .min(0)
+  .describe("Request timeout in milliseconds.");
+const positiveDurationMsSchema = finiteNumberSchema
+  .min(0)
+  .describe("Gesture duration or delay in milliseconds.");
+const confidenceSchema = finiteNumberSchema
+  .min(0)
+  .max(1)
+  .describe("Minimum template match confidence from 0 to 1.");
+const maxDepthSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(100)
+  .describe("Maximum accessibility tree traversal depth.");
+const captureDetailSchema = z
+  .enum(["high", "original"])
+  .optional()
+  .describe('Artifact detail. "high" downscales large captures; "original" preserves pixels.');
+const deviceIdSchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe('Cached Android companion device ID. Defaults to "default".');
 
 const companionOptionsSchema = {
   deviceId: deviceIdSchema,
-  url: z.string(),
-  sessionToken: z.string().optional(),
-  code: z.string().optional(),
-  clientId: z.string().optional(),
+  url: z.string().describe("Companion WebSocket URL, for example ws://host:17341."),
+  sessionToken: z.string().optional().describe("Existing companion session token."),
+  code: z.string().optional().describe("Pairing code shown by the companion app."),
+  clientId: z.string().optional().describe("Optional MCP client identifier for pairing."),
   timeoutMs: timeoutMsSchema.optional(),
 };
 
 const sessionSchema = {
   deviceId: deviceIdSchema,
-  url: z.string().optional(),
-  sessionToken: z.string().optional(),
+  url: z.string().optional().describe("Companion WebSocket URL for one-shot legacy calls."),
+  sessionToken: z.string().optional().describe("Companion session token for one-shot legacy calls."),
   timeoutMs: timeoutMsSchema.optional(),
 };
 
 const pointSchema = z.object({
-  x: coordinateSchema,
-  y: coordinateSchema,
+  x: coordinateSchema.describe("Android device x coordinate."),
+  y: coordinateSchema.describe("Android device y coordinate."),
 });
 
 const regionSchema = z
   .object({
-    left: coordinateSchema,
-    top: coordinateSchema,
-    width: finiteNumberSchema.positive(),
-    height: finiteNumberSchema.positive(),
+    left: coordinateSchema.describe("Android device x coordinate of the region left edge."),
+    top: coordinateSchema.describe("Android device y coordinate of the region top edge."),
+    width: finiteNumberSchema.positive().describe("Region width in pixels."),
+    height: finiteNumberSchema.positive().describe("Region height in pixels."),
   })
-  .optional();
+  .optional()
+  .describe("Optional Android screenshot search region.");
 
 const matchOptionsSchema = {
   confidence: confidenceSchema.optional(),
@@ -56,30 +88,39 @@ const matchOptionsSchema = {
     .union([
       z.boolean(),
       z.object({
-        min: finiteNumberSchema.positive().optional(),
-        max: finiteNumberSchema.positive().optional(),
-        step: finiteNumberSchema.positive().optional(),
+        min: finiteNumberSchema.positive().optional().describe("Minimum template scale factor."),
+        max: finiteNumberSchema.positive().optional().describe("Maximum template scale factor."),
+        step: finiteNumberSchema.positive().optional().describe("Template scale search step."),
       }),
     ])
-    .optional(),
+    .optional()
+    .describe("Enable multi-scale template matching, or provide an explicit scale range."),
 };
 
+const debugImageSchema = z
+  .boolean()
+  .optional()
+  .describe("When true, write an annotated Android debug PNG under .spotter/artifacts.");
+
 const elementQuerySchema = {
-  text: z.string().optional(),
-  textContains: z.string().optional(),
-  resourceId: z.string().optional(),
-  resourceIdContains: z.string().optional(),
-  className: z.string().optional(),
-  classNameContains: z.string().optional(),
-  contentDescription: z.string().optional(),
-  contentDescriptionContains: z.string().optional(),
-  packageName: z.string().optional(),
-  clickable: z.boolean().optional(),
-  enabled: z.boolean().optional(),
-  checked: z.boolean().optional(),
-  selected: z.boolean().optional(),
-  scrollable: z.boolean().optional(),
-  focusable: z.boolean().optional(),
+  text: z.string().optional().describe("Exact accessibility text."),
+  textContains: z.string().optional().describe("Substring match against accessibility text."),
+  resourceId: z.string().optional().describe("Exact Android resource ID."),
+  resourceIdContains: z.string().optional().describe("Substring match against Android resource ID."),
+  className: z.string().optional().describe("Exact Android class name."),
+  classNameContains: z.string().optional().describe("Substring match against Android class name."),
+  contentDescription: z.string().optional().describe("Exact content description."),
+  contentDescriptionContains: z
+    .string()
+    .optional()
+    .describe("Substring match against content description."),
+  packageName: z.string().optional().describe("Exact Android package name."),
+  clickable: z.boolean().optional().describe("Filter by clickable state."),
+  enabled: z.boolean().optional().describe("Filter by enabled state."),
+  checked: z.boolean().optional().describe("Filter by checked state."),
+  selected: z.boolean().optional().describe("Filter by selected state."),
+  scrollable: z.boolean().optional().describe("Filter by scrollable state."),
+  focusable: z.boolean().optional().describe("Filter by focusable state."),
 };
 
 const treeOptionsSchema = {
@@ -87,18 +128,21 @@ const treeOptionsSchema = {
 };
 
 const gestureStrokeSchema = z.object({
-  points: z.array(pointSchema).min(1),
+  points: z.array(pointSchema).min(1).describe("Stroke points in Android device coordinates."),
   durationMs: positiveDurationMsSchema.optional(),
   startDelayMs: positiveDurationMsSchema.optional(),
 });
 
 const templateImageSchema = z.union([
-  z.object({ path: z.string() }),
+  z.object({ path: z.string().describe("Template image file path.") }),
   z.object({
-    base64: z.string(),
-    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).optional(),
+    base64: z.string().describe("Base64-encoded template image bytes."),
+    mimeType: z
+      .enum(["image/png", "image/jpeg", "image/webp"])
+      .optional()
+      .describe("Template image MIME type."),
   }),
-]);
+]).describe("Template image as a file path or base64-encoded PNG/JPEG/WebP bytes.");
 
 function decodeTemplateImage(image: z.infer<typeof templateImageSchema>): string | Buffer {
   if ("path" in image) return image.path;
@@ -112,8 +156,94 @@ function withAndroidCoordinateSpace<T extends Record<string, unknown>>(payload: 
   };
 }
 
-function serialJson(deviceId: string, device: { sessionToken: string; url: string }) {
-  return json({ deviceId, sessionToken: device.sessionToken, url: device.url });
+type AndroidCaptureContext = {
+  capture: CaptureImage;
+  artifact: CaptureArtifact;
+  density?: number;
+};
+
+async function captureAndroidScreen(
+  device: AndroidCompanionDevice,
+  detail: CaptureArtifactDetail | undefined,
+  prefix = "android-screen"
+): Promise<AndroidCaptureContext> {
+  const screen = await device.captureScreen();
+  const capture = coreImage.decode(screen.bytes);
+  const artifact = workspaceImageStore.writeCapture(capture, {
+    prefix,
+    detail: detail ?? "original",
+  });
+  return {
+    capture,
+    artifact,
+    density: screen.density,
+  };
+}
+
+function captureResponse(context: AndroidCaptureContext) {
+  return withAndroidCoordinateSpace({
+    ...context.artifact,
+    origin: { x: 0, y: 0 },
+    ...(context.density === undefined ? {} : { density: context.density }),
+  });
+}
+
+function localMatchOptions(args: {
+  confidence?: number;
+  region?: { left: number; top: number; width: number; height: number };
+  scale?: boolean | { min?: number; max?: number; step?: number };
+}) {
+  return {
+    confidence: args.confidence,
+    region: args.region,
+    scale: args.scale,
+  };
+}
+
+function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
+  const annotations: DebugAnnotation[] = [];
+  for (const match of matches) {
+    annotations.push({ kind: "region", region: match.region });
+    annotations.push({ kind: "point", point: match.center });
+  }
+  return annotations;
+}
+
+type DeviceIdentity = {
+  manufacturer?: string;
+  model?: string;
+  nickname?: string;
+};
+
+function readIdentity(state: unknown): DeviceIdentity {
+  const obj =
+    typeof state === "object" && state !== null
+      ? (state as Record<string, unknown>)
+      : {};
+  const stringField = (key: string) =>
+    typeof obj[key] === "string" ? (obj[key] as string) : undefined;
+  return {
+    manufacturer: stringField("manufacturer"),
+    model: stringField("model"),
+    nickname: stringField("nickname"),
+  };
+}
+
+function definedOnly<T extends Record<string, unknown>>(o: T) {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+}
+
+function serialJson(
+  deviceId: string,
+  device: { sessionToken: string; url: string },
+  identity: DeviceIdentity = {}
+) {
+  return json({
+    deviceId,
+    sessionToken: device.sessionToken,
+    url: device.url,
+    ...definedOnly(identity),
+  });
 }
 
 function elementQuery(args: Record<string, unknown>) {
@@ -201,6 +331,7 @@ export function registerAndroidTools(server: McpServer): void {
     timeoutMs?: number;
   };
   const devices = new Map<string, AndroidCompanionDevice>();
+  const identities = new Map<string, DeviceIdentity>();
 
   function normalizeDeviceId(deviceId?: string): string {
     return deviceId?.trim() || DEFAULT_DEVICE_ID;
@@ -209,6 +340,20 @@ export function registerAndroidTools(server: McpServer): void {
   function rememberDevice(deviceId: string, device: AndroidCompanionDevice): void {
     devices.get(deviceId)?.close();
     devices.set(deviceId, device);
+  }
+
+  async function rememberIdentity(
+    deviceId: string,
+    device: AndroidCompanionDevice
+  ): Promise<DeviceIdentity> {
+    let identity: DeviceIdentity = {};
+    try {
+      identity = readIdentity(await device.status());
+    } catch {
+      // Older or temporarily busy companions may fail status during connect.
+    }
+    identities.set(deviceId, identity);
+    return identity;
   }
 
   async function resolveDevice(args: SessionArgs): Promise<{
@@ -270,7 +415,7 @@ export function registerAndroidTools(server: McpServer): void {
           timeoutMs: args.timeoutMs,
         });
         rememberDevice(deviceId, device);
-        return serialJson(deviceId, device);
+        return serialJson(deviceId, device, await rememberIdentity(deviceId, device));
       }
       if (!args.code) {
         return json({ deviceId, url: args.url, needsPairing: true });
@@ -282,7 +427,7 @@ export function registerAndroidTools(server: McpServer): void {
         timeoutMs: args.timeoutMs,
       });
       rememberDevice(deviceId, device);
-      return serialJson(deviceId, device);
+      return serialJson(deviceId, device, await rememberIdentity(deviceId, device));
     }
   );
 
@@ -297,7 +442,24 @@ export function registerAndroidTools(server: McpServer): void {
       const deviceId = normalizeDeviceId(args.deviceId);
       devices.get(deviceId)?.close();
       devices.delete(deviceId);
+      identities.delete(deviceId);
       return ok();
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_list_devices",
+    {
+      description:
+        "List cached Android companion sessions and identity captured at android_connect time. This is local-only and does not call devices, so one stuck phone cannot block the list. android_status is the live source of truth after nickname changes.",
+      inputSchema: z.object({}).shape,
+    },
+    async () => {
+      const list = [...devices.entries()].map(([deviceId, device]) =>
+        definedOnly({ deviceId, url: device.url, ...(identities.get(deviceId) ?? {}) })
+      );
+      return json({ devices: list });
     }
   );
 
@@ -666,12 +828,14 @@ export function registerAndroidTools(server: McpServer): void {
     server,
     "android_find_template",
     {
-      description: "Find an image template on an Android device screenshot",
+      description: "Capture an Android screen once, write a PNG artifact, and find an image template in Android device coordinates",
       inputSchema: z
         .object({
           ...sessionSchema,
           image: templateImageSchema,
           ...matchOptionsSchema,
+          detail: captureDetailSchema,
+          debugImage: debugImageSchema,
           all: z.boolean().optional(),
         })
         .shape,
@@ -683,13 +847,78 @@ export function registerAndroidTools(server: McpServer): void {
       image: z.infer<typeof templateImageSchema>;
       all?: boolean;
       timeoutMs?: number;
+      detail?: CaptureArtifactDetail;
+      debugImage?: boolean;
       confidence?: number;
       region?: { left: number; top: number; width: number; height: number };
       scale?: boolean | { min?: number; max?: number; step?: number };
     }) => {
       const needle = decodeTemplateImage(args.image);
-      void needle;
-      throw new Error("Android companion screen capture/template matching is not implemented yet");
+      return withDevice(args, async (device) => {
+        const capture = await captureAndroidScreen(device, args.detail, "android-template");
+        const matches = args.all
+          ? await coreImage.findAll(capture.capture, needle, localMatchOptions(args))
+          : [await coreImage.find(capture.capture, needle, localMatchOptions(args))];
+        const debug = args.debugImage
+          ? writeDebugCapture(capture.capture, matchAnnotations(matches), {
+              prefix: "android-template-debug",
+            })
+          : undefined;
+        return json({
+          ...captureResponse(capture),
+          matches,
+          ...(debug ? { debugImagePath: debug.imagePath } : {}),
+        });
+      });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "android_find_template_and_tap",
+    {
+      description:
+        "Capture an Android screen once, find the best template match, and tap its Android device coordinate center. The tap runs only after a successful match.",
+      inputSchema: z
+        .object({
+          ...sessionSchema,
+          image: templateImageSchema,
+          ...matchOptionsSchema,
+          detail: captureDetailSchema,
+          debugImage: debugImageSchema,
+        })
+        .shape,
+    },
+    async (args: {
+      deviceId?: string;
+      url?: string;
+      sessionToken?: string;
+      image: z.infer<typeof templateImageSchema>;
+      timeoutMs?: number;
+      detail?: CaptureArtifactDetail;
+      debugImage?: boolean;
+      confidence?: number;
+      region?: { left: number; top: number; width: number; height: number };
+      scale?: boolean | { min?: number; max?: number; step?: number };
+    }) => {
+      const needle = decodeTemplateImage(args.image);
+      return withDevice(args, async (device) => {
+        const capture = await captureAndroidScreen(device, args.detail, "android-template-tap");
+        const match = await coreImage.find(capture.capture, needle, localMatchOptions(args));
+        const tapPoint = match.center;
+        await device.tap(tapPoint.x, tapPoint.y);
+        const debug = args.debugImage
+          ? writeDebugCapture(capture.capture, matchAnnotations([match]), {
+              prefix: "android-template-tap-debug",
+            })
+          : undefined;
+        return json({
+          ...captureResponse(capture),
+          match,
+          tapPoint,
+          ...(debug ? { debugImagePath: debug.imagePath } : {}),
+        });
+      });
     }
   );
 
@@ -697,7 +926,7 @@ export function registerAndroidTools(server: McpServer): void {
     server,
     "android_capture_screen",
     {
-      description: "Capture the Android device screen through the companion app",
+      description: "Capture the Android device screen through the companion app and write a workspace PNG artifact",
       inputSchema: z.object({ ...sessionSchema, detail: captureDetailSchema }).shape,
     },
     async (args: {
@@ -707,8 +936,10 @@ export function registerAndroidTools(server: McpServer): void {
       timeoutMs?: number;
       detail?: CaptureArtifactDetail;
     }) => {
-      void args;
-      throw new Error("Android companion screen capture is not implemented yet");
+      return withDevice(args, async (device) => {
+        const capture = await captureAndroidScreen(device, args.detail);
+        return json(captureResponse(capture));
+      });
     }
   );
 }

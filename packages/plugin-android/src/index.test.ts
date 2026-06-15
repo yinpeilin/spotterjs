@@ -50,7 +50,17 @@ describe("android companion websocket client", () => {
           socket.send(JSON.stringify({ type: "pong" }));
         }
         if (message.type === "status") {
-          socket.send(JSON.stringify({ type: "status", state: { running: true } }));
+          socket.send(
+            JSON.stringify({
+              type: "status",
+              state: {
+                running: true,
+                manufacturer: "Google",
+                model: "Pixel 8",
+                nickname: "lab-1",
+              },
+            })
+          );
         }
       });
     });
@@ -80,7 +90,12 @@ describe("android companion websocket client", () => {
       type: "status",
       sessionToken: "token-1",
     });
-    expect(status).toEqual({ running: true });
+    expect(status).toEqual({
+      running: true,
+      manufacturer: "Google",
+      model: "Pixel 8",
+      nickname: "lab-1",
+    });
 
     device.close();
   });
@@ -236,6 +251,95 @@ describe("android companion websocket client", () => {
     expect(app).toEqual({
       packageName: "com.android.settings",
       activity: "com.android.settings.Settings",
+    });
+
+    device.close();
+  });
+
+  it("captures screen frames as validated PNG bytes", async () => {
+    const png = Buffer.from("fake png");
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2, requires: "pair" }));
+      socket.on("message", (raw) => {
+        const message = JSON.parse(String(raw)) as Json;
+        received.push(message);
+        if (message.type === "pair") {
+          socket.send(
+            JSON.stringify({
+              type: "paired",
+              protocolVersion: 2,
+              sessionToken: "token-capture",
+              state: {},
+            })
+          );
+          return;
+        }
+        if (message.type === "captureScreen") {
+          socket.send(
+            JSON.stringify({
+              type: "screenCaptured",
+              mimeType: "image/png",
+              width: 1080,
+              height: 2400,
+              density: 420,
+              base64: png.toString("base64"),
+            })
+          );
+        }
+      });
+    });
+
+    const device = await android.pair({ url, code: "123456" });
+    const capture = await device.captureScreen();
+
+    expect(received.slice(1)).toEqual([
+      { type: "captureScreen", sessionToken: "token-capture" },
+    ]);
+    expect(capture).toEqual({
+      mimeType: "image/png",
+      width: 1080,
+      height: 2400,
+      density: 420,
+      bytes: png,
+    });
+
+    device.close();
+  });
+
+  it("rejects invalid screen capture frames", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2, requires: "pair" }));
+      socket.on("message", (raw) => {
+        const message = JSON.parse(String(raw)) as Json;
+        if (message.type === "pair") {
+          socket.send(
+            JSON.stringify({
+              type: "paired",
+              protocolVersion: 2,
+              sessionToken: "token-capture",
+              state: {},
+            })
+          );
+          return;
+        }
+        socket.send(
+          JSON.stringify({
+            type: "screenCaptured",
+            mimeType: "image/jpeg",
+            width: 1080,
+            height: 2400,
+            base64: "not-png",
+          })
+        );
+      });
+    });
+
+    const device = await android.pair({ url, code: "123456" });
+
+    await expect(device.captureScreen()).rejects.toMatchObject({
+      name: "SpotterError",
+      code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
+      domain: "android",
     });
 
     device.close();

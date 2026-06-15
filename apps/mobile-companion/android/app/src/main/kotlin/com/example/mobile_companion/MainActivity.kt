@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.net.wifi.WifiManager
@@ -46,14 +47,12 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SCREEN_CAPTURE_REQUEST) {
-            bridge.screenCaptureReady = resultCode == Activity.RESULT_OK && data != null
-            bridge.addEvent(
-                if (bridge.screenCaptureReady) {
-                    "screen capture permission granted"
-                } else {
-                    "screen capture permission denied"
-                }
-            )
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                ScreenCaptureService.start(this, resultCode, data)
+                bridge.addEvent("screen capture permission granted")
+            } else {
+                bridge.addEvent("screen capture permission denied")
+            }
         }
     }
 
@@ -72,6 +71,10 @@ class MainActivity : FlutterActivity() {
                 }
                 "regeneratePairingCode" -> {
                     bridge.regeneratePairingCode()
+                    result.success(null)
+                }
+                "setNickname" -> {
+                    bridge.setDeviceNickname(call.argument<String>("nickname"))
                     result.success(null)
                 }
                 "openAccessibilitySettings" -> {
@@ -129,11 +132,12 @@ private class CompanionBridge(private val context: Context) {
     private val random = SecureRandom()
     private val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
     private val events = ArrayDeque<String>()
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("spotter_companion", Context.MODE_PRIVATE)
 
     private var running = false
     private var pairingCode = nextPairingCode()
     private var server: PairingWebSocketServer? = null
-    var screenCaptureReady: Boolean = false
     private var connectedClient: String? = null
 
     fun start() {
@@ -159,7 +163,8 @@ private class CompanionBridge(private val context: Context) {
                 { key -> SpotterAccessibilityService.keyevent(key) },
                 { SpotterAccessibilityService.back() },
                 { SpotterAccessibilityService.home() },
-                ::launchApp
+                ::launchApp,
+                { ScreenCaptureService.captureScreen() }
             ).also { it.start() }
         }
         running = true
@@ -188,6 +193,16 @@ private class CompanionBridge(private val context: Context) {
         addEvent("pairing code regenerated")
     }
 
+    fun deviceNickname(): String? = prefs.getString(PREF_NICKNAME, null)?.takeIf { it.isNotBlank() }
+
+    fun setDeviceNickname(nickname: String?) {
+        val trimmed = nickname?.trim().orEmpty()
+        prefs.edit().apply {
+            if (trimmed.isEmpty()) remove(PREF_NICKNAME) else putString(PREF_NICKNAME, trimmed)
+        }.apply()
+        addEvent(if (trimmed.isEmpty()) "nickname cleared" else "nickname set to $trimmed")
+    }
+
     private fun isPairingCodeValid(code: String): Boolean {
         return code == pairingCode
     }
@@ -206,12 +221,16 @@ private class CompanionBridge(private val context: Context) {
         val inputMethodEnabled = isSpotterInputMethodEnabled()
         val inputMethodSelected = isSpotterInputMethodSelected()
         val notifications = areNotificationsAllowed()
+        val screenCaptureReady = ScreenCaptureService.isReady
         return mapOf(
             "running" to running,
             "host" to localHost(),
             "port" to DEFAULT_PORT,
             "pairingCode" to pairingCode,
             "connectedClient" to connectedClient,
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+            "nickname" to deviceNickname(),
             "accessibilityEnabled" to accessibility,
             "inputMethodEnabled" to inputMethodEnabled,
             "inputMethodSelected" to inputMethodSelected,
@@ -320,5 +339,6 @@ private class CompanionBridge(private val context: Context) {
 
     companion object {
         private const val DEFAULT_PORT = 17341
+        private const val PREF_NICKNAME = "nickname"
     }
 }

@@ -93,6 +93,14 @@ export interface AndroidCurrentApp {
   activity?: string;
 }
 
+export interface AndroidScreenCapture {
+  mimeType: "image/png";
+  width: number;
+  height: number;
+  density?: number;
+  bytes: Buffer;
+}
+
 export interface AndroidCompanionDevice {
   readonly url: string;
   readonly sessionToken: string;
@@ -110,6 +118,7 @@ export interface AndroidCompanionDevice {
   launchApp(packageName: string): Promise<AndroidCurrentApp>;
   getDisplayInfo(): Promise<AndroidDisplayInfo>;
   currentApp(): Promise<AndroidCurrentApp>;
+  captureScreen(): Promise<AndroidScreenCapture>;
 }
 
 type JsonMessage = Record<string, unknown>;
@@ -374,6 +383,29 @@ class CompanionDevice implements AndroidCompanionDevice {
     };
   }
 
+  async captureScreen(): Promise<AndroidScreenCapture> {
+    const response = await this.request(
+      { type: "captureScreen", sessionToken: this.sessionToken },
+      "screenCaptured"
+    );
+    const mimeType = readString(response, "mimeType");
+    if (mimeType !== "image/png") {
+      throw androidError(
+        "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
+        "screen capture mimeType must be image/png",
+        { context: { mimeType } }
+      );
+    }
+    return {
+      mimeType,
+      width: readNumber(response, "width"),
+      height: readNumber(response, "height"),
+      density:
+        response.density === undefined ? undefined : readNumber(response, "density"),
+      bytes: readBase64(response, "base64"),
+    };
+  }
+
   private request(message: JsonMessage, expectedType: string): Promise<JsonMessage> {
     return this.enqueue(async () => {
       await this.session.send(message);
@@ -568,6 +600,23 @@ function readNumber(message: JsonMessage, key: string): number {
     );
   }
   return value;
+}
+
+function readBase64(message: JsonMessage, key: string): Buffer {
+  const value = readString(message, key);
+  const normalized = value.replace(/\s+/g, "");
+  if (
+    normalized.length === 0 ||
+    normalized.length % 4 === 1 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)
+  ) {
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
+      `${key} must be a base64 string`,
+      { context: { key } }
+    );
+  }
+  return Buffer.from(normalized, "base64");
 }
 
 function readObject(message: JsonMessage, key: string): Record<string, unknown> {
