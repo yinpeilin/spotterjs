@@ -29,6 +29,10 @@ const ocrTools = vi.hoisted(() => ({
   registerOcrTools: vi.fn(),
 }));
 
+const visualTools = vi.hoisted(() => ({
+  registerVisualTools: vi.fn(),
+}));
+
 const androidTools = vi.hoisted(() => ({
   registerAndroidTools: vi.fn(),
 }));
@@ -55,6 +59,10 @@ vi.mock("./tools/ocr.js", () => ({
   registerOcrTools: ocrTools.registerOcrTools,
 }));
 
+vi.mock("./tools/visual.js", () => ({
+  registerVisualTools: visualTools.registerVisualTools,
+}));
+
 vi.mock("./tools/android.js", () => ({
   registerAndroidTools: androidTools.registerAndroidTools,
 }));
@@ -74,6 +82,7 @@ beforeEach(() => {
   desktopTools.registerDesktopTools.mockReset();
   hostTools.registerHostTools.mockReset();
   ocrTools.registerOcrTools.mockReset();
+  visualTools.registerVisualTools.mockReset();
   androidTools.registerAndroidTools.mockReset();
 });
 
@@ -120,6 +129,7 @@ describe("runSpotterMcp", () => {
       false
     );
     expect(ocrTools.registerOcrTools).toHaveBeenCalledWith(expect.any(Object));
+    expect(visualTools.registerVisualTools).toHaveBeenCalledWith(expect.any(Object));
   });
 
   it("registers Android companion tools when enabled", async () => {

@@ -4,6 +4,9 @@ import { host } from "@spotterjs/core";
 import { json, ok, registerSafeTool } from "./results.js";
 
 const finiteNumber = z.number().finite();
+const workspacePathSchema = z
+  .string()
+  .describe("Path inside SPOTTERJS_WORKSPACE_ROOT. Relative paths are resolved from the workspace root.");
 
 export function registerHostTools(server: McpServer): void {
   registerSafeTool(
@@ -11,7 +14,7 @@ export function registerHostTools(server: McpServer): void {
     "host_read_file",
     {
       description: "Read a text file inside SPOTTERJS_WORKSPACE_ROOT",
-      inputSchema: z.object({ path: z.string() }),
+      inputSchema: z.object({ path: workspacePathSchema }),
     },
     async ({ path: filePath }) => {
       const text = host.readFile(filePath) as string;
@@ -24,7 +27,10 @@ export function registerHostTools(server: McpServer): void {
     "host_write_file",
     {
       description: "Write a text file inside the workspace sandbox",
-      inputSchema: z.object({ path: z.string(), content: z.string() }),
+      inputSchema: z.object({
+        path: workspacePathSchema,
+        content: z.string().describe("Text content to write."),
+      }),
     },
     async ({ path: filePath, content }) => {
       host.writeFile(filePath, content);
@@ -36,7 +42,10 @@ export function registerHostTools(server: McpServer): void {
     server,
     "host_list_dir",
     {
-      inputSchema: z.object({ path: z.string().optional() }),
+      description: "List directory entries inside the workspace sandbox",
+      inputSchema: z.object({
+        path: workspacePathSchema.optional().describe("Workspace directory path. Defaults to '.'."),
+      }),
     },
     async ({ path: dirPath }) => {
       const entries = host.listDir(dirPath ?? ".");
@@ -47,7 +56,10 @@ export function registerHostTools(server: McpServer): void {
   registerSafeTool(
     server,
     "host_stat",
-    { inputSchema: z.object({ path: z.string() }) },
+    {
+      description: "Return file or directory metadata inside the workspace sandbox",
+      inputSchema: z.object({ path: workspacePathSchema }),
+    },
     async ({ path: filePath }) => {
       const st = host.stat(filePath);
       return json(st);
@@ -59,7 +71,7 @@ export function registerHostTools(server: McpServer): void {
     "host_open_file",
     {
       description: "Open a file or folder with the OS default application",
-      inputSchema: z.object({ path: z.string() }),
+      inputSchema: z.object({ path: workspacePathSchema }),
     },
     async ({ path: filePath }) => {
       host.openPath(filePath);
@@ -87,9 +99,15 @@ export function registerHostTools(server: McpServer): void {
       description:
         "Run a command in the workspace shell (requires SPOTTERJS_ALLOW_SHELL=1)",
       inputSchema: z.object({
-        command: z.string(),
-        cwd: z.string().optional(),
-        timeoutMs: finiteNumber.min(0).max(300_000).optional(),
+        command: z.string().describe("Shell command to run."),
+        cwd: workspacePathSchema
+          .optional()
+          .describe("Working directory inside the workspace. Defaults to workspace root."),
+        timeoutMs: finiteNumber
+          .min(0)
+          .max(300_000)
+          .optional()
+          .describe("Command timeout in milliseconds, capped at 300000."),
       }),
     },
     async ({ command, cwd, timeoutMs }) => {

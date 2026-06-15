@@ -1,11 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { scoreOcrText, type OcrTextLine, type OcrTextMatch } from "@spotterjs/plugin-ocr";
-import type { Point } from "@spotterjs/base";
 import { z } from "zod";
+import { writeDebugImageFromPath } from "../adapters/debug-draw.js";
 import {
-  type DebugAnnotation,
-  writeDebugImageFromPath,
-} from "../adapters/debug-draw.js";
+  getOcr,
+  matchingOcrLines,
+  ocrLineAnnotations,
+  ocrModelOptionsSchema,
+  scoreOcrLines,
+} from "./ocr-shared.js";
 import { json, registerSafeTool } from "./results.js";
 
 const finiteNumber = z.number().finite();
@@ -13,46 +15,28 @@ const positiveNumber = finiteNumber.positive();
 const normalizedNumber = finiteNumber.min(0).max(1);
 
 const regionSchema = z.object({
-  left: finiteNumber,
-  top: finiteNumber,
-  width: positiveNumber,
-  height: positiveNumber,
+  left: finiteNumber.describe("Image x coordinate of the search region left edge."),
+  top: finiteNumber.describe("Image y coordinate of the search region top edge."),
+  width: positiveNumber.describe("Search region width in pixels."),
+  height: positiveNumber.describe("Search region height in pixels."),
 });
 
 const readOptionsSchema = {
-  searchRegion: regionSchema.optional(),
-  origin: z.object({ x: finiteNumber, y: finiteNumber }).optional(),
-  debugImage: z.boolean().optional(),
+  searchRegion: regionSchema
+    .optional()
+    .describe("Optional crop inside the input image before OCR."),
+  origin: z
+    .object({
+      x: finiteNumber.describe("X offset added to OCR result coordinates."),
+      y: finiteNumber.describe("Y offset added to OCR result coordinates."),
+    })
+    .optional()
+    .describe("Coordinate offset used to translate cropped image results back to screen space."),
+  debugImage: z
+    .boolean()
+    .optional()
+    .describe("When true, write an annotated OCR debug PNG under .spotter/artifacts."),
 };
-
-const modelOptionsSchema = {
-  modelDir: z.string().optional(),
-  modelProfile: z.enum(["server", "mobile", "ppocrv5-server", "ppocrv5-mobile"]).optional(),
-};
-
-const ocrClients = new Map<string, Promise<import("@spotterjs/plugin-ocr").OcrClient>>();
-let createOcrIdentity: unknown;
-
-async function getOcr(args: { modelDir?: string; modelProfile?: "server" | "mobile" | "ppocrv5-server" | "ppocrv5-mobile" }) {
-  const { createOcr } = await import("@spotterjs/plugin-ocr");
-  if (createOcrIdentity !== createOcr) {
-    ocrClients.clear();
-    createOcrIdentity = createOcr;
-  }
-  const key = JSON.stringify({
-    modelDir: args.modelDir,
-    modelProfile: args.modelProfile,
-  });
-  let client = ocrClients.get(key);
-  if (!client) {
-    client = createOcr({
-      modelDir: args.modelDir,
-      modelProfile: args.modelProfile,
-    });
-    ocrClients.set(key, client);
-  }
-  return client;
-}
 
 export function registerOcrTools(server: McpServer): void {
   registerSafeTool(
@@ -63,9 +47,9 @@ export function registerOcrTools(server: McpServer): void {
         "Read text lines from a workspace image path using OCR. Use this after capture tools return imagePath.",
       inputSchema: z
         .object({
-          imagePath: z.string(),
+          imagePath: z.string().describe("Workspace image path returned by a capture tool."),
           ...readOptionsSchema,
-          ...modelOptionsSchema,
+          ...ocrModelOptionsSchema,
         })
         .shape,
     },
@@ -97,13 +81,21 @@ export function registerOcrTools(server: McpServer): void {
         "Find text in a workspace image path using OCR. Returns matching OCR lines and image coordinate boxes.",
       inputSchema: z
         .object({
-          imagePath: z.string(),
-          text: z.string(),
-          exact: z.boolean().optional(),
-          caseSensitive: z.boolean().optional(),
-          minSimilarity: normalizedNumber.optional(),
+          imagePath: z.string().describe("Workspace image path returned by a capture tool."),
+          text: z.string().describe("Text to find in OCR output."),
+          exact: z
+            .boolean()
+            .optional()
+            .describe("Require exact OCR text equality instead of substring matching."),
+          caseSensitive: z
+            .boolean()
+            .optional()
+            .describe("Preserve case when comparing OCR text."),
+          minSimilarity: normalizedNumber
+            .optional()
+            .describe("Minimum normalized OCR text similarity for fuzzy matching."),
           ...readOptionsSchema,
-          ...modelOptionsSchema,
+          ...ocrModelOptionsSchema,
         })
         .shape,
     },
@@ -114,15 +106,12 @@ export function registerOcrTools(server: McpServer): void {
           searchRegion: args.searchRegion,
           origin: args.origin,
         });
-        const candidates = lines.map((line) => ({
-          ...line,
-          ...scoreOcrText(line.text, args.text, {
-            exact: args.exact,
-            caseSensitive: args.caseSensitive,
-            minSimilarity: args.minSimilarity,
-          }),
-        }));
-        const matches = candidates.filter((line): line is OcrTextMatch => line.matched);
+        const candidates = scoreOcrLines(lines, args.text, {
+          exact: args.exact,
+          caseSensitive: args.caseSensitive,
+          minSimilarity: args.minSimilarity,
+        });
+        const matches = matchingOcrLines(candidates);
         const debug = writeDebugImageFromPath(
           args.imagePath,
           ocrLineAnnotations(candidates),
@@ -150,35 +139,5 @@ export function registerOcrTools(server: McpServer): void {
         }),
       });
     }
-  );
-}
-
-function ocrLineAnnotations(lines: OcrTextLine[]): DebugAnnotation[] {
-  const annotations: DebugAnnotation[] = [];
-  for (const line of lines) {
-    if (hasBox(line.box)) {
-      annotations.push({ kind: "polygon", points: line.box });
-    } else if (line.region) {
-      annotations.push({ kind: "region", region: line.region });
-    }
-    if (isPoint(line.center)) {
-      annotations.push({ kind: "point", point: line.center });
-    }
-  }
-  return annotations;
-}
-
-function hasBox(value: unknown): value is [Point, Point, Point, Point] {
-  return Array.isArray(value) && value.length === 4 && value.every(isPoint);
-}
-
-function isPoint(value: unknown): value is Point {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "x" in value &&
-    "y" in value &&
-    Number.isFinite((value as Point).x) &&
-    Number.isFinite((value as Point).y)
   );
 }

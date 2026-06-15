@@ -27,50 +27,69 @@ import { json, ok, registerSafeTool } from "./results.js";
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
 const nonNegativeNumber = finiteNumber.min(0);
-const captureDetailSchema = z.enum(["high", "original"]).optional();
+const captureDetailSchema = z
+  .enum(["high", "original"])
+  .optional()
+  .describe(
+    'Artifact detail. "high" downscales large captures; "original" preserves pixels.'
+  );
 
 const regionSchema = z
   .object({
-    left: finiteNumber,
-    top: finiteNumber,
-    width: positiveNumber,
-    height: positiveNumber,
+    left: finiteNumber.describe("Screen x coordinate of the region left edge."),
+    top: finiteNumber.describe("Screen y coordinate of the region top edge."),
+    width: positiveNumber.describe("Region width in pixels."),
+    height: positiveNumber.describe("Region height in pixels."),
   })
-  .optional();
+  .optional()
+  .describe("Optional screen search or capture region.");
 
 const matchOptionsSchema = {
-  confidence: nonNegativeNumber.max(1).optional(),
+  confidence: nonNegativeNumber
+    .max(1)
+    .optional()
+    .describe("Minimum template match confidence from 0 to 1."),
   region: regionSchema,
   scale: z
     .union([
       z.boolean(),
       z.object({
-        min: positiveNumber.optional(),
-        max: positiveNumber.optional(),
-        step: positiveNumber.optional(),
+        min: positiveNumber.optional().describe("Minimum template scale factor."),
+        max: positiveNumber.optional().describe("Maximum template scale factor."),
+        step: positiveNumber.optional().describe("Template scale search step."),
       }),
     ])
-    .optional(),
+    .optional()
+    .describe("Enable multi-scale template matching, or provide an explicit scale range."),
 };
 
 const templateImageSchema = z.union([
-  z.object({ path: z.string() }),
+  z.object({ path: z.string().describe("Template image file path.") }),
   z.object({
-    base64: z.string(),
-    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).optional(),
+    base64: z.string().describe("Base64-encoded template image bytes."),
+    mimeType: z
+      .enum(["image/png", "image/jpeg", "image/webp"])
+      .optional()
+      .describe("Template image MIME type."),
   }),
-]);
+]).describe("Template image as a file path or base64-encoded PNG/JPEG/WebP bytes.");
 
 const captureDetailOptionsSchema = {
   detail: captureDetailSchema,
 };
 
 const debugImageOptionsSchema = {
-  debugImage: z.boolean().optional(),
+  debugImage: z
+    .boolean()
+    .optional()
+    .describe("When true, write an annotated debug PNG under .spotter/artifacts."),
 };
 
 const keyboardOptionsSchema = {
-  autoDelayMs: finiteNumber.min(0).optional(),
+  autoDelayMs: finiteNumber
+    .min(0)
+    .optional()
+    .describe("Delay in milliseconds between key events."),
 };
 
 const keyboardTapKeySchema = z.union([
@@ -133,7 +152,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       description:
         "Capture a window by id, downscale long edge to 1600 by default, and return a workspace PNG file path",
       inputSchema: {
-        windowId: z.string(),
+        windowId: z.string().describe("Window ID returned by desktop_list_windows."),
         ...captureDetailOptionsSchema,
       },
     },
@@ -161,7 +180,10 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     server,
     "desktop_focus_window",
     {
-      inputSchema: z.object({ windowId: z.string() }),
+      description: "Bring a window returned by desktop_list_windows to the foreground",
+      inputSchema: z.object({
+        windowId: z.string().describe("Window ID returned by desktop_list_windows."),
+      }),
     },
     async ({ windowId }) => {
       windows.focus(windowId);
@@ -172,7 +194,13 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   registerSafeTool(
     server,
     "desktop_mouse_move",
-    { inputSchema: z.object({ x: finiteNumber, y: finiteNumber }) },
+    {
+      description: "Move the mouse cursor to a screen coordinate",
+      inputSchema: z.object({
+        x: finiteNumber.describe("Screen x coordinate."),
+        y: finiteNumber.describe("Screen y coordinate."),
+      }),
+    },
     async ({ x, y }) => {
       mouse.move(x, y);
       return ok();
@@ -184,7 +212,10 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_mouse_click",
     {
       inputSchema: z.object({
-        button: z.enum(["left", "right", "middle"]).optional(),
+        button: z
+          .enum(["left", "right", "middle"])
+          .optional()
+          .describe("Mouse button. Defaults to left."),
         ...debugImageOptionsSchema,
       }),
     },
@@ -215,9 +246,12 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_mouse_tap",
     {
       inputSchema: z.object({
-        x: finiteNumber,
-        y: finiteNumber,
-        button: z.enum(["left", "right", "middle"]).optional(),
+        x: finiteNumber.describe("Screen x coordinate to tap."),
+        y: finiteNumber.describe("Screen y coordinate to tap."),
+        button: z
+          .enum(["left", "right", "middle"])
+          .optional()
+          .describe("Mouse button. Defaults to left."),
         ...debugImageOptionsSchema,
       }),
     },
@@ -248,10 +282,16 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_keyboard_type",
     {
       inputSchema: z.object({
-        text: z.string(),
+        text: z.string().describe("Text to type."),
         ...keyboardOptionsSchema,
-        mode: z.enum(["paste", "native"]).optional(),
-        restoreClipboard: z.boolean().optional(),
+        mode: z
+          .enum(["paste", "native"])
+          .optional()
+          .describe("Typing mode. Paste is faster; native emits key events."),
+        restoreClipboard: z
+          .boolean()
+          .optional()
+          .describe("Restore clipboard content after paste-mode typing."),
       }),
     },
     async ({ text, autoDelayMs, mode, restoreClipboard }) => {
@@ -265,7 +305,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_keyboard_tap",
     {
       inputSchema: z.object({
-        key: keyboardTapKeySchema,
+        key: keyboardTapKeySchema.describe("Key name or numeric key to tap."),
         ...keyboardOptionsSchema,
       }),
     },
@@ -285,7 +325,10 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
   registerSafeTool(
     server,
     "desktop_clipboard_set",
-    { inputSchema: z.object({ text: z.string() }) },
+    {
+      description: "Set clipboard text",
+      inputSchema: z.object({ text: z.string().describe("Text to put on the clipboard.") }),
+    },
     async ({ text }) => {
       clipboard.set(text);
       return ok();
@@ -299,7 +342,10 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       inputSchema: z.object({
         image: templateImageSchema,
         ...matchOptionsSchema,
-        all: z.boolean().optional(),
+        all: z
+          .boolean()
+          .optional()
+          .describe("Return all template matches instead of only the best match."),
         ...debugImageOptionsSchema,
       }).shape,
     },

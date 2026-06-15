@@ -4,6 +4,7 @@ import { accessibility, configureHost } from "@spotterjs/core";
 import { registerDesktopTools } from "./tools/desktop.js";
 import { registerHostTools } from "./tools/host.js";
 import { registerOcrTools } from "./tools/ocr.js";
+import { registerVisualTools } from "./tools/visual.js";
 
 export async function registerOptionalAndroidTools(
   server: McpServer,
@@ -39,6 +40,7 @@ export async function runSpotterMcp(): Promise<void> {
 
   registerHostTools(server);
   registerOcrTools(server);
+  registerVisualTools(server);
   if (a11yEnabled) {
     accessibility.quick.enable();
   }

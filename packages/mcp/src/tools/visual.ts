@@ -1,0 +1,463 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  image as coreImage,
+  mouse,
+  screen,
+  windows,
+} from "@spotterjs/core";
+import type {
+  CaptureImage,
+  MatchResult,
+  Point,
+  Region,
+} from "@spotterjs/base";
+import { z } from "zod";
+import {
+  type CaptureArtifact,
+  type CaptureArtifactDetail,
+  workspaceImageStore,
+} from "../adapters/artifacts.js";
+import {
+  type DebugAnnotation,
+  writeDebugCapture,
+} from "../adapters/debug-draw.js";
+import {
+  getOcr,
+  matchingOcrLines,
+  ocrLineAnnotations,
+  ocrModelOptionsSchema,
+  scoreOcrLines,
+} from "./ocr-shared.js";
+import { json, registerSafeTool } from "./results.js";
+
+const finiteNumber = z.number().finite();
+const positiveNumber = finiteNumber.positive();
+const normalizedNumber = finiteNumber.min(0).max(1);
+const captureDetailSchema = z
+  .enum(["high", "original"])
+  .default("original")
+  .describe(
+    'Artifact detail. Combo tools default to "original" so returned screen coordinates line up with saved pixels.'
+  );
+
+const regionSchema = z
+  .object({
+    left: finiteNumber.describe("Screen x coordinate of the capture region left edge."),
+    top: finiteNumber.describe("Screen y coordinate of the capture region top edge."),
+    width: positiveNumber.describe("Capture region width in pixels."),
+    height: positiveNumber.describe("Capture region height in pixels."),
+  })
+  .optional()
+  .describe("Screen capture region. Only applies when source is screen.");
+
+const sourceSchema = z
+  .enum(["screen", "active", "window"])
+  .default("screen")
+  .describe("Desktop capture source: full screen/region, foreground window, or a specific window.");
+
+const debugImageSchema = z
+  .boolean()
+  .optional()
+  .describe("When true, write an annotated PNG debug artifact under .spotter/artifacts.");
+
+const matchOptionsSchema = {
+  confidence: normalizedNumber
+    .optional()
+    .describe("Minimum template match confidence from 0 to 1."),
+  scale: z
+    .union([
+      z.boolean(),
+      z.object({
+        min: positiveNumber.optional().describe("Minimum template scale factor."),
+        max: positiveNumber.optional().describe("Maximum template scale factor."),
+        step: positiveNumber.optional().describe("Template scale search step."),
+      }),
+    ])
+    .optional()
+    .describe("Enable multi-scale template matching, or provide an explicit scale range."),
+};
+
+const templateImageSchema = z
+  .union([
+    z.object({
+      path: z.string().describe("Template image file path."),
+    }),
+    z.object({
+      base64: z.string().describe("Base64-encoded template image bytes."),
+      mimeType: z
+        .enum(["image/png", "image/jpeg", "image/webp"])
+        .optional()
+        .describe("MIME type for documentation and client routing."),
+    }),
+  ])
+  .describe("Template image as a file path or base64-encoded PNG/JPEG/WebP bytes.");
+
+const captureSourceFields = {
+  source: sourceSchema,
+  windowId: z
+    .string()
+    .optional()
+    .describe('Window ID required when source is "window".'),
+  region: regionSchema,
+  detail: captureDetailSchema,
+};
+
+const ocrFields = {
+  text: z
+    .string()
+    .optional()
+    .describe("Optional query text. When omitted, the tool returns OCR lines."),
+  exact: z
+    .boolean()
+    .optional()
+    .describe("Require exact OCR text equality instead of substring matching."),
+  caseSensitive: z
+    .boolean()
+    .optional()
+    .describe("Preserve case when comparing OCR text."),
+  minSimilarity: normalizedNumber
+    .optional()
+    .describe("Minimum normalized OCR text similarity for fuzzy matching."),
+  ...ocrModelOptionsSchema,
+  debugImage: debugImageSchema,
+};
+
+const templateFields = {
+  image: templateImageSchema,
+  ...matchOptionsSchema,
+  debugImage: debugImageSchema,
+};
+
+const templateListFields = {
+  ...templateFields,
+  all: z
+    .boolean()
+    .optional()
+    .describe("Return all template matches instead of only the best match."),
+};
+
+const tapFields = {
+  ...templateFields,
+  button: z
+    .enum(["left", "right", "middle"])
+    .optional()
+    .describe("Mouse button to tap after a successful match. Defaults to left."),
+};
+
+type CaptureSource = "screen" | "active" | "window";
+type CaptureArgs = {
+  source?: CaptureSource;
+  windowId?: string;
+  region?: Region;
+  detail?: CaptureArtifactDetail;
+};
+
+type CaptureContext = {
+  source: CaptureSource;
+  windowId?: string;
+  capture: CaptureImage;
+  artifact: CaptureArtifact;
+  origin: Point;
+};
+
+type TemplateImageInput = z.infer<typeof templateImageSchema>;
+
+export function registerVisualTools(server: McpServer): void {
+  registerSafeTool(
+    server,
+    "desktop_capture_and_ocr",
+    {
+      description:
+        "Capture a desktop source once, write a PNG artifact, and run OCR on the same original in-memory capture. Returns screen-space OCR lines or matches.",
+      inputSchema: z
+        .object({
+          ...captureSourceFields,
+          ...ocrFields,
+        })
+        .shape,
+    },
+    async (args) => {
+      const capture = captureDesktopSource(args, "desktop-capture-ocr");
+      const ocr = await getOcr(args);
+      const lines = await ocr.read(capture.capture, {
+        searchRegion: undefined,
+        origin: capture.origin,
+      });
+
+      if (args.text !== undefined) {
+        const candidates = scoreOcrLines(lines, args.text, {
+          exact: args.exact,
+          caseSensitive: args.caseSensitive,
+          minSimilarity: args.minSimilarity,
+        });
+        const matches = matchingOcrLines(candidates);
+        const debug = args.debugImage
+          ? writeDebugCapture(
+              capture.capture,
+              localizeAnnotations(ocrLineAnnotations(candidates), capture.origin),
+              { prefix: "desktop-capture-ocr-debug" }
+            )
+          : undefined;
+        return json({
+          ...captureResponse(capture),
+          matches,
+          ...(args.debugImage ? { candidates } : {}),
+          ...(debug ? { debugImagePath: debug.imagePath } : {}),
+        });
+      }
+
+      const debug = args.debugImage
+        ? writeDebugCapture(
+            capture.capture,
+            localizeAnnotations(ocrLineAnnotations(lines), capture.origin),
+            { prefix: "desktop-capture-ocr-debug" }
+          )
+        : undefined;
+      return json({
+        ...captureResponse(capture),
+        lines,
+        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+      });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "desktop_capture_and_find_template",
+    {
+      description:
+        "Capture a desktop source once, write a PNG artifact, and run template matching on the same original in-memory capture. Returns screen-space matches.",
+      inputSchema: z
+        .object({
+          ...captureSourceFields,
+          ...templateListFields,
+        })
+        .shape,
+    },
+    async (args) => {
+      const capture = captureDesktopSource(args, "desktop-capture-template");
+      const needle = decodeTemplateImage(args.image);
+      const localMatches = args.all
+        ? await coreImage.findAll(capture.capture, needle, localMatchOptions(args))
+        : [await coreImage.find(capture.capture, needle, localMatchOptions(args))];
+      const matches = localMatches.map((match) => translateMatch(match, capture.origin));
+      const debug = args.debugImage
+        ? writeDebugCapture(capture.capture, matchAnnotations(localMatches), {
+            prefix: "desktop-capture-template-debug",
+          })
+        : undefined;
+
+      return json({
+        ...captureResponse(capture),
+        matches,
+        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+      });
+    }
+  );
+
+  registerSafeTool(
+    server,
+    "desktop_find_template_and_tap",
+    {
+      description:
+        "Capture a desktop source once, find the best template match, and tap its screen-space center. The mouse is tapped only after a successful match.",
+      inputSchema: z
+        .object({
+          ...captureSourceFields,
+          ...tapFields,
+        })
+        .shape,
+    },
+    async (args) => {
+      const capture = captureDesktopSource(args, "desktop-template-tap");
+      const needle = decodeTemplateImage(args.image);
+      const localMatch = await coreImage.find(
+        capture.capture,
+        needle,
+        localMatchOptions(args)
+      );
+      const match = translateMatch(localMatch, capture.origin);
+      const tapPoint = match.center;
+      mouse.tap(tapPoint.x, tapPoint.y, args.button);
+      const debug = args.debugImage
+        ? writeDebugCapture(
+            capture.capture,
+            matchAnnotations([localMatch]),
+            { prefix: "desktop-template-tap-debug" }
+          )
+        : undefined;
+
+      return json({
+        ...captureResponse(capture),
+        match,
+        tapPoint,
+        button: args.button ?? "left",
+        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+      });
+    }
+  );
+}
+
+function captureDesktopSource(args: CaptureArgs, prefix: string): CaptureContext {
+  const source = args.source ?? "screen";
+  if (source === "window" && !args.windowId) {
+    throw new Error('source "window" requires windowId');
+  }
+
+  if (source === "screen") {
+    const capture = screen.capture(args.region);
+    return buildCaptureContext({
+      source,
+      capture,
+      prefix,
+      detail: args.detail,
+      origin: {
+        x: args.region?.left ?? 0,
+        y: args.region?.top ?? 0,
+      },
+    });
+  }
+
+  if (source === "active") {
+    const active = windows.active();
+    const capture = screen.captureWindow(active.id);
+    return buildCaptureContext({
+      source,
+      windowId: active.id,
+      capture,
+      prefix,
+      detail: args.detail,
+      origin: {
+        x: active.region.left,
+        y: active.region.top,
+      },
+    });
+  }
+
+  const windowId = args.windowId!;
+  const region = windows.region(windowId);
+  const capture = screen.captureWindow(windowId);
+  return buildCaptureContext({
+    source,
+    windowId,
+    capture,
+    prefix,
+    detail: args.detail,
+    origin: {
+      x: region.left,
+      y: region.top,
+    },
+  });
+}
+
+function buildCaptureContext(args: {
+  source: CaptureSource;
+  windowId?: string;
+  capture: CaptureImage;
+  prefix: string;
+  detail?: CaptureArtifactDetail;
+  origin: Point;
+}): CaptureContext {
+  return {
+    source: args.source,
+    windowId: args.windowId,
+    capture: args.capture,
+    artifact: workspaceImageStore.writeCapture(args.capture, {
+      prefix: args.prefix,
+      detail: args.detail ?? "original",
+    }),
+    origin: args.origin,
+  };
+}
+
+function captureResponse(capture: CaptureContext) {
+  return {
+    ...capture.artifact,
+    source: capture.source,
+    ...(capture.windowId ? { windowId: capture.windowId } : {}),
+    origin: capture.origin,
+    coordinateSpace: "screen",
+  };
+}
+
+function decodeTemplateImage(image: TemplateImageInput): string | Buffer {
+  if ("path" in image) return image.path;
+  return Buffer.from(image.base64, "base64");
+}
+
+function localMatchOptions(args: {
+  confidence?: number;
+  scale?: boolean | { min?: number; max?: number; step?: number };
+}) {
+  return {
+    confidence: args.confidence,
+    region: undefined,
+    scale: args.scale,
+  };
+}
+
+function translateMatch(match: MatchResult, origin: Point): MatchResult {
+  return {
+    ...match,
+    region: {
+      left: match.region.left + origin.x,
+      top: match.region.top + origin.y,
+      width: match.region.width,
+      height: match.region.height,
+    },
+    center: {
+      x: match.center.x + origin.x,
+      y: match.center.y + origin.y,
+    },
+  };
+}
+
+function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
+  const annotations: DebugAnnotation[] = [];
+  for (const match of matches) {
+    annotations.push({ kind: "region", region: match.region });
+    annotations.push({ kind: "point", point: match.center });
+  }
+  return annotations;
+}
+
+function localizeAnnotations(
+  annotations: DebugAnnotation[],
+  origin: Point
+): DebugAnnotation[] {
+  if (origin.x === 0 && origin.y === 0) return annotations;
+  return annotations.map((annotation) => {
+    if (annotation.kind === "region") {
+      return {
+        ...annotation,
+        region: localizeRegion(annotation.region, origin),
+      };
+    }
+    if (annotation.kind === "polygon") {
+      return {
+        ...annotation,
+        points: annotation.points.map((point) => localizePoint(point, origin)),
+      };
+    }
+    return {
+      ...annotation,
+      point: localizePoint(annotation.point, origin),
+    };
+  });
+}
+
+function localizeRegion(region: Region, origin: Point): Region {
+  return {
+    left: region.left - origin.x,
+    top: region.top - origin.y,
+    width: region.width,
+    height: region.height,
+  };
+}
+
+function localizePoint(point: Point, origin: Point): Point {
+  return {
+    x: point.x - origin.x,
+    y: point.y - origin.y,
+  };
+}
