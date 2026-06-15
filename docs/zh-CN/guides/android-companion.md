@@ -34,6 +34,53 @@ const phone = await android.connect({
 });
 ```
 
+## 从电脑端控制多台设备
+
+一台电脑可以同时连接多台运行 companion app 的 Android 设备。推荐把每台设备的
+WebSocket URL 和 session token 放到配置里，由脚本统一调度。
+
+```typescript
+import { android } from "@spotterjs/plugin-android";
+
+const devices = [
+  {
+    name: "pixel-lab",
+    url: "ws://192.168.1.23:17341",
+    sessionToken: process.env.PIXEL_SESSION_TOKEN!,
+  },
+  {
+    name: "samsung-lab",
+    url: "ws://192.168.1.24:17341",
+    sessionToken: process.env.SAMSUNG_SESSION_TOKEN!,
+  },
+];
+
+const phones = await Promise.all(
+  devices.map(async (item) => ({
+    name: item.name,
+    phone: await android.connect({
+      url: item.url,
+      sessionToken: item.sessionToken,
+    }),
+  }))
+);
+
+try {
+  await Promise.all(
+    phones.map(async ({ name, phone }) => {
+      await phone.launchApp("com.android.settings");
+      const display = await phone.getDisplayInfo();
+      console.log(name, display.width, display.height);
+    })
+  );
+} finally {
+  for (const { phone } of phones) phone.close();
+}
+```
+
+适合并行的任务包括启动同一个 App、读取当前界面、截图留档、等待某个文字出现。
+会修改共享账号、后端状态或同一份测试数据的任务，建议按设备串行执行，避免互相影响。
+
 ## 设备操作
 
 ```typescript
@@ -45,6 +92,16 @@ console.log(await phone.currentApp());
 await phone.launchApp("com.android.settings");
 await phone.tap(320, 900);
 await phone.swipe({ x: 500, y: 1600 }, { x: 500, y: 500 }, { durationMs: 350 });
+await phone.gesture([
+  {
+    points: [
+      { x: 240, y: 1200 },
+      { x: 640, y: 1200 },
+      { x: 640, y: 900 },
+    ],
+    durationMs: 450,
+  },
+]);
 await phone.text("hello");
 await phone.keyevent("BACK");
 await phone.home();
@@ -74,7 +131,7 @@ try {
 `SPOTTER_ANDROID_COMPANION_ERROR`，设备返回的原始值放在
 `context.remoteCode`。
 
-## Accessibility Tree
+## 无障碍树
 
 ```typescript
 const tree = await phone.dumpTree({ maxDepth: 6 });
@@ -103,6 +160,27 @@ depth、path 和 children。
 `android_connect` 会返回 `deviceId`，默认是 `"default"`。后续工具可以只传
 `{ "deviceId": "default" }`，也可以继续使用旧式 `{ "url": "...", "sessionToken": "..." }`。
 
+多设备时，为每台设备显式指定 `deviceId`：
+
+```json
+{
+  "deviceId": "pixel-lab",
+  "url": "ws://192.168.1.23:17341",
+  "code": "123456"
+}
+```
+
+```json
+{
+  "deviceId": "samsung-lab",
+  "url": "ws://192.168.1.24:17341",
+  "sessionToken": "saved-session-token"
+}
+```
+
+后续调用只需要传对应的 `deviceId`。`android_list_devices` 可以列出 MCP
+server 当前缓存的设备；`android_disconnect` 可以关闭某台设备的连接。
+
 典型 MCP 闭环：
 
 ```json
@@ -125,7 +203,7 @@ depth、path 和 children。
 
 工具列表和请求形状见 [MCP Server](../MCP.md)。
 
-## Smoke Test
+## Smoke 测试
 
 ```powershell
 $env:SPOTTERJS_ANDROID_URL = "ws://192.168.1.23:17341"
@@ -144,6 +222,25 @@ $env:SPOTTERJS_ANDROID_TAP_ELEMENT = "1"
 npm run smoke:android
 ```
 
-## 当前限制
+## 截图和模板匹配
 
-屏幕截图和模板匹配要等 companion app 提供帧捕获协议后再开放。MCP 对这些路径会返回明确的未实现错误，不会回退到 ADB。
+先在 app 的权限面板中授权屏幕截图，再调用视觉 MCP 工具。companion 会通过已配对
+WebSocket 返回 PNG 帧；MCP server 会写入 `.spotter/artifacts`，并返回
+`coordinateSpace: "android-device"`。
+
+```json
+{ "deviceId": "default", "detail": "original" }
+```
+
+```json
+{
+  "deviceId": "default",
+  "image": { "path": "assets/android/button.png" },
+  "confidence": 0.9,
+  "debugImage": true
+}
+```
+
+`android_find_template_and_tap` 使用同一套模板字段，只会在匹配成功后点击。Android 14
+及更新版本要求 MediaProjection 运行在 `mediaProjection` foreground service 中；
+app 已声明该 service type，但仍需要用户授权当前截图 session。

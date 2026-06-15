@@ -5,6 +5,17 @@
 spotterjs 是面向桌面和 Android companion 自动化的 TypeScript-first 工具集。
 写脚本、构建 MCP tools 或维护仓库时，可以从这里进入对应文档。
 
+## 可以用来做什么
+
+- **桌面重复操作自动化：** 自动打开应用、聚焦窗口、截图、点击、输入、读剪贴板，适合冒烟测试、数据录入和批量配置。
+- **没有 API 的界面自动化：** 通过 OCR、NCC 模板匹配和无障碍树识别界面元素，再用坐标或元素中心点操作。
+- **代码 Agent 的眼睛和手：** 通过 MCP Server 让 Agent 观察桌面、读写工作区文件、调用受控 shell，并把截图 artifact 留在仓库内复查。
+- **Android 真机编排：** 在电脑端用 TypeScript 或 MCP 连接 companion app，控制多台 Android 设备执行安装后验证、账号流程、跨端消息确认等任务。
+- **跨端业务闭环：** 把桌面后台、浏览器、Windows 应用、Android App 和 OCR 检查组合成端到端脚本。
+
+多设备场景建议从 [Android companion 自动化](./guides/android-companion.md#从电脑端控制多台设备)
+和 [MCP Server 的 Android 工具](./MCP.md#android-多设备编排) 开始。
+
 ## 快速上手
 
 - [快速开始](./getting-started.md)：安装包、运行第一个脚本，并验证本地环境。

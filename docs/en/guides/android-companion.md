@@ -48,6 +48,16 @@ console.log(await phone.currentApp());
 await phone.launchApp("com.android.settings");
 await phone.tap(320, 900);
 await phone.swipe({ x: 500, y: 1600 }, { x: 500, y: 500 }, { durationMs: 350 });
+await phone.gesture([
+  {
+    points: [
+      { x: 240, y: 1200 },
+      { x: 640, y: 1200 },
+      { x: 640, y: 900 },
+    ],
+    durationMs: 450,
+  },
+]);
 await phone.text("hello");
 await phone.keyevent("BACK");
 await phone.home();
@@ -149,8 +159,28 @@ $env:SPOTTERJS_ANDROID_TAP_ELEMENT = "1"
 npm run smoke:android
 ```
 
-## Current Limits
+## Screen Capture And Templates
 
-Screen capture and template matching are not implemented until the companion
-app provides a frame capture protocol. MCP tools for these paths return explicit
-errors instead of falling back to ADB.
+Use the app permission panel to grant screen capture before calling visual MCP
+tools. The companion sends captures as PNG frames over the paired WebSocket;
+the MCP server writes them to `.spotter/artifacts` and returns
+`coordinateSpace: "android-device"`.
+
+```json
+{ "deviceId": "default", "detail": "original" }
+```
+
+```json
+{
+  "deviceId": "default",
+  "image": { "path": "assets/android/button.png" },
+  "confidence": 0.9,
+  "debugImage": true
+}
+```
+
+`android_find_template_and_tap` uses the same template fields and taps only
+after a successful match. Android 14 and newer require the companion to run
+MediaProjection through a `mediaProjection` foreground service; the app
+declares that service type and still requires a fresh user-granted projection
+session.

@@ -1,6 +1,6 @@
 # 测试指南
 
-## Key path coverage
+## 关键路径覆盖
 
 Default automated tests should avoid real desktop, WeChat, or Android device dependencies. Put real environment checks in smoke or integration scripts.
 
@@ -68,7 +68,7 @@ npm run smoke:android
 
 运行前确认当前桌面可以被聚焦、点击和输入。CI 不应默认运行会控制真实桌面的脚本。
 
-## Integration 脚本
+## 集成脚本
 
 微信脚本会操作真实应用：
 
@@ -110,7 +110,7 @@ npm run docs:check
 ```
 
 该命令检查 Markdown 本地相对链接。新增、移动或重命名文档时必须运行。
-## Error assertions
+## 错误断言
 
 库错误类型是公共 API。新增错误路径测试时，优先断言稳定 `code` 和必要的
 `context` 字段：

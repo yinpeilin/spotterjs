@@ -54,7 +54,7 @@ npm run sync-license
 
 该命令把根许可证同步到各 npm 包。同步后检查 diff，确认没有覆盖包内必须保留的文件。
 
-## Native platform packages
+## Native 平台包
 
 `@spotterjs/node` 是 JS loader。平台二进制作为 optional package 发布：
 
@@ -79,7 +79,7 @@ node scripts/prepare-native-package.mjs linux-x64-gnu
 npm publish ./crates/spotterjs-node/linux-x64-gnu
 ```
 
-### JS loader
+### JS 加载器
 
 平台包发布后：
 
@@ -87,7 +87,7 @@ npm publish ./crates/spotterjs-node/linux-x64-gnu
 npm publish -w @spotterjs/node
 ```
 
-## TypeScript packages
+## TypeScript 包
 
 按依赖顺序发布：
 

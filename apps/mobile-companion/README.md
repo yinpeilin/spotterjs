@@ -135,6 +135,28 @@ Multi-touch gesture:
 }
 ```
 
+Capture the current screen after the user grants the screen capture permission:
+
+```json
+{
+  "type": "captureScreen",
+  "sessionToken": "<token>"
+}
+```
+
+Success returns a PNG frame as base64:
+
+```json
+{
+  "type": "screenCaptured",
+  "mimeType": "image/png",
+  "width": 1080,
+  "height": 2400,
+  "density": 420,
+  "base64": "<png>"
+}
+```
+
 The `imeText` capability prefers the bundled `Spotter Keyboard` input method.
 When the user enables and selects that keyboard in Android settings, text
 commands are delivered through `InputConnection.commitText`. If the keyboard is
@@ -143,12 +165,14 @@ not selected, the app falls back to the accessibility service and calls
 
 ## Android Permissions
 
-The app declares the Android services needed for later milestones:
+The app declares the Android services needed by the companion protocol:
 
 - `MobileCompanionService`: foreground service used to keep the local pairing endpoint alive.
-- `SpotterAccessibilityService`: accessibility service stub for UI tree and gesture actions.
+- `ScreenCaptureService`: MediaProjection foreground service used for PNG frame capture.
+- `SpotterAccessibilityService`: accessibility service for UI tree and gesture actions.
 - `SpotterInputMethodService`: optional Android keyboard used for robust text input.
-- `MediaProjection` permission request: launched from the Flutter permission panel.
+- `MediaProjection` permission request: launched from the Flutter permission panel and required before `captureScreen`.
 
-The current companion milestone focuses on pairing. Screen frames, UI nodes, and
-input commands should be added as explicit capability-backed protocol commands.
+Android 14 and newer require the screen capture service to declare the
+`mediaProjection` foreground service type. The app still needs a user-approved
+MediaProjection session before it can return frames.

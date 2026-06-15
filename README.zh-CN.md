@@ -11,6 +11,22 @@ MCP server。
 - npm 包：`@spotterjs/core` 和可选插件
 - 文档：[English](./docs/en/README.md) / [中文](./docs/zh-CN/README.md)
 
+## 适用场景
+
+spotterjs 适合把「看屏幕、找目标、点按钮、输入文本、读状态」这类人工操作写成
+TypeScript 脚本，或通过 MCP 暴露给代码 Agent 使用。
+
+- **桌面应用自动化：** 对 Windows / Linux 桌面应用做冒烟测试、重复配置、截图取证、窗口聚焦和键鼠输入。
+- **视觉定位和 OCR：** 目标应用没有稳定 API 时，用模板匹配、OCR 或无障碍树定位按钮、图标和文本。
+- **Agent 驱动的本机操作：** 在 Cursor、Claude Desktop 等 MCP client 中，让 Agent 读取工作区文件、观察桌面、执行安全范围内的操作。
+- **Android companion 自动化：** 在电脑端写 TypeScript 或 MCP 调用，通过 WebSocket 控制一台或多台 Android 设备。
+- **跨设备流程验证：** 把桌面端配置、网页后台、手机端 App、短信或消息确认串成一个自动化闭环。
+
+如果你的目标是「电脑端写代码操作多台设备」，推荐使用 MCP 的
+`android_connect` 为每台手机分配不同 `deviceId`，再用 `android_list_devices`
+查看缓存连接，用 `android_launch_app`、`android_wait_for_element`、
+`android_find_template_and_tap` 等工具分别操作每台设备。
+
 ## 安装
 
 ```bash

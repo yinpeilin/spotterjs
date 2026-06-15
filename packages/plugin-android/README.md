@@ -31,6 +31,8 @@ const samePhone = await android.connect({
 });
 
 await samePhone.launchApp("com.android.settings");
+const frame = await samePhone.captureScreen();
+console.log(frame.width, frame.height);
 ```
 
 ## Device API
@@ -40,9 +42,11 @@ await samePhone.launchApp("com.android.settings");
 - `getDisplayInfo()`
 - `currentApp()`
 - `launchApp(packageName)`
+- `captureScreen()`
 - `dumpTree({ maxDepth? })`
 - `tap(x, y)`
 - `swipe(from, to, { durationMs? })`
+- `gesture(strokes)`
 - `text(text)`
 - `keyevent(key)`
 - `back()`
@@ -50,5 +54,20 @@ await samePhone.launchApp("com.android.settings");
 
 Coordinates use the Android device screen coordinate space.
 
-Screen capture and template matching are intentionally not exposed until the
-companion app provides a frame capture protocol.
+Use `gesture(strokes)` for multi-point or multi-stroke touch input:
+
+```typescript
+await phone.gesture([
+  {
+    points: [
+      { x: 240, y: 1200 },
+      { x: 640, y: 1200 },
+      { x: 640, y: 900 },
+    ],
+    durationMs: 450,
+  },
+]);
+```
+
+`captureScreen()` returns PNG bytes plus width, height, and density. Template
+matching stays in the MCP layer so the core plugin can remain transport-only.

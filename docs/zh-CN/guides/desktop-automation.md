@@ -81,6 +81,37 @@ mouse.tap(found.center.x, found.center.y);
 
 更多匹配细节见 [模板匹配](../MATCHING.md)。
 
+## MCP 组合工具
+
+当 MCP agent 驱动桌面时，可以用组合工具减少重复截图和人工编排：
+
+```json
+{
+  "source": "active",
+  "image": { "path": "C:/path/to/button.png" },
+  "confidence": 0.9,
+  "debugImage": true
+}
+```
+
+把这类参数传给 `desktop_capture_and_find_template` 可以只检查匹配结果；
+传给 `desktop_find_template_and_tap` 则会在匹配成功后点击最佳匹配中心点。
+两者都会只截图一次，写出 artifact，并在同一张原始内存截图上做模板匹配，返回屏幕坐标。
+
+实时 OCR 可以用 `desktop_capture_and_ocr`：
+
+```json
+{
+  "source": "active",
+  "text": "Send",
+  "modelProfile": "server",
+  "debugImage": true
+}
+```
+
+组合工具不会替代底层工具。已经有图片 artifact、需要自定义控制流、或想复用同一张截图做多种检查时，
+继续使用 `desktop_capture_*`、`desktop_find_template`、`ocr_*` 或 `@spotterjs/core` 函数。
+
 ## 坐标空间
 
 spotterjs 里常见坐标有两类：

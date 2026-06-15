@@ -47,7 +47,7 @@ accessibility.quick.invoke(buttonId);
 | `automationId` | 应用提供的稳定自动化 ID |
 | `className` | 控件类名，适合诊断或兜底 |
 
-## Dump UI 树
+## 导出 UI 树
 
 当查不到元素时，先 dump 树：
 

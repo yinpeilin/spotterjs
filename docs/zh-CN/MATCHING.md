@@ -1,8 +1,8 @@
-# Template matching (NCC)
+# 模板匹配 (NCC)
 
 spotterjs uses **normalized cross-correlation** (NCC, `TM_CCOEFF_NORMED` semantics) in `spotterjs-plugin-match-ncc`, exposed through `@spotterjs/node` and `@spotterjs/core`.
 
-## Architecture
+## 架构
 
 ```
 screen.find / findAll / waitFor
@@ -17,7 +17,7 @@ Screen / window capture       → spotterjs-core::capture [platform GDI / X11]
 
 See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate boundaries.
 
-## Features
+## 功能特性
 
 - **Path or Buffer needles** — PNG/JPEG/WebP bytes decoded in Rust (`load_rgba_from_bytes`)
 - **Multi-scale** — `scale: true` or `scale: { min, max, step }` (gray Triangle resize per scale; scales run in parallel)
@@ -25,7 +25,7 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 - **Coarse-to-fine pyramid** — single-scale on haystack ≥1920×1080: 0.5× coarse top-3, then ROI refine
 - **Search region** — `region` crops before match; results are translated back to screen coordinates
 
-## API matrix
+## API 矩阵
 
 | API | path | Buffer | scale | region |
 |-----|------|--------|------------|--------------|
@@ -34,14 +34,14 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 | `windows.findTemplate` / `findAllTemplates` / `tapTemplate` | yes | yes | yes | yes |
 | `image.find` / `findAll` | yes | yes | yes | yes |
 
-## Core concepts
+## 核心概念
 
 - `TemplateImage`: a template input. A `string` is always a file path; a `Buffer` is always encoded image bytes (PNG/JPEG/WebP).
 - `CaptureImage`: raw RGBA capture data from `screen.capture`, `captureWindow`, or native buffer APIs.
 - `Region`: `{ left, top, width, height }`; high-level APIs use screen coordinates.
 - `MatchResult`: `{ region, center, score, matchScore, matchAlgorithm }`; `score` remains the NCC score, `matchScore` is the normalized match score, and `region` / `center` are screen coordinates.
 
-## Search region
+## 搜索区域
 
 When `region` is set, the core captures that screen rectangle first, then resets internal search bounds to `(0, 0, width, height)` on the cropped haystack. **`find` and `findAll` use the same logic**; returned regions are in **screen coordinates**.
 
@@ -75,7 +75,7 @@ const windowMatch = windows.findTemplate(windowId, "./button.png", { confidence:
 windows.findTemplate(windowId, fs.readFileSync("./icon.png"), { confidence: 0.9 });
 ```
 
-## Native (low-level)
+## Native 底层接口
 
 Image utilities (decode / size / PNG encode):
 
@@ -109,14 +109,14 @@ Window + buffer needle:
 native.findTemplateInWindow(windowId, "", needlePngBuffer, { confidence: 0.9 });
 ```
 
-## Limits
+## 限制
 
 - No rotation or perspective — scale search only
 - Template size up to **512×512**
 - `findAll` uses serial peak suppression (parallel applies to single-best `find` only)
 - `findTemplateBuffers` expects **raw RGBA8** haystack/needle buffers (not PNG-encoded bytes)
 
-## Performance (1536×960 hay, 32×32 needle, release)
+## 性能 (1536×960 hay, 32×32 needle, release)
 
 | Scenario | Pure Rust (`benchmark:ncc:rust`) | With capture (`benchmark:ncc`) |
 |----------|----------------------------------|--------------------------------|
@@ -134,7 +134,7 @@ npm run benchmark:ncc        # full screen.find path
 For the broader library report, use `npm run benchmark:ci` for synthetic CI-safe
 coverage and `npm run benchmark:deep` for local desktop/OCR profiling.
 
-## Breaking changes (v0.2)
+## 破坏性变更 (v0.2)
 
 - Removed `@spotterjs/plugin-match-opencv` and `@spotterjs/node-match-opencv`
 - Removed `useMatchPlugin`, `getMatchProvider`, and `createNccMatchProvider` — use `screen.find` directly

@@ -69,6 +69,23 @@ artifact 尺寸。识别小字、密集 UI 或需要像素级定位时，先用
 `detail: "original"` 获取原尺寸 PNG，再把返回的 `imagePath` 传给
 `ocr_read_image` 或 `ocr_find_text`。
 
+通过 MCP 做实时桌面 OCR 时，如果 agent 不需要单独控制截图步骤，优先使用
+`desktop_capture_and_ocr`：
+
+```json
+{
+  "source": "active",
+  "text": "Send",
+  "minSimilarity": 0.85,
+  "modelProfile": "server",
+  "debugImage": true
+}
+```
+
+这个组合工具只截图一次，默认以 `detail: "original"` 写出 artifact，并在同一张原始内存截图上执行 OCR。
+返回结果使用 `coordinateSpace: "screen"`。不传 `text` 时返回 `lines`；传入 `text` 时返回
+`matches`。开启 `debugImage: true` 后，未匹配场景也会带上 scored `candidates` 方便排查。
+
 ## 模型缓存
 
 默认模型会在第一次 `createOcr()` 时下载到用户缓存目录：
@@ -192,7 +209,8 @@ npm run test -w @spotterjs/plugin-ocr -- src/onnx.integration.test.ts
 ```
 
 更多排障见 [排障指南](../troubleshooting.md)。
-## Error handling
+
+## 错误处理
 
 `@spotterjs/plugin-ocr` 重新导出 `SpotterError`、`isSpotterError` 和
 `toSpotterError`。OCR 错误使用稳定的 `SPOTTER_OCR_*` code、`domain:

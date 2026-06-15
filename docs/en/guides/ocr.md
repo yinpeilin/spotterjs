@@ -113,6 +113,25 @@ may downscale the artifact. Use `detail: "original"` for small text, dense UI,
 or pixel-level positioning, then pass the returned `imagePath` to
 `ocr_read_image` or `ocr_find_text`.
 
+For live desktop OCR through MCP, prefer `desktop_capture_and_ocr` when the
+agent does not need a separate capture step:
+
+```json
+{
+  "source": "active",
+  "text": "Send",
+  "minSimilarity": 0.85,
+  "modelProfile": "server",
+  "debugImage": true
+}
+```
+
+The combo tool captures once, writes an artifact with `detail: "original"` by
+default, runs OCR on the original in-memory capture, and returns
+`coordinateSpace: "screen"`. When `text` is omitted it returns `lines`; when
+`text` is provided it returns `matches`. With `debugImage: true`, no-match cases
+also include scored `candidates`.
+
 ## Model Cache
 
 Default models are downloaded on first `createOcr()` use:

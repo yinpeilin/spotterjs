@@ -96,6 +96,41 @@ area but does not rebase returned coordinates.
 
 For deeper matching details, see [Template matching](../MATCHING.md).
 
+## MCP Combo Tools
+
+When an MCP agent is driving the desktop, use combo tools to reduce repeated
+captures and manual orchestration:
+
+```json
+{
+  "source": "active",
+  "image": { "path": "C:/path/to/button.png" },
+  "confidence": 0.9,
+  "debugImage": true
+}
+```
+
+Call that shape with `desktop_capture_and_find_template` to inspect, or
+`desktop_find_template_and_tap` to click the best match. Both tools capture
+once, write an artifact, run matching on the original in-memory capture, and
+return screen coordinates. The tap tool clicks only after a successful match.
+
+Use `desktop_capture_and_ocr` for live OCR:
+
+```json
+{
+  "source": "active",
+  "text": "Send",
+  "modelProfile": "server",
+  "debugImage": true
+}
+```
+
+Combo tools do not replace lower-level APIs. Use `desktop_capture_*`,
+`desktop_find_template`, `ocr_*`, or the `@spotterjs/core` functions when you
+already have an image artifact, need custom control flow, or want to reuse a
+capture across several independent checks.
+
 ## Coordinate Spaces
 
 | Space | Common source | Meaning |
