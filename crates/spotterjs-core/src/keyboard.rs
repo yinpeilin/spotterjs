@@ -8,13 +8,13 @@ use std::thread;
 use std::time::Duration;
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, VIRTUAL_KEY, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_KEYUP, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B,
-    VK_BACK, VK_C, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10,
-    VK_F11, VK_F12, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H,
-    VK_HOME, VK_I, VK_J, VK_K, VK_L, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M,
-    VK_N, VK_NEXT, VK_O, VK_P, VK_PRIOR, VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU,
-    VK_RSHIFT, VK_RWIN, VK_S, VK_SPACE, VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+    VIRTUAL_KEY, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B, VK_BACK,
+    VK_C, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12,
+    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H, VK_HOME, VK_I, VK_J, VK_K,
+    VK_L, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M, VK_N, VK_NEXT, VK_O, VK_P,
+    VK_PRIOR, VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S,
+    VK_SPACE, VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -148,44 +148,96 @@ impl Key {
             Key::RightControl => EnigoKey::RControl,
             Key::LeftShift => EnigoKey::LShift,
             Key::RightShift => EnigoKey::RShift,
-            Key::LeftAlt => EnigoKey::LMenu,
-            Key::RightAlt => EnigoKey::RMenu,
-            Key::LeftSuper => EnigoKey::LWin,
-            Key::RightSuper => EnigoKey::RWin,
+            Key::LeftAlt => left_alt_to_enigo(),
+            Key::RightAlt => right_alt_to_enigo(),
+            Key::LeftSuper => left_super_to_enigo(),
+            Key::RightSuper => right_super_to_enigo(),
             Key::Letter(c) => letter_to_enigo(c),
         }
     }
 }
 
+fn left_alt_to_enigo() -> EnigoKey {
+    #[cfg(windows)]
+    {
+        EnigoKey::LMenu
+    }
+    #[cfg(not(windows))]
+    {
+        EnigoKey::Alt
+    }
+}
+
+fn right_alt_to_enigo() -> EnigoKey {
+    #[cfg(windows)]
+    {
+        EnigoKey::RMenu
+    }
+    #[cfg(not(windows))]
+    {
+        EnigoKey::Alt
+    }
+}
+
+fn left_super_to_enigo() -> EnigoKey {
+    #[cfg(windows)]
+    {
+        EnigoKey::LWin
+    }
+    #[cfg(not(windows))]
+    {
+        EnigoKey::Meta
+    }
+}
+
+fn right_super_to_enigo() -> EnigoKey {
+    #[cfg(windows)]
+    {
+        EnigoKey::RWin
+    }
+    #[cfg(not(windows))]
+    {
+        EnigoKey::Meta
+    }
+}
+
 fn letter_to_enigo(c: char) -> EnigoKey {
-    match c.to_ascii_lowercase() {
-        'a' => EnigoKey::A,
-        'b' => EnigoKey::B,
-        'c' => EnigoKey::C,
-        'd' => EnigoKey::D,
-        'e' => EnigoKey::E,
-        'f' => EnigoKey::F,
-        'g' => EnigoKey::G,
-        'h' => EnigoKey::H,
-        'i' => EnigoKey::I,
-        'j' => EnigoKey::J,
-        'k' => EnigoKey::K,
-        'l' => EnigoKey::L,
-        'm' => EnigoKey::M,
-        'n' => EnigoKey::N,
-        'o' => EnigoKey::O,
-        'p' => EnigoKey::P,
-        'q' => EnigoKey::Q,
-        'r' => EnigoKey::R,
-        's' => EnigoKey::S,
-        't' => EnigoKey::T,
-        'u' => EnigoKey::U,
-        'v' => EnigoKey::V,
-        'w' => EnigoKey::W,
-        'x' => EnigoKey::X,
-        'y' => EnigoKey::Y,
-        'z' => EnigoKey::Z,
-        _ => EnigoKey::Unicode(c),
+    let c = c.to_ascii_lowercase();
+    #[cfg(windows)]
+    {
+        match c {
+            'a' => EnigoKey::A,
+            'b' => EnigoKey::B,
+            'c' => EnigoKey::C,
+            'd' => EnigoKey::D,
+            'e' => EnigoKey::E,
+            'f' => EnigoKey::F,
+            'g' => EnigoKey::G,
+            'h' => EnigoKey::H,
+            'i' => EnigoKey::I,
+            'j' => EnigoKey::J,
+            'k' => EnigoKey::K,
+            'l' => EnigoKey::L,
+            'm' => EnigoKey::M,
+            'n' => EnigoKey::N,
+            'o' => EnigoKey::O,
+            'p' => EnigoKey::P,
+            'q' => EnigoKey::Q,
+            'r' => EnigoKey::R,
+            's' => EnigoKey::S,
+            't' => EnigoKey::T,
+            'u' => EnigoKey::U,
+            'v' => EnigoKey::V,
+            'w' => EnigoKey::W,
+            'x' => EnigoKey::X,
+            'y' => EnigoKey::Y,
+            'z' => EnigoKey::Z,
+            _ => EnigoKey::Unicode(c),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        EnigoKey::Unicode(c)
     }
 }
 
@@ -420,7 +472,10 @@ fn send_windows_shortcut(keys: &[Key]) -> Result<()> {
     let key = windows_vk(keys[keys.len() - 1]);
 
     for modifier in modifiers {
-        inputs.push(windows_key_input(windows_vk(*modifier), KEYBD_EVENT_FLAGS::default()));
+        inputs.push(windows_key_input(
+            windows_vk(*modifier),
+            KEYBD_EVENT_FLAGS::default(),
+        ));
     }
     inputs.push(windows_key_input(key, KEYBD_EVENT_FLAGS::default()));
     inputs.push(windows_key_input(key, KEYEVENTF_KEYUP));
@@ -488,8 +543,25 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn letters_map_to_physical_keys_for_shortcuts() {
         assert_eq!(parse_key("v").unwrap().to_enigo(), EnigoKey::V);
         assert_eq!(parse_key("A").unwrap().to_enigo(), EnigoKey::A);
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn letters_map_to_unicode_keys_for_shortcuts() {
+        assert_eq!(parse_key("v").unwrap().to_enigo(), EnigoKey::Unicode('v'));
+        assert_eq!(parse_key("A").unwrap().to_enigo(), EnigoKey::Unicode('a'));
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn modifiers_map_to_cross_platform_enigo_keys() {
+        assert_eq!(parse_key("LeftAlt").unwrap().to_enigo(), EnigoKey::Alt);
+        assert_eq!(parse_key("RightAlt").unwrap().to_enigo(), EnigoKey::Alt);
+        assert_eq!(parse_key("LeftSuper").unwrap().to_enigo(), EnigoKey::Meta);
+        assert_eq!(parse_key("RightSuper").unwrap().to_enigo(), EnigoKey::Meta);
     }
 }
