@@ -1,6 +1,6 @@
 {
   "name": "spotterjs-workspace",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "build": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/node && npm run build -w @spotterjs/core && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android && npm run build -w @spotterjs/mcp",
@@ -64,9 +64,9 @@
   ],
   "devDependencies": {
     "@changesets/cli": "^2.29.0",
-    "@spotterjs/core": "1.0.3",
-    "@spotterjs/plugin-ocr": "1.0.3",
-    "@spotterjs/plugin-android": "1.0.3",
+    "@spotterjs/core": "1.1.0",
+    "@spotterjs/plugin-ocr": "1.1.0",
+    "@spotterjs/plugin-android": "1.1.0",
     "@types/pngjs": "^6.0.5",
     "pngjs": "^7.0.0",
     "tinybench": "^2.9.0",

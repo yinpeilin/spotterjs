@@ -1,5 +1,19 @@
 # @spotterjs/plugin-ocr
 
+## 1.1.0
+
+### Minor Changes
+
+- Improve keyboard paste-mode shortcut dispatch, keep the `writeText` alias, and
+  restore the clipboard after paste-mode writes settle.
+
+### Patch Changes
+
+- Updated dependencies [7254a3d]
+- Updated dependencies
+  - @spotterjs/core@1.1.0
+  - @spotterjs/base@1.1.0
+
 ## 1.0.3
 
 ### Patch Changes

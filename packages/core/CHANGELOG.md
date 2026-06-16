@@ -1,5 +1,19 @@
 # @spotterjs/core
 
+## 1.1.0
+
+### Minor Changes
+
+- Improve keyboard paste-mode shortcut dispatch, keep the `writeText` alias, and
+  restore the clipboard after paste-mode writes settle.
+
+### Patch Changes
+
+- 7254a3d: Improve native loading diagnostics when an optional platform package is missing.
+- Updated dependencies
+  - @spotterjs/base@1.1.0
+  - @spotterjs/node@1.1.0
+
 ## 1.0.3
 
 ### Minor Changes

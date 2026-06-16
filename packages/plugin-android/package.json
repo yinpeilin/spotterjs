@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/plugin-android",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Android companion app automation plugin for spotterjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -46,7 +46,7 @@
     "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
   },
   "dependencies": {
-    "@spotterjs/base": "1.0.3",
+    "@spotterjs/base": "1.1.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {

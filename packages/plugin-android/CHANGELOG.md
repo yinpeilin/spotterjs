@@ -1,5 +1,25 @@
 # @spotterjs/plugin-android
 
+## 1.1.0
+
+### Minor Changes
+
+- Improve keyboard paste-mode shortcut dispatch, keep the `writeText` alias, and
+  restore the clipboard after paste-mode writes settle.
+
+### Patch Changes
+
+- 30fc168: Report Android companion device identity (manufacturer, model, and user-set nickname)
+  in companion state, and add the android_list_devices MCP tool so agents can tell
+  connected phones apart and operate each independently.
+
+  Expose companion screen capture as validated PNG bytes in @spotterjs/plugin-android
+  and wire MCP Android capture/template tools to write workspace artifacts and tap
+  only after successful visual matches.
+
+- Updated dependencies
+  - @spotterjs/base@1.1.0
+
 ## 1.0.3
 
 ### Major Changes

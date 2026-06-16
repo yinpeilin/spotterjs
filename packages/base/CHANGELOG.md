@@ -1,5 +1,12 @@
 # @spotterjs/base
 
+## 1.1.0
+
+### Minor Changes
+
+- Improve keyboard paste-mode shortcut dispatch, keep the `writeText` alias, and
+  restore the clipboard after paste-mode writes settle.
+
 ## 1.0.3
 
 ### Major Changes

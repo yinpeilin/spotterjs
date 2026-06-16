@@ -1,6 +1,6 @@
 {
     "name": "@spotterjs/mcp",
-    "version": "1.0.3",
+    "version": "1.1.0",
     "description": "spotterjs MCP server - desktop automation, workspace files, and shell",
     "license": "SEE LICENSE IN LICENSE",
     "type": "module",
@@ -46,14 +46,14 @@
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.12.0",
-        "@spotterjs/base": "1.0.3",
-        "@spotterjs/core": "1.0.3",
-        "@spotterjs/plugin-android": "1.0.3",
-        "@spotterjs/plugin-ocr": "1.0.3",
+        "@spotterjs/base": "1.1.0",
+        "@spotterjs/core": "1.1.0",
+        "@spotterjs/plugin-android": "1.1.0",
+        "@spotterjs/plugin-ocr": "1.1.0",
         "zod": "^3.24.0"
     },
     "devDependencies": {
-        "@spotterjs/plugin-android": "1.0.3",
+        "@spotterjs/plugin-android": "1.1.0",
         "@types/node": "^22.0.0",
         "typescript": "^5.4.0",
         "vitest": "^3.0.0"

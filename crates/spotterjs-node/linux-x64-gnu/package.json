@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/node-linux-x64-gnu",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Linux x64 glibc native binary for @spotterjs/node",
   "main": "index.linux-x64-gnu.node",
   "license": "SEE LICENSE IN LICENSE",
