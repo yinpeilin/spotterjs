@@ -1,9 +1,21 @@
 use crate::error::{Result, SpotterError};
 use enigo::{Direction, Enigo, Key as EnigoKey, Keyboard, Settings};
+#[cfg(windows)]
+use std::mem::size_of;
 use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+#[cfg(windows)]
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, VIRTUAL_KEY, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+    KEYEVENTF_KEYUP, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B,
+    VK_BACK, VK_C, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10,
+    VK_F11, VK_F12, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H,
+    VK_HOME, VK_I, VK_J, VK_K, VK_L, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M,
+    VK_N, VK_NEXT, VK_O, VK_P, VK_PRIOR, VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU,
+    VK_RSHIFT, VK_RWIN, VK_S, VK_SPACE, VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Key {
@@ -132,12 +144,48 @@ impl Key {
             Key::F10 => EnigoKey::F10,
             Key::F11 => EnigoKey::F11,
             Key::F12 => EnigoKey::F12,
-            Key::LeftControl | Key::RightControl => EnigoKey::Control,
-            Key::LeftShift | Key::RightShift => EnigoKey::Shift,
-            Key::LeftAlt | Key::RightAlt => EnigoKey::Alt,
-            Key::LeftSuper | Key::RightSuper => EnigoKey::Meta,
-            Key::Letter(c) => EnigoKey::Unicode(c),
+            Key::LeftControl => EnigoKey::LControl,
+            Key::RightControl => EnigoKey::RControl,
+            Key::LeftShift => EnigoKey::LShift,
+            Key::RightShift => EnigoKey::RShift,
+            Key::LeftAlt => EnigoKey::LMenu,
+            Key::RightAlt => EnigoKey::RMenu,
+            Key::LeftSuper => EnigoKey::LWin,
+            Key::RightSuper => EnigoKey::RWin,
+            Key::Letter(c) => letter_to_enigo(c),
         }
+    }
+}
+
+fn letter_to_enigo(c: char) -> EnigoKey {
+    match c.to_ascii_lowercase() {
+        'a' => EnigoKey::A,
+        'b' => EnigoKey::B,
+        'c' => EnigoKey::C,
+        'd' => EnigoKey::D,
+        'e' => EnigoKey::E,
+        'f' => EnigoKey::F,
+        'g' => EnigoKey::G,
+        'h' => EnigoKey::H,
+        'i' => EnigoKey::I,
+        'j' => EnigoKey::J,
+        'k' => EnigoKey::K,
+        'l' => EnigoKey::L,
+        'm' => EnigoKey::M,
+        'n' => EnigoKey::N,
+        'o' => EnigoKey::O,
+        'p' => EnigoKey::P,
+        'q' => EnigoKey::Q,
+        'r' => EnigoKey::R,
+        's' => EnigoKey::S,
+        't' => EnigoKey::T,
+        'u' => EnigoKey::U,
+        'v' => EnigoKey::V,
+        'w' => EnigoKey::W,
+        'x' => EnigoKey::X,
+        'y' => EnigoKey::Y,
+        'z' => EnigoKey::Z,
+        _ => EnigoKey::Unicode(c),
     }
 }
 
@@ -252,11 +300,144 @@ pub fn keyboard_type_keys_with_config(keys: &[Key], config: Option<KeyboardConfi
         auto_delay_for(cfg);
         return Ok(());
     }
-    keyboard_press_with_config(keys, Some(cfg))?;
-    let mut e = enigo()?;
-    e.key(keys[keys.len() - 1].to_enigo(), Direction::Click)
-        .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
-    keyboard_release_with_config(keys, Some(cfg))
+    #[cfg(windows)]
+    {
+        send_windows_shortcut(keys)?;
+        auto_delay_for(cfg);
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        let modifiers = &keys[..keys.len() - 1];
+        keyboard_press_with_config(modifiers, Some(cfg))?;
+        let mut e = enigo()?;
+        e.key(keys[keys.len() - 1].to_enigo(), Direction::Click)
+            .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
+        keyboard_release_with_config(modifiers, Some(cfg))
+    }
+}
+
+#[cfg(windows)]
+fn windows_vk(key: Key) -> VIRTUAL_KEY {
+    match key {
+        Key::Digit('0') => VK_0,
+        Key::Digit('1') => VK_1,
+        Key::Digit('2') => VK_2,
+        Key::Digit('3') => VK_3,
+        Key::Digit('4') => VK_4,
+        Key::Digit('5') => VK_5,
+        Key::Digit('6') => VK_6,
+        Key::Digit('7') => VK_7,
+        Key::Digit('8') => VK_8,
+        Key::Digit('9') => VK_9,
+        Key::Digit(c) => VIRTUAL_KEY(c as u16),
+        Key::Enter => VK_RETURN,
+        Key::Tab => VK_TAB,
+        Key::Escape => VK_ESCAPE,
+        Key::Space => VK_SPACE,
+        Key::Backspace => VK_BACK,
+        Key::Delete => VK_DELETE,
+        Key::Up => VK_UP,
+        Key::Down => VK_DOWN,
+        Key::Left => VK_LEFT,
+        Key::Right => VK_RIGHT,
+        Key::Home => VK_HOME,
+        Key::End => VK_END,
+        Key::PageUp => VK_PRIOR,
+        Key::PageDown => VK_NEXT,
+        Key::F1 => VK_F1,
+        Key::F2 => VK_F2,
+        Key::F3 => VK_F3,
+        Key::F4 => VK_F4,
+        Key::F5 => VK_F5,
+        Key::F6 => VK_F6,
+        Key::F7 => VK_F7,
+        Key::F8 => VK_F8,
+        Key::F9 => VK_F9,
+        Key::F10 => VK_F10,
+        Key::F11 => VK_F11,
+        Key::F12 => VK_F12,
+        Key::LeftControl => VK_LCONTROL,
+        Key::RightControl => VK_RCONTROL,
+        Key::LeftShift => VK_LSHIFT,
+        Key::RightShift => VK_RSHIFT,
+        Key::LeftAlt => VK_LMENU,
+        Key::RightAlt => VK_RMENU,
+        Key::LeftSuper => VK_LWIN,
+        Key::RightSuper => VK_RWIN,
+        Key::Letter(c) => match c.to_ascii_lowercase() {
+            'a' => VK_A,
+            'b' => VK_B,
+            'c' => VK_C,
+            'd' => VK_D,
+            'e' => VK_E,
+            'f' => VK_F,
+            'g' => VK_G,
+            'h' => VK_H,
+            'i' => VK_I,
+            'j' => VK_J,
+            'k' => VK_K,
+            'l' => VK_L,
+            'm' => VK_M,
+            'n' => VK_N,
+            'o' => VK_O,
+            'p' => VK_P,
+            'q' => VK_Q,
+            'r' => VK_R,
+            's' => VK_S,
+            't' => VK_T,
+            'u' => VK_U,
+            'v' => VK_V,
+            'w' => VK_W,
+            'x' => VK_X,
+            'y' => VK_Y,
+            'z' => VK_Z,
+            other => VIRTUAL_KEY(other as u16),
+        },
+    }
+}
+
+#[cfg(windows)]
+fn windows_key_input(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+#[cfg(windows)]
+fn send_windows_shortcut(keys: &[Key]) -> Result<()> {
+    let mut inputs = Vec::with_capacity(keys.len() * 2);
+    let modifiers = &keys[..keys.len() - 1];
+    let key = windows_vk(keys[keys.len() - 1]);
+
+    for modifier in modifiers {
+        inputs.push(windows_key_input(windows_vk(*modifier), KEYBD_EVENT_FLAGS::default()));
+    }
+    inputs.push(windows_key_input(key, KEYBD_EVENT_FLAGS::default()));
+    inputs.push(windows_key_input(key, KEYEVENTF_KEYUP));
+    for modifier in modifiers.iter().rev() {
+        inputs.push(windows_key_input(windows_vk(*modifier), KEYEVENTF_KEYUP));
+    }
+
+    let sent = unsafe { SendInput(&inputs, size_of::<INPUT>() as i32) };
+    if sent == inputs.len() as u32 {
+        Ok(())
+    } else {
+        Err(SpotterError::Platform(format!(
+            "keyboard_shortcut: SendInput sent {sent}/{} events: {}",
+            inputs.len(),
+            std::io::Error::last_os_error()
+        )))
+    }
 }
 
 pub fn parse_key(s: &str) -> Result<Key> {
@@ -304,5 +485,11 @@ mod tests {
     fn parse_unknown_key_errors() {
         assert!(parse_key("NotARealKey").is_err());
         assert!(parse_key("10").is_err());
+    }
+
+    #[test]
+    fn letters_map_to_physical_keys_for_shortcuts() {
+        assert_eq!(parse_key("v").unwrap().to_enigo(), EnigoKey::V);
+        assert_eq!(parse_key("A").unwrap().to_enigo(), EnigoKey::A);
     }
 }

@@ -20,9 +20,9 @@ export type NativeWindow = Node.JsWindowInfo;
 /** @remarks Unstable native binding shape; prefer public types from `@spotterjs/base`. */
 export type NativeDesktopApp = Node.JsDesktopApp;
 /** @remarks Unstable native binding shape; prefer public types from `@spotterjs/base`. */
-export type NativeCapture = Node.JsCaptureImage;
+export type NativeCapture = ReturnType<SpotterNative["captureScreen"]>;
 /** @remarks Unstable native binding shape; prefer public types from `@spotterjs/base`. */
-export type NativeMatchOptions = Node.JsMatchOptions;
+export type NativeMatchOptions = NonNullable<Parameters<SpotterNative["findTemplate"]>[2]>;
 export type NativePoint = Node.JsPoint;
 export type NativeMouseConfig = Node.JsMouseConfig;
 export type NativeKeyboardConfig = Node.JsKeyboardConfig;

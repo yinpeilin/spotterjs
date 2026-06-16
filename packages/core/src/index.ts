@@ -139,12 +139,14 @@ type NativeKeyboardConfig = {
 type NativeKeyboardWithConfig = ReturnType<typeof loadNative> & {
   keyboardTypeText(text: string, config?: NativeKeyboardConfig): void;
   keyboardTypeKey(key: string, config?: NativeKeyboardConfig): void;
+  keyboardShortcut(keys: string[], config?: NativeKeyboardConfig): void;
   keyboardPressKeys(keys: string[], config?: NativeKeyboardConfig): void;
   keyboardReleaseKeys(keys: string[], config?: NativeKeyboardConfig): void;
 };
 
 const pressedKeys = new Set<string>();
 let keyboardDefaultAutoDelayMs = 10;
+const pasteSettleDelayMs = 50;
 
 function keyList(keys: KeyInput): string[] {
   return (Array.isArray(keys) ? keys : [keys]).map((key) => String(key));
@@ -205,9 +207,17 @@ function effectiveKeyboardDelayMs(options?: KeyboardTapOptions): number {
   return options?.autoDelayMs ?? keyboardDefaultAutoDelayMs;
 }
 
+function effectivePasteSettleDelayMs(options?: KeyboardTapOptions): number {
+  return Math.max(effectiveKeyboardDelayMs(options), pasteSettleDelayMs);
+}
+
 function sleepSync(ms: number) {
   if (!Number.isFinite(ms) || ms <= 0) return;
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function pasteHotkey(): KeyName[] {
+  return process.platform === "darwin" ? ["Meta", "V"] : ["Ctrl", "V"];
 }
 
 function callKeyboardTypeText(text: string, options?: KeyboardTapOptions) {
@@ -225,6 +235,15 @@ function callKeyboardTypeKey(key: string, options?: KeyboardTapOptions) {
     const n = nativeKeyboard();
     if (config) n.keyboardTypeKey(key, config);
     else n.keyboardTypeKey(key);
+  });
+}
+
+function callKeyboardShortcut(keys: string[], options?: KeyboardTapOptions) {
+  const config = nativeKeyboardConfig(options);
+  callNative("keyboard.hotkey", { keys, config }, () => {
+    const n = nativeKeyboard();
+    if (config) n.keyboardShortcut(keys, config);
+    else n.keyboardShortcut(keys);
   });
 }
 
@@ -273,8 +292,8 @@ function pasteText(text: string, options?: KeyboardWriteOptions) {
   }
   callNative("keyboard.write.clipboardSet", {}, () => n.clipboardSet(text));
   try {
-    keyboard.hotkey(["Ctrl", "V"], options);
-    sleepSync(effectiveKeyboardDelayMs(options));
+    keyboard.hotkey(pasteHotkey(), options);
+    sleepSync(effectivePasteSettleDelayMs(options));
   } finally {
     if (shouldRestore && previous !== undefined) {
       callNative("keyboard.write.restoreClipboard", {}, () => n.clipboardSet(previous));
@@ -424,8 +443,7 @@ export const keyboard = {
   up(keys: KeyInput, options?: KeyboardTapOptions) {
     const names = keyList(keys);
     const releasable = names
-      .filter((name) => pressedKeys.has(normalizeKeyName(name)))
-      .reverse();
+      .filter((name) => pressedKeys.has(normalizeKeyName(name)));
     if (releasable.length === 0) return;
     callKeyboardReleaseKeys(releasable, options);
     for (const name of releasable) {
@@ -450,14 +468,7 @@ export const keyboard = {
       keyboard.tap(keys[0], options);
       return;
     }
-    const modifiers = keys.slice(0, -1);
-    const key = keys[keys.length - 1];
-    keyboard.down(modifiers, options);
-    try {
-      keyboard.tap(key, options);
-    } finally {
-      keyboard.up(modifiers, options);
-    }
+    callKeyboardShortcut(keyList(keys), options);
   },
 
   /** @param config.autoDelayMs Delay between key events. */
