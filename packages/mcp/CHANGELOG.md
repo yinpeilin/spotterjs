@@ -1,8 +1,8 @@
 # @spotterjs/mcp
 
-## 1.1.0
+## 1.0.4
 
-### Minor Changes
+### Patch Changes
 
 - Improve keyboard paste-mode shortcut dispatch, keep the `writeText` alias, and
   restore the clipboard after paste-mode writes settle.
@@ -27,10 +27,10 @@
 - Updated dependencies [30fc168]
 - Updated dependencies [7254a3d]
 - Updated dependencies
-  - @spotterjs/plugin-android@1.1.0
-  - @spotterjs/core@1.1.0
-  - @spotterjs/base@1.1.0
-  - @spotterjs/plugin-ocr@1.1.0
+  - @spotterjs/plugin-android@1.0.4
+  - @spotterjs/core@1.0.4
+  - @spotterjs/base@1.0.4
+  - @spotterjs/plugin-ocr@1.0.4
 
 ## 1.0.3
 

@@ -1,8 +1,8 @@
 # @spotterjs/plugin-android
 
-## 1.1.0
+## 1.0.4
 
-### Minor Changes
+### Patch Changes
 
 - Improve keyboard paste-mode shortcut dispatch, keep the `writeText` alias, and
   restore the clipboard after paste-mode writes settle.
@@ -18,7 +18,7 @@
   only after successful visual matches.
 
 - Updated dependencies
-  - @spotterjs/base@1.1.0
+  - @spotterjs/base@1.0.4
 
 ## 1.0.3
 

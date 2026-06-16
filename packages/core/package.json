@@ -1,6 +1,6 @@
 {
     "name": "@spotterjs/core",
-    "version": "1.1.0",
+    "version": "1.0.4",
     "description": "spotterjs desktop automation - TypeScript API",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -51,8 +51,8 @@
         "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
     },
     "dependencies": {
-        "@spotterjs/base": "1.1.0",
-        "@spotterjs/node": "1.1.0"
+        "@spotterjs/base": "1.0.4",
+        "@spotterjs/node": "1.0.4"
     },
     "devDependencies": {
         "@types/node": "^22.0.0",
