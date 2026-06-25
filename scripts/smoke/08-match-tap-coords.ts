@@ -70,7 +70,7 @@ function syncFrame(win: { id: string; title: string; region: { left: number; top
 }
 
 export async function run(): Promise<void> {
-  const active = windows.active();
+  const active = windows.getActive();
   const frame = syncFrame(active);
   const { width: w, height: h, left: fx, top: fy } = frame.region;
 
@@ -80,7 +80,7 @@ export async function run(): Promise<void> {
     );
   }
 
-  const primary = screen.size();
+  const primary = screen.getSize();
   info(`foreground "${active.title}" frame left=${fx} top=${fy} ${w}x${h}`);
   info(`primary screen ${primary.width}x${primary.height}`);
   if (fx >= primary.width) {

@@ -24,23 +24,23 @@ import { loadNative } from "./native";
  *
  * @example
  * ```ts
- * const match = await screen.find("./button.png", { confidence: 0.9 });
+ * const match = await screen.findTemplate("./button.png", { confidence: 0.9 });
  * mouse.tap(match.center.x, match.center.y);
  * ```
  */
 export const screen = {
   /** Return the primary screen width in pixels. */
-  width(): number {
+  getWidth(): number {
     return callNative("screen.width", {}, () => loadNative().getScreenWidth());
   },
 
   /** Return the primary screen height in pixels. */
-  height(): number {
+  getHeight(): number {
     return callNative("screen.height", {}, () => loadNative().getScreenHeight());
   },
 
   /** Return the primary screen size. */
-  size(): { width: number; height: number } {
+  getSize(): { width: number; height: number } {
     return callNative("screen.size", {}, () => loadNative().getScreenSize());
   },
 
@@ -81,11 +81,11 @@ export const screen = {
    * @returns The clicked match.
    * @throws When no template match reaches the configured confidence.
    */
-  async tap(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
+  async tapTemplate(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
     const native = loadNative();
     const match = await findNeedle(needle, options);
     const { x, y } = match.center;
-    callNative("screen.tap", { x, y }, () => native.tapAt(x, y));
+    callNative("screen.tapTemplate", { x, y }, () => native.tapAt(x, y));
     return match;
   },
 
@@ -96,7 +96,7 @@ export const screen = {
    * screen coordinates even when `options.region` is set.
    * @throws When no match reaches the configured confidence.
    */
-  find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
+  findTemplate(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult> {
     return findNeedle(needle, options);
   },
 
@@ -106,7 +106,7 @@ export const screen = {
    * Returned coordinates are screen coordinates. Ordering follows native
    * de-duplication and sorting.
    */
-  findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]> {
+  findAllTemplates(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]> {
     return findAllNeedle(needle, options);
   },
 
@@ -116,7 +116,7 @@ export const screen = {
    * @param timeoutMs Timeout in milliseconds. The call throws on timeout.
    * @param intervalMs Delay between attempts. Native defaults are used when omitted.
    */
-  waitFor(
+  waitForTemplate(
     needle: TemplateImage,
     options: MatchWaitOptions
   ): Promise<MatchResult> {

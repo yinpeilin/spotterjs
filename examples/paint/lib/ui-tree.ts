@@ -39,7 +39,7 @@ export function paintTreeView(): TreeViewMode {
 }
 
 export function enablePaintAccessibility(treeView = paintTreeView()): void {
-  accessibility.quick.enable({
+  accessibility.enable({
     attachDelayMs: 300,
     eventSubscription: false,
     treeWaitTimeoutMs: 5_000,

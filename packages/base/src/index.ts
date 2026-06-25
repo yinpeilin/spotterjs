@@ -262,19 +262,28 @@ export interface DesktopApp {
 /**
  * Template matching provider implemented by high-level modules such as
  * `screen`.
+ *
+ * Method names mirror the `screen` and `windows` APIs so providers stay
+ * interchangeable.
  */
 export interface MatchProvider {
   /**
    * Find the best match.
    * @throws When no match reaches the configured confidence threshold.
    */
-  find(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult>;
+  findTemplate(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult>;
   /** Find all matches after native de-duplication and sorting. */
-  findAll(needle: TemplateImage, options?: MatchOptions): Promise<MatchResult[]>;
+  findAllTemplates(
+    needle: TemplateImage,
+    options?: MatchOptions
+  ): Promise<MatchResult[]>;
   /**
    * Poll until a template appears or the timeout expires.
    */
-  waitFor(needle: TemplateImage, options: MatchWaitOptions): Promise<MatchResult>;
+  waitForTemplate(
+    needle: TemplateImage,
+    options: MatchWaitOptions
+  ): Promise<MatchResult>;
 }
 
 /**

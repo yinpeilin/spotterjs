@@ -37,6 +37,20 @@ describe("centerOf", () => {
       y: 5,
     });
   });
+
+  it("offsets the center by the region origin", () => {
+    expect(centerOf({ left: 100, top: 200, width: 40, height: 20 })).toEqual({
+      x: 120,
+      y: 210,
+    });
+  });
+
+  it("supports negative origins", () => {
+    expect(centerOf({ left: -20, top: -10, width: 10, height: 10 })).toEqual({
+      x: -15,
+      y: -5,
+    });
+  });
 });
 
 describe("SpotterError", () => {
@@ -72,6 +86,18 @@ describe("SpotterError", () => {
     expect(isSpotterError(new Error("plain"))).toBe(false);
   });
 
+  it("rejects non-spotter shapes and primitives", () => {
+    expect(isSpotterError(null)).toBe(false);
+    expect(isSpotterError(undefined)).toBe(false);
+    expect(isSpotterError("SPOTTER_X")).toBe(false);
+    expect(
+      isSpotterError({ name: "SpotterError", message: "x", code: "OOPS" })
+    ).toBe(false);
+    expect(
+      isSpotterError({ name: "OtherError", message: "x", code: "SPOTTER_X" })
+    ).toBe(false);
+  });
+
   it("converts unknown thrown values into SpotterError", () => {
     const cause = new Error("boom");
     const error = toSpotterError(cause, {
@@ -88,6 +114,44 @@ describe("SpotterError", () => {
       domain: "native",
     });
     expect(error.cause).toBe(cause);
+  });
+
+  it("returns the same instance for an existing SpotterError", () => {
+    const original = new SpotterError("SPOTTER_OCR_TEXT_NOT_FOUND", "missing");
+    expect(toSpotterError(original)).toBe(original);
+  });
+
+  it("rebuilds structural spotter errors and preserves code and context", () => {
+    const structural = {
+      name: "SpotterError",
+      message: "structural failure",
+      code: "SPOTTER_NATIVE_CAPTURE_FAILED",
+      context: { api: "windows.capture" },
+      domain: "native",
+    };
+
+    const error = toSpotterError(structural);
+
+    expect(error).toBeInstanceOf(SpotterError);
+    expect(error.code).toBe("SPOTTER_NATIVE_CAPTURE_FAILED");
+    expect(error.context).toEqual({ api: "windows.capture" });
+    expect(error.domain).toBe("native");
+    expect(error.cause).toBe(structural);
+  });
+
+  it("defaults unknown non-error values to SPOTTER_UNKNOWN_ERROR", () => {
+    const error = toSpotterError("just a string");
+
+    expect(error.code).toBe("SPOTTER_UNKNOWN_ERROR");
+    expect(error.message).toBe("just a string");
+    expect(error.cause).toBe("just a string");
+  });
+
+  it("uses an explicit message override for unknown values", () => {
+    const error = toSpotterError({ weird: true }, { message: "overridden" });
+
+    expect(error.code).toBe("SPOTTER_UNKNOWN_ERROR");
+    expect(error.message).toBe("overridden");
   });
 });
 

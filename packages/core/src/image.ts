@@ -148,26 +148,26 @@ function size(source: string | Buffer | CaptureImage): ImageSize {
   return { width: source.width, height: source.height };
 }
 
-async function find(
+async function findTemplate(
   haystack: CaptureImage,
   needle: ImageSource,
   options?: MatchOptions
 ): Promise<MatchResult> {
   const loadedNeedle = load(needle);
-  return callNative("image.find", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
+  return callNative("image.findTemplate", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
     toMatchResult(
       loadNative().findTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
     )
   );
 }
 
-async function findAll(
+async function findAllTemplates(
   haystack: CaptureImage,
   needle: ImageSource,
   options?: MatchOptions
 ): Promise<MatchResult[]> {
   const loadedNeedle = load(needle);
-  return callNative("image.findAll", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
+  return callNative("image.findAllTemplates", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
     loadNative()
       .findAllTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
       .map(toMatchResult)
@@ -182,6 +182,6 @@ export const image = {
   encodeBase64,
   save,
   size,
-  find,
-  findAll,
+  findTemplate,
+  findAllTemplates,
 };

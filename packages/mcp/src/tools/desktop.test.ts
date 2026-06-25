@@ -13,18 +13,31 @@ const artifacts = vi.hoisted(() => ({
   captureActiveArtifact: vi.fn(),
 }));
 
-const debugDraw = vi.hoisted(() => ({
-  writeDebugCapture: vi.fn(() => ({
-    imagePath: ".spotter/artifacts/desktop-debug.png",
-    width: 100,
-    height: 80,
-    originalWidth: 100,
-    originalHeight: 80,
-    format: "png",
-    isDownscaled: false,
-    detail: "original",
-  })),
-}));
+const debugDraw = vi.hoisted(() => {
+  const z = require("zod");
+  return {
+    debugImageField: { debugImage: z.boolean().optional() },
+    debugImagePatch: vi.fn((enabled: boolean | undefined, write: () => { imagePath: string }) =>
+      enabled ? { debugImagePath: write().imagePath } : {}
+    ),
+    matchAnnotations: vi.fn((matches: Array<{ region: unknown; center: unknown }>) =>
+      matches.flatMap((m) => [
+        { kind: "region", region: m.region },
+        { kind: "point", point: m.center },
+      ])
+    ),
+    writeDebugCapture: vi.fn(() => ({
+      imagePath: ".spotter/artifacts/desktop-debug.png",
+      width: 100,
+      height: 80,
+      originalWidth: 100,
+      originalHeight: 80,
+      format: "png",
+      isDownscaled: false,
+      detail: "original",
+    })),
+  };
+});
 
 vi.mock("@spotterjs/core", () => ({
   accessibility: {
@@ -33,11 +46,9 @@ vi.mock("@spotterjs/core", () => ({
       dumpTree: vi.fn(),
       getElementInfo: vi.fn(),
     },
-    quick: {
-      click: vi.fn(),
-      find: vi.fn(),
-      invoke: vi.fn(),
-    },
+    click: vi.fn(),
+    find: vi.fn(),
+    invoke: vi.fn(),
   },
   clipboard: {
     get: vi.fn(),
@@ -60,17 +71,17 @@ vi.mock("@spotterjs/core", () => ({
     capture: vi.fn(() => ({ data: Buffer.alloc(100 * 80 * 4), width: 100, height: 80 })),
     captureActive: vi.fn(() => ({ data: Buffer.alloc(0), width: 0, height: 0 })),
     captureWindow: vi.fn(() => ({ data: Buffer.alloc(0), width: 0, height: 0 })),
-    find: core.find,
-    findAll: core.findAll,
+    findTemplate: core.find,
+    findAllTemplates: core.findAll,
   },
   windows: {
-    active: vi.fn(),
+    getActive: vi.fn(),
     focus: vi.fn(),
     list: vi.fn(),
   },
   image: {
-    find: core.imageFind,
-    findAll: core.imageFindAll,
+    findTemplate: core.imageFind,
+    findAllTemplates: core.imageFindAll,
   },
 }));
 
@@ -337,7 +348,7 @@ describe("desktop debug input tools", () => {
 
   it("marks accessibility tap bounds and center when debug images are requested", async () => {
     const { accessibility } = await import("@spotterjs/core");
-    vi.mocked(accessibility.quick.click).mockReturnValue({
+    vi.mocked(accessibility.click).mockReturnValue({
       left: 20,
       top: 30,
       width: 40,
@@ -351,7 +362,7 @@ describe("desktop debug input tools", () => {
       })
     );
 
-    expect(accessibility.quick.click).toHaveBeenCalledWith("element-1");
+    expect(accessibility.click).toHaveBeenCalledWith("element-1");
     expect(json).toMatchObject({
       region: { left: 20, top: 30, width: 40, height: 20 },
       tapPoint: { x: 40, y: 40 },

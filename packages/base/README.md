@@ -29,7 +29,7 @@ npm install @spotterjs/base
 | `TextMatchEvaluation` | OCR text-match diagnostics |
 | `WindowInfo` | Top-level desktop window metadata |
 | `DesktopApp` | Process-grouped desktop app and window metadata |
-| `MatchProvider` | `find` / `findAll` / `waitFor` provider interface |
+| `MatchProvider` | `findTemplate` / `findAllTemplates` / `waitForTemplate` provider interface |
 | `SpotterError` | Structured error with stable `code`, optional `domain`, and `context` |
 | `isSpotterError(error)` | Type guard for spotterjs structured errors |
 | `toSpotterError(error)` | Convert unknown errors into `SpotterError` |
@@ -44,7 +44,7 @@ top-left corner.
 Window-scoped APIs such as `windows.findTemplate` also return screen
 coordinates, so their centers can be passed directly to `mouse.tap`.
 
-`image.find` returns coordinates relative to the provided capture. Android
+`image.findTemplate` returns coordinates relative to the provided capture. Android
 plugin APIs use Android device screenshot coordinates.
 
 ## Error Conventions

@@ -9,7 +9,7 @@ import { ensureOutputDir, info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
   const depth = 12;
-  accessibility.quick.enable({
+  accessibility.enable({
     attachDelayMs: 800,
     eventSubscription: true,
     treeWaitTimeoutMs: 15_000,

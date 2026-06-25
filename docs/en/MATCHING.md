@@ -9,7 +9,7 @@ and `@spotterjs/core`.
 ## Architecture
 
 ```text
-screen.find / findAll / waitFor
+screen.findTemplate / findAllTemplates / waitForTemplate
   -> @spotterjs/node
   -> spotterjs-core::matcher
   -> spotterjs-plugin-match-ncc
@@ -31,10 +31,10 @@ Screen / window capture       -> spotterjs-core::capture [platform GDI / X11]
 
 | API | Path needle | Buffer needle | `scale` | `region` |
 |-----|-------------|---------------|---------|----------|
-| `screen.find` / `findAll` / `waitFor` | Yes | Yes | Yes | Yes |
-| `screen.tap` | Yes | Yes | Yes | Yes |
+| `screen.findTemplate` / `findAllTemplates` / `waitForTemplate` | Yes | Yes | Yes | Yes |
+| `screen.tapTemplate` | Yes | Yes | Yes | Yes |
 | `windows.findTemplate` / `findAllTemplates` / `tapTemplate` | Yes | Yes | Yes | Yes |
-| `image.find` / `findAll` | Yes | Yes | Yes | Yes |
+| `image.findTemplate` / `findAllTemplates` | Yes | Yes | Yes | Yes |
 
 ## Core Concepts
 
@@ -48,7 +48,7 @@ Screen / window capture       -> spotterjs-core::capture [platform GDI / X11]
   shared with other match APIs and is the same value for NCC results.
 
 High-level desktop APIs return screen coordinates. Android APIs return Android
-device screenshot coordinates. `image.find` returns coordinates relative to the
+device screenshot coordinates. `image.findTemplate` returns coordinates relative to the
 provided capture.
 
 ## Search Region
@@ -63,17 +63,17 @@ coordinates. `find` and `findAll` use the same coordinate behavior.
 import { screen, windows } from "@spotterjs/core";
 import fs from "fs";
 
-const match = await screen.find("./button.png", { confidence: 0.9 });
+const match = await screen.findTemplate("./button.png", { confidence: 0.9 });
 console.log(match.region, match.center, match.score);
 
-await screen.find("./button.png", {
+await screen.findTemplate("./button.png", {
   confidence: 0.85,
   scale: { min: 0.8, max: 1.2, step: 0.05 },
 });
 
-await screen.find(fs.readFileSync("./icon.png"), { confidence: 0.9 });
+await screen.findTemplate(fs.readFileSync("./icon.png"), { confidence: 0.9 });
 
-const matches = await screen.findAll("./button.png", {
+const matches = await screen.findAllTemplates("./button.png", {
   confidence: 0.9,
   region: { left: 0, top: 0, width: 1920, height: 1080 },
 });
@@ -89,7 +89,7 @@ const windowMatch = windows.findTemplate(windowId, "./button.png", {
 import { image, screen } from "@spotterjs/core";
 
 const haystack = screen.capture();
-const match = await image.find(haystack, "./button.png", { confidence: 0.9 });
+const match = await image.findTemplate(haystack, "./button.png", { confidence: 0.9 });
 ```
 
 Use `image.decode(encodedBytes)` when you have encoded PNG/JPEG/WebP bytes and

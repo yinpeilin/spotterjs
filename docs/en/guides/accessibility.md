@@ -20,27 +20,27 @@ is better for semantically stable controls. Robust scripts often combine both.
 ```typescript
 import { accessibility, desktop } from "@spotterjs/core";
 
-accessibility.quick.enable({ eventSubscription: true });
+accessibility.enable({ eventSubscription: true });
 
 const win = desktop.waitForWindow("Notepad", 10_000);
-const rootId = accessibility.quick.attach(win.id);
-const editId = accessibility.quick.find(rootId, {
+const rootId = accessibility.attach(win.id);
+const editId = accessibility.find(rootId, {
   controlType: "Edit",
 });
 
-accessibility.quick.click(editId);
+accessibility.click(editId);
 ```
 
 ## Query Elements
 
 ```typescript
-const buttonId = accessibility.quick.waitFor(
+const buttonId = accessibility.waitFor(
   rootId,
   { controlType: "Button", name: "OK" },
   5000
 );
 
-accessibility.quick.invoke(buttonId);
+accessibility.invoke(buttonId);
 ```
 
 Common query fields:

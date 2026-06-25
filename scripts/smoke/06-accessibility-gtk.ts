@@ -13,7 +13,7 @@ export async function run(): Promise<void> {
     return;
   }
 
-  accessibility.quick.enable({ attachDelayMs: 500 });
+  accessibility.enable({ attachDelayMs: 500 });
 
   const allWindows = windows.list();
   const target =
@@ -28,7 +28,7 @@ export async function run(): Promise<void> {
   windows.focus(target.id);
   await sleep(500);
 
-  const root = accessibility.quick.attach(target.id);
+  const root = accessibility.attach(target.id);
   const health = accessibility.debug.treeHealth(root, 8);
   info(`nodes=${health.totalNodes}`);
 }

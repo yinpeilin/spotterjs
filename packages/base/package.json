@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/base",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Shared TypeScript types for spotterjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,6 +34,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs"
   },
   "devDependencies": {

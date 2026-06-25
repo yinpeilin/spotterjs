@@ -5,7 +5,7 @@ export async function run(): Promise<void> {
   const allWindows = windows.list();
   info(`listed ${allWindows.length} window(s)`);
 
-  const active = windows.active();
+  const active = windows.getActive();
   if (!active.id || active.id.trim().length === 0) {
     throw new Error("getActiveWindow() returned empty id");
   }

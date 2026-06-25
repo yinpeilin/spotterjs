@@ -16,18 +16,22 @@ const plugin = vi.hoisted(() => ({
   })),
 }));
 
-const debugDraw = vi.hoisted(() => ({
-  writeDebugImageFromPath: vi.fn(() => ({
-    imagePath: ".spotter/artifacts/ocr-debug.png",
-    width: 100,
-    height: 50,
-    originalWidth: 100,
-    originalHeight: 50,
-    format: "png",
-    isDownscaled: false,
-    detail: "original",
-  })),
-}));
+const debugDraw = vi.hoisted(() => {
+  const z = require("zod");
+  return {
+    debugImageField: { debugImage: z.boolean().optional() },
+    writeDebugImageFromPath: vi.fn(() => ({
+      imagePath: ".spotter/artifacts/ocr-debug.png",
+      width: 100,
+      height: 50,
+      originalWidth: 100,
+      originalHeight: 50,
+      format: "png",
+      isDownscaled: false,
+      detail: "original",
+    })),
+  };
+});
 
 vi.mock("@spotterjs/plugin-ocr", () => ({
   createOcr: plugin.createOcr,

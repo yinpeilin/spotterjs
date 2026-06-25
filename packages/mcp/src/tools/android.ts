@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { CaptureImage, MatchResult } from "@spotterjs/base";
+import type { CaptureImage } from "@spotterjs/base";
 import { image as coreImage } from "@spotterjs/core";
 import { android } from "@spotterjs/plugin-android";
 import type {
@@ -14,7 +14,9 @@ import {
   workspaceImageStore,
 } from "../adapters/artifacts.js";
 import {
-  type DebugAnnotation,
+  debugImageField,
+  debugImagePatch,
+  matchAnnotations,
   writeDebugCapture,
 } from "../adapters/debug-draw.js";
 import { json, ok, registerSafeTool } from "./results.js";
@@ -97,10 +99,7 @@ const matchOptionsSchema = {
     .describe("Enable multi-scale template matching, or provide an explicit scale range."),
 };
 
-const debugImageSchema = z
-  .boolean()
-  .optional()
-  .describe("When true, write an annotated Android debug PNG under .spotter/artifacts.");
+const debugImageSchema = debugImageField.debugImage;
 
 const elementQuerySchema = {
   text: z.string().optional().describe("Exact accessibility text."),
@@ -198,15 +197,6 @@ function localMatchOptions(args: {
     region: args.region,
     scale: args.scale,
   };
-}
-
-function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
-  const annotations: DebugAnnotation[] = [];
-  for (const match of matches) {
-    annotations.push({ kind: "region", region: match.region });
-    annotations.push({ kind: "point", point: match.center });
-  }
-  return annotations;
 }
 
 type DeviceIdentity = {
@@ -857,17 +847,16 @@ export function registerAndroidTools(server: McpServer): void {
       return withDevice(args, async (device) => {
         const capture = await captureAndroidScreen(device, args.detail, "android-template");
         const matches = args.all
-          ? await coreImage.findAll(capture.capture, needle, localMatchOptions(args))
-          : [await coreImage.find(capture.capture, needle, localMatchOptions(args))];
-        const debug = args.debugImage
-          ? writeDebugCapture(capture.capture, matchAnnotations(matches), {
-              prefix: "android-template-debug",
-            })
-          : undefined;
+          ? await coreImage.findAllTemplates(capture.capture, needle, localMatchOptions(args))
+          : [await coreImage.findTemplate(capture.capture, needle, localMatchOptions(args))];
         return json({
           ...captureResponse(capture),
           matches,
-          ...(debug ? { debugImagePath: debug.imagePath } : {}),
+          ...debugImagePatch(args.debugImage, () =>
+            writeDebugCapture(capture.capture, matchAnnotations(matches), {
+              prefix: "android-template-debug",
+            })
+          ),
         });
       });
     }
@@ -904,19 +893,18 @@ export function registerAndroidTools(server: McpServer): void {
       const needle = decodeTemplateImage(args.image);
       return withDevice(args, async (device) => {
         const capture = await captureAndroidScreen(device, args.detail, "android-template-tap");
-        const match = await coreImage.find(capture.capture, needle, localMatchOptions(args));
+        const match = await coreImage.findTemplate(capture.capture, needle, localMatchOptions(args));
         const tapPoint = match.center;
         await device.tap(tapPoint.x, tapPoint.y);
-        const debug = args.debugImage
-          ? writeDebugCapture(capture.capture, matchAnnotations([match]), {
-              prefix: "android-template-tap-debug",
-            })
-          : undefined;
         return json({
           ...captureResponse(capture),
           match,
           tapPoint,
-          ...(debug ? { debugImagePath: debug.imagePath } : {}),
+          ...debugImagePatch(args.debugImage, () =>
+            writeDebugCapture(capture.capture, matchAnnotations([match]), {
+              prefix: "android-template-tap-debug",
+            })
+          ),
         });
       });
     }

@@ -19,6 +19,10 @@ import {
 } from "../adapters/artifacts.js";
 import {
   type DebugAnnotation,
+  debugImageField,
+  debugImagePatch,
+  matchAnnotations,
+  offsetAnnotations,
   writeDebugCapture,
 } from "../adapters/debug-draw.js";
 import {
@@ -55,10 +59,7 @@ const sourceSchema = z
   .default("screen")
   .describe("Desktop capture source: full screen/region, foreground window, or a specific window.");
 
-const debugImageSchema = z
-  .boolean()
-  .optional()
-  .describe("When true, write an annotated PNG debug artifact under .spotter/artifacts.");
+const debugImageSchema = debugImageField.debugImage;
 
 const matchOptionsSchema = {
   confidence: normalizedNumber
@@ -191,32 +192,30 @@ export function registerVisualTools(server: McpServer): void {
           minSimilarity: args.minSimilarity,
         });
         const matches = matchingOcrLines(candidates);
-        const debug = args.debugImage
-          ? writeDebugCapture(
-              capture.capture,
-              localizeAnnotations(ocrLineAnnotations(candidates), capture.origin),
-              { prefix: "desktop-capture-ocr-debug" }
-            )
-          : undefined;
         return json({
           ...captureResponse(capture),
           matches,
           ...(args.debugImage ? { candidates } : {}),
-          ...(debug ? { debugImagePath: debug.imagePath } : {}),
+          ...debugImagePatch(args.debugImage, () =>
+            writeDebugCapture(
+              capture.capture,
+              offsetAnnotations(ocrLineAnnotations(candidates), capture.origin),
+              { prefix: "desktop-capture-ocr-debug" }
+            )
+          ),
         });
       }
 
-      const debug = args.debugImage
-        ? writeDebugCapture(
-            capture.capture,
-            localizeAnnotations(ocrLineAnnotations(lines), capture.origin),
-            { prefix: "desktop-capture-ocr-debug" }
-          )
-        : undefined;
       return json({
         ...captureResponse(capture),
         lines,
-        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+        ...debugImagePatch(args.debugImage, () =>
+          writeDebugCapture(
+            capture.capture,
+            offsetAnnotations(ocrLineAnnotations(lines), capture.origin),
+            { prefix: "desktop-capture-ocr-debug" }
+          )
+        ),
       });
     }
   );
@@ -238,19 +237,18 @@ export function registerVisualTools(server: McpServer): void {
       const capture = captureDesktopSource(args, "desktop-capture-template");
       const needle = decodeTemplateImage(args.image);
       const localMatches = args.all
-        ? await coreImage.findAll(capture.capture, needle, localMatchOptions(args))
-        : [await coreImage.find(capture.capture, needle, localMatchOptions(args))];
+        ? await coreImage.findAllTemplates(capture.capture, needle, localMatchOptions(args))
+        : [await coreImage.findTemplate(capture.capture, needle, localMatchOptions(args))];
       const matches = localMatches.map((match) => translateMatch(match, capture.origin));
-      const debug = args.debugImage
-        ? writeDebugCapture(capture.capture, matchAnnotations(localMatches), {
-            prefix: "desktop-capture-template-debug",
-          })
-        : undefined;
 
       return json({
         ...captureResponse(capture),
         matches,
-        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+        ...debugImagePatch(args.debugImage, () =>
+          writeDebugCapture(capture.capture, matchAnnotations(localMatches), {
+            prefix: "desktop-capture-template-debug",
+          })
+        ),
       });
     }
   );
@@ -271,7 +269,7 @@ export function registerVisualTools(server: McpServer): void {
     async (args) => {
       const capture = captureDesktopSource(args, "desktop-template-tap");
       const needle = decodeTemplateImage(args.image);
-      const localMatch = await coreImage.find(
+      const localMatch = await coreImage.findTemplate(
         capture.capture,
         needle,
         localMatchOptions(args)
@@ -279,20 +277,17 @@ export function registerVisualTools(server: McpServer): void {
       const match = translateMatch(localMatch, capture.origin);
       const tapPoint = match.center;
       mouse.tap(tapPoint.x, tapPoint.y, args.button);
-      const debug = args.debugImage
-        ? writeDebugCapture(
-            capture.capture,
-            matchAnnotations([localMatch]),
-            { prefix: "desktop-template-tap-debug" }
-          )
-        : undefined;
 
       return json({
         ...captureResponse(capture),
         match,
         tapPoint,
         button: args.button ?? "left",
-        ...(debug ? { debugImagePath: debug.imagePath } : {}),
+        ...debugImagePatch(args.debugImage, () =>
+          writeDebugCapture(capture.capture, matchAnnotations([localMatch]), {
+            prefix: "desktop-template-tap-debug",
+          })
+        ),
       });
     }
   );
@@ -319,7 +314,7 @@ function captureDesktopSource(args: CaptureArgs, prefix: string): CaptureContext
   }
 
   if (source === "active") {
-    const active = windows.active();
+    const active = windows.getActive();
     const capture = screen.captureWindow(active.id);
     return buildCaptureContext({
       source,
@@ -335,7 +330,7 @@ function captureDesktopSource(args: CaptureArgs, prefix: string): CaptureContext
   }
 
   const windowId = args.windowId!;
-  const region = windows.region(windowId);
+  const region = windows.getRegion(windowId);
   const capture = screen.captureWindow(windowId);
   return buildCaptureContext({
     source,
@@ -409,55 +404,5 @@ function translateMatch(match: MatchResult, origin: Point): MatchResult {
       x: match.center.x + origin.x,
       y: match.center.y + origin.y,
     },
-  };
-}
-
-function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
-  const annotations: DebugAnnotation[] = [];
-  for (const match of matches) {
-    annotations.push({ kind: "region", region: match.region });
-    annotations.push({ kind: "point", point: match.center });
-  }
-  return annotations;
-}
-
-function localizeAnnotations(
-  annotations: DebugAnnotation[],
-  origin: Point
-): DebugAnnotation[] {
-  if (origin.x === 0 && origin.y === 0) return annotations;
-  return annotations.map((annotation) => {
-    if (annotation.kind === "region") {
-      return {
-        ...annotation,
-        region: localizeRegion(annotation.region, origin),
-      };
-    }
-    if (annotation.kind === "polygon") {
-      return {
-        ...annotation,
-        points: annotation.points.map((point) => localizePoint(point, origin)),
-      };
-    }
-    return {
-      ...annotation,
-      point: localizePoint(annotation.point, origin),
-    };
-  });
-}
-
-function localizeRegion(region: Region, origin: Point): Region {
-  return {
-    left: region.left - origin.x,
-    top: region.top - origin.y,
-    width: region.width,
-    height: region.height,
-  };
-}
-
-function localizePoint(point: Point, origin: Point): Point {
-  return {
-    x: point.x - origin.x,
-    y: point.y - origin.y,
   };
 }

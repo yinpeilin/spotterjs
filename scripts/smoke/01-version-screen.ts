@@ -10,7 +10,7 @@ export async function run(): Promise<void> {
   }
   info(`version: ${version}`);
 
-  const { width, height } = screen.size();
+  const { width, height } = screen.getSize();
   if (width <= 0 || height <= 0) {
     throw new Error(`invalid screen size: ${width}x${height}`);
   }

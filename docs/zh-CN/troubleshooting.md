@@ -42,7 +42,7 @@ npm run smoke:match-tap
 - 多显示器或 DPI 缩放导致坐标理解不一致。
 - 混用了窗口外框坐标和客户区坐标。
 
-高层 `screen.find` 和 `windows.findTemplate` 返回的坐标可以直接点击。
+高层 `screen.findTemplate` 和 `windows.findTemplate` 返回的坐标可以直接点击。
 只有在需要手动转换坐标时，才使用 `toMatchBox` 和 `matchTapScreen`。
 
 ## 无障碍树为空或缺少元素

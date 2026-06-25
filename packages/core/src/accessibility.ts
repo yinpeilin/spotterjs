@@ -32,7 +32,7 @@ export type A11yQuery = {
 /**
  * Accessibility subsystem options.
  *
- * Applied by {@link accessibility.quick.enable}. These settings affect attach
+ * Applied by {@link accessibility.enable}. These settings affect attach
  * timing and tree expansion behavior.
  */
 export type A11yConfig = {
@@ -302,10 +302,11 @@ const accessibilityBase = {
 /**
  * High-level accessibility automation API.
  *
- * Typical flow: `quick.enable()` -> `quick.attach()` -> `quick.find()` ->
- * `quick.click()` or `quick.invoke()`.
+ * Typical flow: `accessibility.enable()` -> `accessibility.attach()` ->
+ * `accessibility.find()` -> `accessibility.click()` or `accessibility.invoke()`.
+ * Diagnostics live under `accessibility.debug`.
  */
-export type A11yQuickApi = {
+export type A11yApi = {
   enable(config?: A11yConfig): void;
   attach(windowId: string): string;
   find(rootId: string, query: A11yQuery, maxDepth?: number): string;
@@ -324,13 +325,14 @@ export type A11yQuickApi = {
     query: A11yQuery,
     maxDepth?: number
   ): { rootId: string; elementId: string };
+  debug: A11yDebugApi;
 };
 
 /**
  * Accessibility diagnostics API.
  *
- * Use this when `quick.find()` misses an element or the UIA / AT-SPI tree is
- * incomplete.
+ * Use this when `accessibility.find()` misses an element or the UIA / AT-SPI
+ * tree is incomplete.
  */
 export type A11yDebugApi = {
   attachWindowReport(windowId: string, maxDepth?: number): AttachReport;
@@ -362,45 +364,40 @@ function clickElement(elementId: string): Region {
   return region;
 }
 
-export const accessibility: {
-  quick: A11yQuickApi;
-  debug: A11yDebugApi;
-} = {
-  quick: {
-    enable: accessibilityBase.enable,
+export const accessibility: A11yApi = {
+  enable: accessibilityBase.enable,
 
-    attach(windowId: string): string {
-      return accessibilityBase.attachWindow(windowId);
-    },
+  attach(windowId: string): string {
+    return accessibilityBase.attachWindow(windowId);
+  },
 
-    find: accessibilityBase.find,
-    waitFor: accessibilityBase.waitFor,
+  find: accessibilityBase.find,
+  waitFor: accessibilityBase.waitFor,
 
-    click(elementId: string): Region {
-      return clickElement(elementId);
-    },
+  click(elementId: string): Region {
+    return clickElement(elementId);
+  },
 
-    typeText(elementId: string, text: string): void {
-      accessibilityBase.setValue(elementId, text);
-    },
+  typeText(elementId: string, text: string): void {
+    accessibilityBase.setValue(elementId, text);
+  },
 
-    invoke: accessibilityBase.invoke,
+  invoke: accessibilityBase.invoke,
 
-    findAndClick(rootId: string, query: A11yQuery, maxDepth = 12): string {
-      const elementId = accessibilityBase.find(rootId, query, maxDepth);
-      clickElement(elementId);
-      return elementId;
-    },
+  findAndClick(rootId: string, query: A11yQuery, maxDepth = 12): string {
+    const elementId = accessibilityBase.find(rootId, query, maxDepth);
+    clickElement(elementId);
+    return elementId;
+  },
 
-    attachAndFind(
-      windowId: string,
-      query: A11yQuery,
-      maxDepth = 12
-    ): { rootId: string; elementId: string } {
-      const report = accessibilityBase.attachWindowReport(windowId, maxDepth);
-      const elementId = accessibilityBase.find(report.elementId, query, maxDepth);
-      return { rootId: report.elementId, elementId };
-    },
+  attachAndFind(
+    windowId: string,
+    query: A11yQuery,
+    maxDepth = 12
+  ): { rootId: string; elementId: string } {
+    const report = accessibilityBase.attachWindowReport(windowId, maxDepth);
+    const elementId = accessibilityBase.find(report.elementId, query, maxDepth);
+    return { rootId: report.elementId, elementId };
   },
 
   debug: {

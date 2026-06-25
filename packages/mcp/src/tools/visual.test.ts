@@ -25,18 +25,32 @@ const artifacts = vi.hoisted(() => ({
   },
 }));
 
-const debugDraw = vi.hoisted(() => ({
-  writeDebugCapture: vi.fn(() => ({
-    imagePath: ".spotter/artifacts/visual-debug.png",
-    width: 100,
-    height: 80,
-    originalWidth: 100,
-    originalHeight: 80,
-    format: "png",
-    isDownscaled: false,
-    detail: "original",
-  })),
-}));
+const debugDraw = vi.hoisted(() => {
+  const z = require("zod");
+  return {
+    debugImageField: { debugImage: z.boolean().optional() },
+    debugImagePatch: vi.fn((enabled: boolean | undefined, write: () => { imagePath: string }) =>
+      enabled ? { debugImagePath: write().imagePath } : {}
+    ),
+    matchAnnotations: vi.fn((matches: Array<{ region: unknown; center: unknown }>) =>
+      matches.flatMap((m) => [
+        { kind: "region", region: m.region },
+        { kind: "point", point: m.center },
+      ])
+    ),
+    offsetAnnotations: vi.fn((annotations: unknown[]) => annotations),
+    writeDebugCapture: vi.fn(() => ({
+      imagePath: ".spotter/artifacts/visual-debug.png",
+      width: 100,
+      height: 80,
+      originalWidth: 100,
+      originalHeight: 80,
+      format: "png",
+      isDownscaled: false,
+      detail: "original",
+    })),
+  };
+});
 
 const ocr = vi.hoisted(() => ({
   read: vi.fn(),
@@ -56,8 +70,8 @@ const plugin = vi.hoisted(() => ({
 
 vi.mock("@spotterjs/core", () => ({
   image: {
-    find: core.imageFind,
-    findAll: core.imageFindAll,
+    findTemplate: core.imageFind,
+    findAllTemplates: core.imageFindAll,
   },
   mouse: {
     tap: vi.fn(),
@@ -67,11 +81,11 @@ vi.mock("@spotterjs/core", () => ({
     captureWindow: vi.fn(() => capture.window),
   },
   windows: {
-    active: vi.fn(() => ({
+    getActive: vi.fn(() => ({
       id: "active-1",
       region: { left: 30, top: 40, width: 120, height: 90 },
     })),
-    region: vi.fn(() => ({ left: 100, top: 200, width: 120, height: 90 })),
+    getRegion: vi.fn(() => ({ left: 100, top: 200, width: 120, height: 90 })),
   },
 }));
 
@@ -221,7 +235,7 @@ describe("desktop_capture_and_ocr", () => {
       })
     );
 
-    expect(windows.active).toHaveBeenCalledTimes(1);
+    expect(windows.getActive).toHaveBeenCalledTimes(1);
     expect(screen.captureWindow).toHaveBeenCalledWith("active-1");
     expect(ocr.findAllText).not.toHaveBeenCalled();
     expect(plugin.scoreOcrText).toHaveBeenCalledTimes(2);
@@ -307,7 +321,7 @@ describe("desktop_capture_and_find_template", () => {
       })
     );
 
-    expect(windows.region).toHaveBeenCalledWith("win-1");
+    expect(windows.getRegion).toHaveBeenCalledWith("win-1");
     expect(screen.captureWindow).toHaveBeenCalledWith("win-1");
     expect(artifacts.workspaceImageStore.writeCapture).toHaveBeenCalledWith(
       capture.window,

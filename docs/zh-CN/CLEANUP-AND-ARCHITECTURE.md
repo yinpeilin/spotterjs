@@ -9,7 +9,7 @@
 OpenCV 插件与 native 包已删除，NCC v2 承担全部模板匹配（scale、多线程、Buffer/path）。匹配链路统一为：
 
 ```
-screen.find → @spotterjs/node → spotterjs-core::matcher → spotterjs-plugin-match-ncc
+screen.findTemplate → @spotterjs/node → spotterjs-core::matcher → spotterjs-plugin-match-ncc
 ```
 
 ## 2. 目标架构
@@ -37,8 +37,8 @@ screen.find → @spotterjs/node → spotterjs-core::matcher → spotterjs-plugin
 
 | API | path | Buffer | scale | region |
 |-----|------|--------|------------|--------------|
-| `screen.find` / `findAll` / `waitFor` | 是 | 是 | 是 | 是 |
-| `screen.tap` | 是 | 是 | 是 | 是 |
+| `screen.findTemplate` / `findAll` / `waitFor` | 是 | 是 | 是 | 是 |
+| `screen.tapTemplate` | 是 | 是 | 是 | 是 |
 | `windows.findTemplate` / `tapTemplate` | 是 | 是 | 是 | 是 |
 | `windows.findAllTemplates` | 是 | 是 | 是 | 是 |
 

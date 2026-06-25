@@ -63,7 +63,7 @@ function chatInputRegion(win: WechatWin): Region {
 async function ensureWechatFocused(win: WechatWin, step: string): Promise<void> {
   windows.focus(win.id);
   await sleep(450);
-  const active = windows.active();
+  const active = windows.getActive();
   if (!active?.title.includes("微信")) {
     throw new Error(
       `${step}: 微信未在前台（当前: "${active?.title ?? "无"}"）。` +

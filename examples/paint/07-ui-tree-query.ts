@@ -16,7 +16,7 @@ function findFirst(rootId: string): { label: string; elementId: string } {
     try {
       return {
         label: candidate.label,
-        elementId: accessibility.quick.find(rootId, candidate.query, 8),
+        elementId: accessibility.find(rootId, candidate.query, 8),
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -37,7 +37,7 @@ export async function run(): Promise<void> {
   info(formatElementInfo(element));
 
   if (process.env.SPOTTERJS_PAINT_UIA_CLICK === "1") {
-    const bounds = accessibility.quick.click(found.elementId);
+    const bounds = accessibility.click(found.elementId);
     info(
       `clicked center of bounds (${bounds.left},${bounds.top}) ${bounds.width}x${bounds.height}`
     );

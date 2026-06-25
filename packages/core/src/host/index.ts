@@ -24,7 +24,7 @@ import { openPath } from "./open";
  * - Shell execution is disabled until explicitly enabled.
  *
  * Environment variables: `SPOTTERJS_WORKSPACE_ROOT`, `SPOTTERJS_ALLOW_SHELL`,
- * `SPOTTERJS_FS_MAX_BYTES`、`SPOTTERJS_EXEC_TIMEOUT_MS`、`SPOTTERJS_SHELL`
+ * `SPOTTERJS_FS_MAX_BYTES`, `SPOTTERJS_EXEC_TIMEOUT_MS`, `SPOTTERJS_SHELL`
  */
 export const host = {
   configure: configureHost,

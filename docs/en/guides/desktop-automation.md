@@ -25,7 +25,7 @@ import {
 const win = desktop.waitForWindow("Notepad", 10_000);
 windows.focus(win.id);
 
-const active = windows.active();
+const active = windows.getActive();
 console.log(active.title, active.region);
 ```
 
@@ -82,7 +82,7 @@ Use raw key APIs only when you understand the current desktop state.
 ## Template Matching
 
 ```typescript
-const found = await screen.find("./button.png", {
+const found = await screen.findTemplate("./button.png", {
   confidence: 0.9,
   region: { left: 100, top: 80, width: 900, height: 600 },
   scale: { min: 0.8, max: 1.2 },
@@ -135,7 +135,7 @@ capture across several independent checks.
 
 | Space | Common source | Meaning |
 |-------|---------------|---------|
-| Screen coordinates | `screen.find`, `screen.capture`, `windows.findTemplate` | Origin is the desktop’s top-left corner |
+| Screen coordinates | `screen.findTemplate`, `screen.capture`, `windows.findTemplate` | Origin is the desktop’s top-left corner |
 | Window-local coordinates | Coordinate helpers and some window-local reasoning | Origin is the window frame or captured window area |
 
 Use `toMatchBox` and `matchTapScreen` when you need to store both screen and

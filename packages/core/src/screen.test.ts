@@ -27,14 +27,14 @@ beforeEach(() => {
   tapAt.mockReset();
 });
 
-describe("screen.find", () => {
+describe("screen.findTemplate", () => {
   it("calls findTemplate for path needles and returns a MatchResult", async () => {
     findTemplate.mockReturnValue({
       region: { left: 10, top: 20, width: 5, height: 5 },
       score: 0.93,
     });
 
-    const match = await screen.find("x.png", {
+    const match = await screen.findTemplate("x.png", {
       confidence: 0.9,
       region: { left: 1, top: 2, width: 30, height: 40 },
       scale: { min: 0.8, max: 1.2, step: 0.05 },
@@ -64,7 +64,7 @@ describe("screen.find", () => {
     });
     const buf = Buffer.from("png");
 
-    await screen.find(buf, { scale: true });
+    await screen.findTemplate(buf, { scale: true });
 
     expect(findTemplate).toHaveBeenCalledWith("", buf, {
       confidence: undefined,
@@ -77,13 +77,13 @@ describe("screen.find", () => {
   });
 });
 
-describe("screen.findAll", () => {
+describe("screen.findAllTemplates", () => {
   it("returns MatchResult entries with centers and scores", async () => {
     findAllTemplates.mockReturnValue([
       { region: { left: 4, top: 6, width: 8, height: 10 }, score: 0.88 },
     ]);
 
-    const matches = await screen.findAll("x.png");
+    const matches = await screen.findAllTemplates("x.png");
 
     expect(matches).toEqual([
       {
@@ -97,14 +97,14 @@ describe("screen.findAll", () => {
   });
 });
 
-describe("screen.waitFor", () => {
+describe("screen.waitForTemplate", () => {
   it("uses an options object for timeout and interval", async () => {
     waitForTemplate.mockReturnValue({
       region: { left: 1, top: 2, width: 6, height: 8 },
       score: 0.91,
     });
 
-    const match = await screen.waitFor("x.png", {
+    const match = await screen.waitForTemplate("x.png", {
       timeoutMs: 500,
       intervalMs: 25,
       confidence: 0.9,
@@ -129,14 +129,14 @@ describe("screen.waitFor", () => {
   });
 });
 
-describe("screen.tap", () => {
+describe("screen.tapTemplate", () => {
   it("taps the MatchResult center and returns the MatchResult", async () => {
     findTemplate.mockReturnValue({
       region: { left: 10, top: 20, width: 6, height: 8 },
       score: 0.92,
     });
 
-    const match = await screen.tap("x.png");
+    const match = await screen.tapTemplate("x.png");
 
     expect(tapAt).toHaveBeenCalledWith(13, 24);
     expect(match).toEqual({

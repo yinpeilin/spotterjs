@@ -5,7 +5,7 @@ spotterjs uses **normalized cross-correlation** (NCC, `TM_CCOEFF_NORMED` semanti
 ## 架构
 
 ```
-screen.find / findAll / waitFor
+screen.findTemplate / findAllTemplates / waitForTemplate
   → @spotterjs/node
   → spotterjs-core::matcher
   → spotterjs-plugin-match-ncc
@@ -29,10 +29,10 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 
 | API | path | Buffer | scale | region |
 |-----|------|--------|------------|--------------|
-| `screen.find` / `findAll` / `waitFor` | yes | yes | yes | yes |
-| `screen.tap` | yes | yes | yes | yes |
+| `screen.findTemplate` / `findAllTemplates` / `waitForTemplate` | yes | yes | yes | yes |
+| `screen.tapTemplate` | yes | yes | yes | yes |
 | `windows.findTemplate` / `findAllTemplates` / `tapTemplate` | yes | yes | yes | yes |
-| `image.find` / `findAll` | yes | yes | yes | yes |
+| `image.findTemplate` / `findAllTemplates` | yes | yes | yes | yes |
 
 ## 核心概念
 
@@ -52,20 +52,20 @@ import { screen, windows } from "@spotterjs/core";
 import fs from "fs";
 
 // File path
-const match = await screen.find("./button.png", { confidence: 0.9 });
+const match = await screen.findTemplate("./button.png", { confidence: 0.9 });
 console.log(match.region, match.center, match.score);
 
 // Multi-scale
-await screen.find("./button.png", {
+await screen.findTemplate("./button.png", {
   confidence: 0.85,
   scale: { min: 0.8, max: 1.2, step: 0.05 },
 });
 
 // In-memory needle (encoded image bytes)
-await screen.find(fs.readFileSync("./icon.png"), { confidence: 0.9 });
+await screen.findTemplate(fs.readFileSync("./icon.png"), { confidence: 0.9 });
 
-// findAll in a screen sub-region
-const matches = await screen.findAll("./button.png", {
+// findAllTemplates in a screen sub-region
+const matches = await screen.findAllTemplates("./button.png", {
   confidence: 0.9,
   region: { left: 0, top: 0, width: 1920, height: 1080 },
 });
@@ -128,7 +128,7 @@ Run benchmarks after `npm run smoke:capture` (writes `test-output/capture.png` +
 ```bash
 npm run benchmark:ncc:rust -- --runs 20 --warmup 3 --json test-output/benchmark/ncc-rust.json
 npm run benchmark:ncc:rust   # match only, no capture overhead
-npm run benchmark:ncc        # full screen.find path
+npm run benchmark:ncc        # full screen.findTemplate path
 ```
 
 For the broader library report, use `npm run benchmark:ci` for synthetic CI-safe
@@ -137,4 +137,4 @@ coverage and `npm run benchmark:deep` for local desktop/OCR profiling.
 ## 破坏性变更 (v0.2)
 
 - Removed `@spotterjs/plugin-match-opencv` and `@spotterjs/node-match-opencv`
-- Removed `useMatchPlugin`, `getMatchProvider`, and `createNccMatchProvider` — use `screen.find` directly
+- Removed `useMatchPlugin`, `getMatchProvider`, and `createNccMatchProvider` — use `screen.findTemplate` directly

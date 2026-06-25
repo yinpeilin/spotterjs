@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const core = vi.hoisted(() => ({
   accessibility: {
-    quick: {
-      enable: vi.fn(),
-    },
+    enable: vi.fn(),
   },
   configureHost: vi.fn(),
 }));
@@ -74,7 +72,7 @@ beforeEach(() => {
   delete process.env.SPOTTERJS_ANDROID;
   delete process.env.SPOTTERJS_WORKSPACE_ROOT;
   delete process.env.SPOTTERJS_ALLOW_SHELL;
-  core.accessibility.quick.enable.mockReset();
+  core.accessibility.enable.mockReset();
   core.configureHost.mockReset();
   mcpSdk.connect.mockReset();
   mcpSdk.McpServer.mockClear();
@@ -110,12 +108,12 @@ describe("runSpotterMcp", () => {
 
     await runSpotterMcp();
 
-    expect(core.accessibility.quick.enable).toHaveBeenCalledTimes(1);
+    expect(core.accessibility.enable).toHaveBeenCalledTimes(1);
     expect(desktopTools.registerDesktopTools).toHaveBeenCalledWith(
       expect.any(Object),
       true
     );
-    expect(core.accessibility.quick.enable.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(core.accessibility.enable.mock.invocationCallOrder[0]).toBeLessThan(
       desktopTools.registerDesktopTools.mock.invocationCallOrder[0]
     );
   });
@@ -123,7 +121,7 @@ describe("runSpotterMcp", () => {
   it("does not enable accessibility when a11y tools are disabled", async () => {
     await runSpotterMcp();
 
-    expect(core.accessibility.quick.enable).not.toHaveBeenCalled();
+    expect(core.accessibility.enable).not.toHaveBeenCalled();
     expect(desktopTools.registerDesktopTools).toHaveBeenCalledWith(
       expect.any(Object),
       false

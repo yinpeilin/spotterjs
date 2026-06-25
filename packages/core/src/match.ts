@@ -9,7 +9,6 @@ import {
 
 import { callNative, type SpotterErrorContext } from "./errors";
 import { loadNative } from "./native";
-import { image } from "./image";
 import { toMatchResult, toNativeOpts } from "./match-shared";
 
 export function needleArgs(needle: TemplateImage): { path: string; buffer?: Buffer } {
@@ -27,10 +26,6 @@ function matchContext(needle: TemplateImage, options?: MatchOptions): SpotterErr
     region: options?.region,
     scale: options?.scale,
   };
-}
-
-export function loadNeedleCapture(needle: TemplateImage): CaptureImage {
-  return image.load(needle);
 }
 
 /**
@@ -124,24 +119,36 @@ export function findAllNeedleInWindow(
   );
 }
 
-export async function findNeedleInCapture(
-  haystack: CaptureImage,
-  needle: TemplateImage,
-  options?: MatchOptions
-): Promise<MatchResult> {
-  return callNative("findNeedleInCapture", matchContext(needle, options), () =>
-    image.find(haystack, needle, options)
-  );
+function sleepSync(ms: number): void {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-export async function findAllNeedleInCapture(
-  haystack: CaptureImage,
+/**
+ * Poll {@link findNeedleInWindow} until a match appears or the timeout expires.
+ *
+ * The native layer has no window-scoped wait, so this polls synchronously to
+ * match the rest of the synchronous `windows` API.
+ */
+export function waitForNeedleInWindow(
+  windowId: string,
   needle: TemplateImage,
-  options?: MatchOptions
-): Promise<MatchResult[]> {
-  return callNative("findAllNeedleInCapture", matchContext(needle, options), () =>
-    image.findAll(haystack, needle, options)
-  );
+  options: MatchWaitOptions
+): MatchResult {
+  const { timeoutMs, intervalMs, ...matchOptions } = options;
+  const deadline = Date.now() + timeoutMs;
+  const poll = intervalMs ?? 200;
+  let lastError: unknown;
+  for (;;) {
+    try {
+      return findNeedleInWindow(windowId, needle, matchOptions);
+    } catch (error) {
+      lastError = error;
+      if (Date.now() >= deadline) break;
+      sleepSync(Math.min(poll, Math.max(0, deadline - Date.now())));
+    }
+  }
+  throw lastError;
 }
 
 /**

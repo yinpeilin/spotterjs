@@ -37,6 +37,6 @@ examples/paint/assets/tool-template.png
 UI 树示例使用 Windows UI Automation：
 
 - `example:paint:ui-tree` 会写入 `test-output/examples/paint-ui-tree.json` 和 `paint-ui-tree-object.json`。
-- `example:paint:ui-query` 展示 `accessibility.quick.find()` 和 `accessibility.debug.getElementInfo()`。默认只报告匹配元素；设置 `SPOTTERJS_PAINT_UIA_CLICK=1` 后才会点击。
+- `example:paint:ui-query` 展示 `accessibility.find()` 和 `accessibility.debug.getElementInfo()`。默认只报告匹配元素；设置 `SPOTTERJS_PAINT_UIA_CLICK=1` 后才会点击。
 
 设置 `SPOTTERJS_PAINT_TREE_VIEW=raw`、`control`、`content` 或 `auto` 可以比较不同 UIA tree walker。默认值是 `control`。

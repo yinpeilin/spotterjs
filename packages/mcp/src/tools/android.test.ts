@@ -46,18 +46,31 @@ const artifacts = vi.hoisted(() => ({
   },
 }));
 
-const debugDraw = vi.hoisted(() => ({
-  writeDebugCapture: vi.fn(() => ({
-    imagePath: ".spotter/artifacts/android-debug.png",
-    width: 20,
-    height: 10,
-    originalWidth: 20,
-    originalHeight: 10,
-    format: "png",
-    isDownscaled: false,
-    detail: "original",
-  })),
-}));
+const debugDraw = vi.hoisted(() => {
+  const z = require("zod");
+  return {
+    debugImageField: { debugImage: z.boolean().optional() },
+    debugImagePatch: vi.fn((enabled: boolean | undefined, write: () => { imagePath: string }) =>
+      enabled ? { debugImagePath: write().imagePath } : {}
+    ),
+    matchAnnotations: vi.fn((matches: Array<{ region: unknown; center: unknown }>) =>
+      matches.flatMap((m) => [
+        { kind: "region", region: m.region },
+        { kind: "point", point: m.center },
+      ])
+    ),
+    writeDebugCapture: vi.fn(() => ({
+      imagePath: ".spotter/artifacts/android-debug.png",
+      width: 20,
+      height: 10,
+      originalWidth: 20,
+      originalHeight: 10,
+      format: "png",
+      isDownscaled: false,
+      detail: "original",
+    })),
+  };
+});
 
 vi.mock("@spotterjs/plugin-android", () => ({
   android: {
@@ -69,8 +82,8 @@ vi.mock("@spotterjs/plugin-android", () => ({
 vi.mock("@spotterjs/core", () => ({
   image: {
     decode: core.imageDecode,
-    find: core.imageFind,
-    findAll: core.imageFindAll,
+    findTemplate: core.imageFind,
+    findAllTemplates: core.imageFindAll,
   },
 }));
 

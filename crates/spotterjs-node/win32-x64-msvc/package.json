@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/node-win32-x64-msvc",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Windows x64 native binary for @spotterjs/node",
   "main": "index.win32-x64-msvc.node",
   "license": "SEE LICENSE IN LICENSE",

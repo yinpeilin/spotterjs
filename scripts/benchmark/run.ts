@@ -328,11 +328,11 @@ async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]>
   });
 
   await add(results, bench("synthetic", "core.image.decode png buffer", () => image.decode(encodedHay), options));
-  await add(results, bench("synthetic", "core.image.find buffer needle", () =>
-    image.find(fixture.hay, needlePng, { confidence: CONFIDENCE }), options));
-  await add(results, bench("synthetic", "core.image.find decoded needle", () =>
+  await add(results, bench("synthetic", "core.image.findTemplate buffer needle", () =>
+    image.findTemplate(fixture.hay, needlePng, { confidence: CONFIDENCE }), options));
+  await add(results, bench("synthetic", "core.image.findTemplate decoded needle", () =>
     native.findTemplateBuffers(fixture.hay, decodedNeedle, { confidence: CONFIDENCE }), options));
-  await add(results, bench("synthetic", "core.image.findAll decoded needle", () =>
+  await add(results, bench("synthetic", "core.image.findAllTemplates decoded needle", () =>
     native.findAllTemplateBuffers(fixture.hay, decodedNeedle, { confidence: CONFIDENCE }), options));
   await add(results, bench("synthetic", "core.image.encode 800x600", () => image.encode(fixture.hay), options));
   await add(results, bench("synthetic", "ocr.cropImage 600x400", () =>
@@ -370,16 +370,16 @@ async function deepBenchmarks(options: Options): Promise<BenchmarkResult[]> {
     const needle = crop(capture, left, top, width, height);
     writeRgbaPng(outNeedle, needle.width, needle.height, needle.data);
     const needleBytes = fs.readFileSync(outNeedle);
-    await add(results, bench("deep", "screen.find single-scale buffer", () =>
-      screen.find(needleBytes, { confidence: 0.7 }), options));
-    await add(results, bench("deep", "screen.find multi-scale buffer", () =>
-      screen.find(needleBytes, { confidence: 0.7, scale: { min: 0.9, max: 1.1, step: 0.05 } }), options));
+    await add(results, bench("deep", "screen.findTemplate single-scale buffer", () =>
+      screen.findTemplate(needleBytes, { confidence: 0.7 }), options));
+    await add(results, bench("deep", "screen.findTemplate multi-scale buffer", () =>
+      screen.findTemplate(needleBytes, { confidence: 0.7, scale: { min: 0.9, max: 1.1, step: 0.05 } }), options));
     await add(results, bench("deep", "mcp.workspaceImageStore.writeCapture", () =>
       workspaceImageStore.writeCapture(capture!, { prefix: "benchmark-deep" }), options));
   }
 
   try {
-    const active = windows.active();
+    const active = windows.getActive();
     await add(results, bench("deep", "windows.capture active", () =>
       screen.captureWindow(active.id), options));
     if (fs.existsSync(outNeedle)) {

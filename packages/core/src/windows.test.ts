@@ -106,4 +106,51 @@ describe("windows", () => {
     expect(tapAt).toHaveBeenCalledWith(16, 29);
     expect(match.center).toEqual({ x: 16, y: 29 });
   });
+
+  it("waits for a window template and returns the first match", () => {
+    findTemplateInWindow.mockReturnValue({
+      region: { left: 12, top: 24, width: 8, height: 10 },
+      score: 0.94,
+    });
+
+    const match = windows.waitForTemplate("123", "button.png", {
+      timeoutMs: 1_000,
+      intervalMs: 5,
+    });
+
+    expect(findTemplateInWindow).toHaveBeenCalledTimes(1);
+    expect(match.center).toEqual({ x: 16, y: 29 });
+  });
+
+  it("retries window template matching until a match appears", () => {
+    findTemplateInWindow
+      .mockImplementationOnce(() => {
+        throw new Error("no match");
+      })
+      .mockReturnValueOnce({
+        region: { left: 12, top: 24, width: 8, height: 10 },
+        score: 0.94,
+      });
+
+    const match = windows.waitForTemplate("123", "button.png", {
+      timeoutMs: 1_000,
+      intervalMs: 1,
+    });
+
+    expect(findTemplateInWindow).toHaveBeenCalledTimes(2);
+    expect(match.center).toEqual({ x: 16, y: 29 });
+  });
+
+  it("throws the last error when the wait times out", () => {
+    findTemplateInWindow.mockImplementation(() => {
+      throw new Error("never matches");
+    });
+
+    expect(() =>
+      windows.waitForTemplate("123", "button.png", {
+        timeoutMs: 0,
+        intervalMs: 1,
+      })
+    ).toThrow("never matches");
+  });
 });

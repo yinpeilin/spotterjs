@@ -42,7 +42,7 @@ export async function runSpotterMcp(): Promise<void> {
   registerOcrTools(server);
   registerVisualTools(server);
   if (a11yEnabled) {
-    accessibility.quick.enable();
+    accessibility.enable();
   }
   registerDesktopTools(server, a11yEnabled);
   await registerOptionalAndroidTools(server, androidEnabled);

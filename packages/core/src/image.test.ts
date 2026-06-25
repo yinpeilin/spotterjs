@@ -102,9 +102,9 @@ describe("image.size", () => {
   });
 });
 
-describe("image.find", () => {
+describe("image.findTemplate", () => {
   it("matches a path needle against a provided capture", async () => {
-    const match = await image.find(haystack, "button.png", {
+    const match = await image.findTemplate(haystack, "button.png", {
       confidence: 0.9,
       region: { left: 1, top: 2, width: 30, height: 40 },
     });
@@ -128,7 +128,7 @@ describe("image.find", () => {
   });
 
   it("matches all results with centers", async () => {
-    const matches = await image.findAll(haystack, { capture: needleCapture });
+    const matches = await image.findAllTemplates(haystack, { capture: needleCapture });
 
     expect(findAllTemplateBuffers).toHaveBeenCalledWith(
       haystack,

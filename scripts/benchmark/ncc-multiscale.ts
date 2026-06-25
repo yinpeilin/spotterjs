@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     scale: { min: 0.8, max: 1.2, step: 0.05 },
   };
   const needleBytes = fs.readFileSync(needlePath);
-  const { width, height } = screen.size();
+  const { width, height } = screen.getSize();
 
   console.log("NCC benchmark");
   console.log(`screen: ${width}x${height}`);
@@ -108,19 +108,19 @@ async function main(): Promise<void> {
   const scenarios = [
     {
       label: "find path (single scale, capture + disk needle)",
-      fn: () => screen.find(needlePath, opts),
+      fn: () => screen.findTemplate(needlePath, opts),
     },
     {
       label: "find path (multi-scale, capture + disk needle)",
-      fn: () => screen.find(needlePath, multiOpts),
+      fn: () => screen.findTemplate(needlePath, multiOpts),
     },
     {
       label: "find buffer (single scale, capture + memory needle)",
-      fn: () => screen.find(needleBytes, opts),
+      fn: () => screen.findTemplate(needleBytes, opts),
     },
     {
       label: "find buffer (multi-scale, capture + memory needle)",
-      fn: () => screen.find(needleBytes, multiOpts),
+      fn: () => screen.findTemplate(needleBytes, multiOpts),
     },
   ] as const;
 

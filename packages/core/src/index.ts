@@ -500,7 +500,7 @@ export type {
   A11yQuery,
   A11yConfig,
   A11yDebugApi,
-  A11yQuickApi,
+  A11yApi,
   TreeHealth,
   AttachReport,
   TreeViewMode,

@@ -3,6 +3,7 @@
 node_modules/
 .npmrc
 packages/*/dist/
+packages/*/coverage/
 crates/spotterjs-node/*.node
 crates/spotterjs-node/*/*.node
 crates/spotterjs-node/index.js

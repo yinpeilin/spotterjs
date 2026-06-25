@@ -5,10 +5,6 @@ const findAllTemplates = vi.fn();
 const waitForTemplate = vi.fn();
 const findTemplateInWindow = vi.fn();
 const findAllTemplatesInWindow = vi.fn();
-const findTemplateBuffers = vi.fn();
-const findAllTemplateBuffers = vi.fn();
-const loadImageFromPath = vi.fn();
-const loadImageFromBuffer = vi.fn();
 
 vi.mock("./native", () => ({
   loadNative: () => ({
@@ -17,21 +13,14 @@ vi.mock("./native", () => ({
     waitForTemplate,
     findTemplateInWindow,
     findAllTemplatesInWindow,
-    findTemplateBuffers,
-    findAllTemplateBuffers,
-    loadImageFromPath,
-    loadImageFromBuffer,
   }),
 }));
 
 import {
   findAllNeedle,
-  findAllNeedleInCapture,
   findAllNeedleInWindow,
   findNeedle,
-  findNeedleInCapture,
   findNeedleInWindow,
-  loadNeedleCapture,
   waitForNeedle,
 } from "./match";
 import { SpotterError } from "./errors";
@@ -42,10 +31,6 @@ beforeEach(() => {
   waitForTemplate.mockReset();
   findTemplateInWindow.mockReset();
   findAllTemplatesInWindow.mockReset();
-  findTemplateBuffers.mockReset();
-  findAllTemplateBuffers.mockReset();
-  loadImageFromPath.mockReset();
-  loadImageFromBuffer.mockReset();
   findTemplate.mockReturnValue({
     region: { left: 0, top: 0, width: 10, height: 10 },
     score: 0.97,
@@ -63,16 +48,6 @@ beforeEach(() => {
   });
   findAllTemplatesInWindow.mockReturnValue([
     { region: { left: 14, top: 28, width: 8, height: 10 }, score: 0.93 },
-  ]);
-  const needleCapture = { data: Buffer.from("needle"), width: 8, height: 10 };
-  loadImageFromPath.mockReturnValue(needleCapture);
-  loadImageFromBuffer.mockReturnValue(needleCapture);
-  findTemplateBuffers.mockReturnValue({
-    region: { left: 2, top: 4, width: 8, height: 10 },
-    score: 0.92,
-  });
-  findAllTemplateBuffers.mockReturnValue([
-    { region: { left: 6, top: 8, width: 8, height: 10 }, score: 0.91 },
   ]);
 });
 
@@ -273,39 +248,6 @@ describe("findNeedleInWindow", () => {
         center: { x: 18, y: 33 },
         score: 0.93,
         matchScore: 0.93,
-        matchAlgorithm: "ncc",
-      },
-    ]);
-  });
-});
-
-describe("capture image matching helpers", () => {
-  it("loads path and buffer needles through one helper", () => {
-    const encoded = Buffer.from("encoded");
-
-    loadNeedleCapture("button.png");
-    loadNeedleCapture(encoded);
-
-    expect(loadImageFromPath).toHaveBeenCalledWith("button.png");
-    expect(loadImageFromBuffer).toHaveBeenCalledWith(encoded);
-  });
-
-  it("matches already captured images through the shared result mapper", async () => {
-    const haystack = { data: Buffer.from("hay"), width: 20, height: 20 };
-
-    await expect(findNeedleInCapture(haystack, "button.png")).resolves.toEqual({
-      region: { left: 2, top: 4, width: 8, height: 10 },
-      center: { x: 6, y: 9 },
-      score: 0.92,
-      matchScore: 0.92,
-      matchAlgorithm: "ncc",
-    });
-    await expect(findAllNeedleInCapture(haystack, "button.png")).resolves.toEqual([
-      {
-        region: { left: 6, top: 8, width: 8, height: 10 },
-        center: { x: 10, y: 13 },
-        score: 0.91,
-        matchScore: 0.91,
         matchAlgorithm: "ncc",
       },
     ]);

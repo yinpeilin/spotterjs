@@ -47,7 +47,7 @@ Common causes:
 - Multi-monitor or DPI scaling confusion.
 - Mixing window frame and client-area coordinates.
 
-High-level `screen.find` and `windows.findTemplate` return coordinates that can
+High-level `screen.findTemplate` and `windows.findTemplate` return coordinates that can
 be clicked directly. Use `toMatchBox` and `matchTapScreen` only when you need
 manual conversion.
 

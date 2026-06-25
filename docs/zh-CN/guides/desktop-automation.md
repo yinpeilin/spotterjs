@@ -21,7 +21,7 @@ import {
 const win = desktop.waitForWindow("Notepad", 10_000);
 windows.focus(win.id);
 
-const active = windows.active();
+const active = windows.getActive();
 console.log(active.title, active.region);
 ```
 
@@ -68,7 +68,7 @@ const text = clipboard.get();
 ## 模板匹配
 
 ```typescript
-const found = await screen.find("./button.png", {
+const found = await screen.findTemplate("./button.png", {
   confidence: 0.9,
   region: { left: 100, top: 80, width: 900, height: 600 },
   scale: { min: 0.8, max: 1.2 },
@@ -118,7 +118,7 @@ spotterjs 里常见坐标有两类：
 
 | 坐标 | 来源 | 说明 |
 |------|------|------|
-| 屏幕坐标 | `screen.find`、`screen.capture` | 以整个桌面为原点 |
+| 屏幕坐标 | `screen.findTemplate`、`screen.capture` | 以整个桌面为原点 |
 | 窗口局部坐标 | 部分窗口内部逻辑 | 以窗口客户区或截图区域为原点 |
 
 使用 `toMatchBox` 和 `matchTapScreen` 可以把窗口 frame 和匹配结果整理成可点击点：

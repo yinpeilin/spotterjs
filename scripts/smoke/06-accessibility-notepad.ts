@@ -6,7 +6,7 @@ import { info, runSmokeScript } from "../lib/log";
  * Requires Notepad or Calculator to be open.
  */
 export async function run(): Promise<void> {
-  accessibility.quick.enable({ attachDelayMs: 300 });
+  accessibility.enable({ attachDelayMs: 300 });
 
   const allWindows = windows.list();
   const target =

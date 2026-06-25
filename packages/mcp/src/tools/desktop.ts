@@ -19,7 +19,8 @@ import {
   captureWindowArtifact,
 } from "../adapters/capture.js";
 import {
-  type DebugAnnotation,
+  debugImageField,
+  matchAnnotations,
   writeDebugCapture,
 } from "../adapters/debug-draw.js";
 import { json, ok, registerSafeTool } from "./results.js";
@@ -78,12 +79,7 @@ const captureDetailOptionsSchema = {
   detail: captureDetailSchema,
 };
 
-const debugImageOptionsSchema = {
-  debugImage: z
-    .boolean()
-    .optional()
-    .describe("When true, write an annotated debug PNG under .spotter/artifacts."),
-};
+const debugImageOptionsSchema = debugImageField;
 
 const keyboardOptionsSchema = {
   autoDelayMs: finiteNumber
@@ -125,7 +121,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     server,
     "desktop_get_active_window",
     { description: "Get the foreground window" },
-    async () => json(windows.active())
+    async () => json(windows.getActive())
   );
 
   registerSafeTool(
@@ -360,8 +356,8 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
           scale: options.scale,
         };
         const localMatches = all
-          ? await coreImage.findAll(capture, needle, localOptions)
-          : [await coreImage.find(capture, needle, localOptions)];
+          ? await coreImage.findAllTemplates(capture, needle, localOptions)
+          : [await coreImage.findTemplate(capture, needle, localOptions)];
         const matches = localMatches.map((match) => translateMatch(match, origin));
         const debug = writeDebugCapture(
           capture,
@@ -376,8 +372,8 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
       }
 
       const matches = all
-        ? await screen.findAll(needle, options)
-        : [await screen.find(needle, options)];
+        ? await screen.findAllTemplates(needle, options)
+        : [await screen.findTemplate(needle, options)];
       return json({ matches, coordinateSpace: "screen" });
     }
   );
@@ -414,7 +410,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     },
     async (args) => {
       const { rootId, maxDepth, ...query } = args;
-      const id = accessibility.quick.find(rootId, query, maxDepth ?? 12);
+      const id = accessibility.find(rootId, query, maxDepth ?? 12);
       return ok(id);
     }
   );
@@ -424,7 +420,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     "desktop_a11y_invoke",
     { inputSchema: z.object({ elementId: z.string() }) },
     async ({ elementId }) => {
-      accessibility.quick.invoke(elementId);
+      accessibility.invoke(elementId);
       return ok();
     }
   );
@@ -435,7 +431,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
     { inputSchema: z.object({ elementId: z.string(), ...debugImageOptionsSchema }) },
     async ({ elementId, debugImage }) => {
       const capture = debugImage ? screen.capture() : undefined;
-      const region = accessibility.quick.click(elementId);
+      const region = accessibility.click(elementId);
       if (debugImage && capture) {
         const tapPoint = centerOf(region);
         const debug = writeDebugCapture(
@@ -508,13 +504,4 @@ function translateMatch(match: MatchResult, origin: Point): MatchResult {
       y: match.center.y + origin.y,
     },
   };
-}
-
-function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
-  const annotations: DebugAnnotation[] = [];
-  for (const match of matches) {
-    annotations.push({ kind: "region", region: match.region });
-    annotations.push({ kind: "point", point: match.center });
-  }
-  return annotations;
 }

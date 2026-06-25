@@ -1,6 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { writeDebugImageFromPath } from "../adapters/debug-draw.js";
+import {
+  debugImageField,
+  writeDebugImageFromPath,
+} from "../adapters/debug-draw.js";
 import {
   getOcr,
   matchingOcrLines,
@@ -32,10 +35,7 @@ const readOptionsSchema = {
     })
     .optional()
     .describe("Coordinate offset used to translate cropped image results back to screen space."),
-  debugImage: z
-    .boolean()
-    .optional()
-    .describe("When true, write an annotated OCR debug PNG under .spotter/artifacts."),
+  ...debugImageField,
 };
 
 export function registerOcrTools(server: McpServer): void {

@@ -1,5 +1,6 @@
-import type { CaptureImage, Point, Region } from "@spotterjs/base";
+import type { CaptureImage, MatchResult, Point, Region } from "@spotterjs/base";
 import { image } from "@spotterjs/core";
+import { z } from "zod";
 import {
   type CaptureArtifact,
   workspaceImageStore,
@@ -16,6 +17,72 @@ export type WriteDebugOptions = {
   prefix: string;
   origin?: Point;
 };
+
+/**
+ * Shared `debugImage` input field for MCP tool schemas.
+ *
+ * Spread into a tool's `inputSchema` object so every tool exposes the same flag
+ * name and description.
+ */
+export const debugImageField = {
+  debugImage: z
+    .boolean()
+    .optional()
+    .describe(
+      "When true, write an annotated PNG debug artifact under .spotter/artifacts."
+    ),
+};
+
+/**
+ * Build region + center annotations for template matches.
+ *
+ * Used by desktop, visual, and Android template tools so debug overlays look
+ * identical across surfaces.
+ */
+export function matchAnnotations(matches: MatchResult[]): DebugAnnotation[] {
+  const annotations: DebugAnnotation[] = [];
+  for (const match of matches) {
+    annotations.push({ kind: "region", region: match.region });
+    annotations.push({ kind: "point", point: match.center });
+  }
+  return annotations;
+}
+
+/**
+ * Shift annotations by `-origin` so screen-space coordinates land on a capture
+ * whose top-left corresponds to `origin`. A zero origin is returned unchanged.
+ */
+export function offsetAnnotations(
+  annotations: DebugAnnotation[],
+  origin: Point
+): DebugAnnotation[] {
+  if (origin.x === 0 && origin.y === 0) return annotations;
+  return annotations.map((annotation) => {
+    if (annotation.kind === "region") {
+      return { ...annotation, region: offsetRegion(annotation.region, origin) };
+    }
+    if (annotation.kind === "polygon") {
+      return {
+        ...annotation,
+        points: annotation.points.map((point) => offsetPoint(point, origin)),
+      };
+    }
+    return { ...annotation, point: offsetPoint(annotation.point, origin) };
+  });
+}
+
+/**
+ * Conditionally write a debug capture and return the response fragment.
+ *
+ * Returns `{ debugImagePath }` when `enabled`, otherwise an empty object, so
+ * tools can spread the result directly into their JSON response.
+ */
+export function debugImagePatch(
+  enabled: boolean | undefined,
+  write: () => CaptureArtifact
+): { debugImagePath: string } | Record<string, never> {
+  return enabled ? { debugImagePath: write().imagePath } : {};
+}
 
 const COLORS = {
   region: [0, 204, 102, 255] as Rgba,
@@ -65,37 +132,12 @@ export function writeDebugImageFromPath(
   const capture = image.read(imagePath);
   return writeDebugCapture(
     capture,
-    translateAnnotations(annotations, options.origin ?? { x: 0, y: 0 }),
+    offsetAnnotations(annotations, options.origin ?? { x: 0, y: 0 }),
     options
   );
 }
 
-function translateAnnotations(
-  annotations: DebugAnnotation[],
-  origin: Point
-): DebugAnnotation[] {
-  if (origin.x === 0 && origin.y === 0) return annotations;
-  return annotations.map((annotation) => {
-    if (annotation.kind === "region") {
-      return {
-        ...annotation,
-        region: translateRegion(annotation.region, origin),
-      };
-    }
-    if (annotation.kind === "polygon") {
-      return {
-        ...annotation,
-        points: annotation.points.map((point) => translatePoint(point, origin)),
-      };
-    }
-    return {
-      ...annotation,
-      point: translatePoint(annotation.point, origin),
-    };
-  });
-}
-
-function translateRegion(region: Region, origin: Point): Region {
+function offsetRegion(region: Region, origin: Point): Region {
   return {
     left: region.left - origin.x,
     top: region.top - origin.y,
@@ -104,7 +146,7 @@ function translateRegion(region: Region, origin: Point): Region {
   };
 }
 
-function translatePoint(point: Point, origin: Point): Point {
+function offsetPoint(point: Point, origin: Point): Point {
   return {
     x: point.x - origin.x,
     y: point.y - origin.y,

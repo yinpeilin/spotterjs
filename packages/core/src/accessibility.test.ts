@@ -66,12 +66,12 @@ beforeEach(() => {
   accessibilityDumpTree.mockReturnValue("{}");
 });
 
-describe("accessibility.quick", () => {
+describe("accessibility", () => {
   it("exposes the everyday attach/find/invoke flow", () => {
-    accessibility.quick.enable({ attachDelayMs: 100 });
-    const rootId = accessibility.quick.attach("window-1");
-    const elementId = accessibility.quick.find(rootId, { name: "OK" });
-    accessibility.quick.invoke(elementId);
+    accessibility.enable({ attachDelayMs: 100 });
+    const rootId = accessibility.attach("window-1");
+    const elementId = accessibility.find(rootId, { name: "OK" });
+    accessibility.invoke(elementId);
 
     expect(accessibilityEnable).toHaveBeenCalledWith({
       attachDelayMs: 100,
@@ -97,14 +97,14 @@ describe("accessibility.quick", () => {
   });
 
   it("clicks an element center and returns its bounds", () => {
-    const bounds = accessibility.quick.click("element-1");
+    const bounds = accessibility.click("element-1");
 
     expect(bounds).toEqual({ left: 10, top: 20, width: 30, height: 40 });
     expect(tapAt).toHaveBeenCalledWith(25, 40);
   });
 
   it("combines find and click for common scripts", () => {
-    const elementId = accessibility.quick.findAndClick("root-1", {
+    const elementId = accessibility.findAndClick("root-1", {
       controlType: "Button",
       name: "Send",
     });
@@ -115,7 +115,7 @@ describe("accessibility.quick", () => {
   });
 
   it("attaches with report and finds an element", () => {
-    const result = accessibility.quick.attachAndFind("window-1", {
+    const result = accessibility.attachAndFind("window-1", {
       nameContains: "Send",
     });
 

@@ -23,7 +23,7 @@ Create `check-spotter.ts`:
 ```typescript
 import { screen } from "@spotterjs/core";
 
-const size = screen.size();
+const size = screen.getSize();
 const capture = screen.capture({
   left: 0,
   top: 0,
@@ -52,7 +52,7 @@ After that works, use template matching to click a visible button or icon:
 ```typescript
 import { mouse, screen } from "@spotterjs/core";
 
-const match = await screen.find("./assets/button.png", {
+const match = await screen.findTemplate("./assets/button.png", {
   confidence: 0.9,
   scale: true,
 });
