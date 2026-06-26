@@ -156,7 +156,8 @@ async function findTemplate(
   const loadedNeedle = load(needle);
   return callNative("image.findTemplate", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
     toMatchResult(
-      loadNative().findTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
+      loadNative().findTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options)),
+      options?.backend
     )
   );
 }
@@ -170,7 +171,7 @@ async function findAllTemplates(
   return callNative("image.findAllTemplates", { needle: Buffer.isBuffer(needle) ? "buffer" : "source" }, () =>
     loadNative()
       .findAllTemplateBuffers(haystack, loadedNeedle, toNativeOpts(options))
-      .map(toMatchResult)
+      .map((match) => toMatchResult(match, options?.backend))
   );
 }
 

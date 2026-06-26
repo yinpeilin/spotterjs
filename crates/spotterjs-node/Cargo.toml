@@ -14,9 +14,12 @@ spotterjs-core = { path = "../spotterjs-core" }
 napi = { workspace = true, features = ["napi4"] }
 napi-derive = { workspace = true }
 base64 = { workspace = true }
+serde_json = { workspace = true }
 
 [features]
-default = []
+default = ["input-listen"]
+feature-match = ["spotterjs-core/feature-match"]
+input-listen = ["spotterjs-core/input-listen"]
 linux-x11 = ["spotterjs-core/linux-x11"]
 
 [build-dependencies]

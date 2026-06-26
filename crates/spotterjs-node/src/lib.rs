@@ -1,10 +1,15 @@
 #![deny(clippy::all)]
 
 use napi::bindgen_prelude::*;
+use napi::threadsafe_function::{
+    ErrorStrategy, ThreadSafeCallContext, ThreadsafeFunction, ThreadsafeFunctionCallMode,
+};
+use napi::JsFunction;
 use napi_derive::napi;
 use spotterjs_base::napi::{
     capture_from_js, capture_to_js, map_err, match_opts_from_js, match_result_to_js,
-    region_from_js, region_to_js, JsCaptureImage, JsMatchOptions, JsMatchResult, JsRegion,
+    region_from_js, region_to_js, rgb_from_js, rgb_to_js, JsCaptureImage, JsMatchOptions,
+    JsMatchResult, JsRegion, JsRgb,
 };
 use spotterjs_core::{
     a11y_attach_active, a11y_attach_window, a11y_attach_window_report, a11y_disable,
@@ -21,6 +26,7 @@ use spotterjs_core::{
     MouseButton, MouseConfig, Point, TreeHealth, TreeNodeDump, TreeViewMode, WindowInfo, VERSION,
 };
 use std::path::Path;
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[napi(object)]
 pub struct JsPoint {
@@ -57,6 +63,12 @@ pub struct JsScreenSize {
 }
 
 #[napi(object)]
+pub struct JsDiffStats {
+    pub mean_abs_diff: f64,
+    pub changed_fraction: f64,
+}
+
+#[napi(object)]
 pub struct JsMouseConfig {
     pub auto_delay_ms: Option<u32>,
     pub mouse_speed: Option<u32>,
@@ -65,6 +77,90 @@ pub struct JsMouseConfig {
 #[napi(object)]
 pub struct JsKeyboardConfig {
     pub auto_delay_ms: Option<u32>,
+}
+
+#[napi(object)]
+pub struct JsRecordingOptions {
+    pub move_throttle_ms: Option<u32>,
+}
+
+type StringTsfn = ThreadsafeFunction<String, ErrorStrategy::Fatal>;
+
+#[derive(Default)]
+struct EventState {
+    listener_callback: Option<StringTsfn>,
+    hotkey_callbacks: std::collections::HashMap<String, StringTsfn>,
+    hotkeys: spotterjs_core::HotkeyRegistry,
+}
+
+static EVENT_STATE: OnceLock<Arc<Mutex<EventState>>> = OnceLock::new();
+static EVENT_HANDLE: OnceLock<Mutex<Option<spotterjs_core::ListenerHandle>>> = OnceLock::new();
+
+fn event_state() -> Arc<Mutex<EventState>> {
+    EVENT_STATE
+        .get_or_init(|| Arc::new(Mutex::new(EventState::default())))
+        .clone()
+}
+
+fn event_handle() -> &'static Mutex<Option<spotterjs_core::ListenerHandle>> {
+    EVENT_HANDLE.get_or_init(|| Mutex::new(None))
+}
+
+fn create_string_tsfn(callback: JsFunction) -> Result<StringTsfn> {
+    callback.create_threadsafe_function(0, |ctx: ThreadSafeCallContext<String>| {
+        Ok(vec![ctx.env.create_string(&ctx.value)?])
+    })
+}
+
+fn ensure_event_listener() -> Result<()> {
+    let mut handle = event_handle().lock().unwrap();
+    if handle.as_ref().map(|h| h.is_running()).unwrap_or(false) {
+        return Ok(());
+    }
+
+    let state = event_state();
+    let listener = spotterjs_core::start_listener(
+        spotterjs_core::ListenerOptions::default(),
+        Box::new(move |event| {
+            let json = match serde_json::to_string(&event) {
+                Ok(json) => json,
+                Err(_) => return,
+            };
+            let (listener_callback, hotkey_callbacks) = {
+                let mut guard = state.lock().unwrap();
+                let listener_callback = guard.listener_callback.clone();
+                let triggered = guard.hotkeys.handle_event(&event);
+                let hotkey_callbacks = triggered
+                    .into_iter()
+                    .filter_map(|id| guard.hotkey_callbacks.get(&id).cloned().map(|cb| (id, cb)))
+                    .collect::<Vec<_>>();
+                (listener_callback, hotkey_callbacks)
+            };
+
+            if let Some(callback) = listener_callback {
+                callback.call(json, ThreadsafeFunctionCallMode::NonBlocking);
+            }
+            for (id, callback) in hotkey_callbacks {
+                callback.call(id, ThreadsafeFunctionCallMode::NonBlocking);
+            }
+        }),
+    )
+    .map_err(map_err)?;
+    *handle = Some(listener);
+    Ok(())
+}
+
+fn stop_event_listener_if_idle() {
+    let idle = {
+        let state = event_state();
+        let guard = state.lock().unwrap();
+        guard.listener_callback.is_none() && guard.hotkey_callbacks.is_empty()
+    };
+    if idle {
+        if let Some(handle) = event_handle().lock().unwrap().take() {
+            handle.stop();
+        }
+    }
 }
 
 fn window_to_js(w: WindowInfo) -> JsWindowInfo {
@@ -131,6 +227,109 @@ pub fn capture_screen(region: Option<JsRegion>) -> Result<JsCaptureImage> {
     spotterjs_core::capture_screen(reg)
         .map(capture_to_js)
         .map_err(map_err)
+}
+
+#[napi]
+pub fn get_pixel_color(x: i32, y: i32) -> Result<JsRgb> {
+    spotterjs_core::get_pixel_color(x, y)
+        .map(rgb_to_js)
+        .map_err(map_err)
+}
+
+#[napi]
+pub fn find_color(
+    target: JsRgb,
+    tolerance: Option<u32>,
+    region: Option<JsRegion>,
+) -> Result<Option<JsPoint>> {
+    let reg = region.as_ref().map(region_from_js);
+    spotterjs_core::find_color(
+        rgb_from_js(&target),
+        tolerance.unwrap_or(0).min(255) as u8,
+        reg,
+    )
+    .map(|point| point.map(|p| JsPoint { x: p.x, y: p.y }))
+    .map_err(map_err)
+}
+
+#[napi]
+pub fn find_all_color(
+    target: JsRgb,
+    tolerance: Option<u32>,
+    region: Option<JsRegion>,
+) -> Result<Vec<JsPoint>> {
+    let reg = region.as_ref().map(region_from_js);
+    spotterjs_core::find_all_color(
+        rgb_from_js(&target),
+        tolerance.unwrap_or(0).min(255) as u8,
+        reg,
+    )
+    .map(|points| {
+        points
+            .into_iter()
+            .map(|p| JsPoint { x: p.x, y: p.y })
+            .collect()
+    })
+    .map_err(map_err)
+}
+
+#[napi]
+pub fn wait_for_color(
+    x: i32,
+    y: i32,
+    target: JsRgb,
+    tolerance: Option<u32>,
+    timeout_ms: u32,
+    interval_ms: Option<u32>,
+) -> Result<bool> {
+    spotterjs_core::wait_for_color(
+        x,
+        y,
+        rgb_from_js(&target),
+        tolerance.unwrap_or(0).min(255) as u8,
+        timeout_ms as u64,
+        interval_ms.map(|v| v as u64),
+    )
+    .map_err(map_err)
+}
+
+#[napi]
+pub fn region_diff(
+    previous: JsCaptureImage,
+    current: JsCaptureImage,
+    per_pixel_threshold: Option<u32>,
+) -> Result<JsDiffStats> {
+    let previous = capture_from_js(&previous)?;
+    let current = capture_from_js(&current)?;
+    spotterjs_core::region_diff(
+        &previous,
+        &current,
+        per_pixel_threshold.unwrap_or(0).min(255) as u8,
+    )
+    .map(|stats| JsDiffStats {
+        mean_abs_diff: stats.mean_abs_diff,
+        changed_fraction: stats.changed_fraction,
+    })
+    .map_err(map_err)
+}
+
+#[napi]
+pub fn wait_for_screen_stable(
+    region: Option<JsRegion>,
+    threshold: Option<f64>,
+    settle_ms: Option<u32>,
+    timeout_ms: Option<u32>,
+    interval_ms: Option<u32>,
+) -> Result<bool> {
+    let reg = region.as_ref().map(region_from_js);
+    spotterjs_core::wait_for_screen_stable(
+        reg,
+        threshold.unwrap_or(0.0),
+        settle_ms.unwrap_or(250) as u64,
+        timeout_ms.unwrap_or(5_000) as u64,
+        interval_ms.map(|v| v as u64),
+    )
+    .map_err(map_err)
 }
 
 #[napi]
@@ -571,6 +770,66 @@ pub fn keyboard_type_key(key: String, config: Option<JsKeyboardConfig>) -> Resul
 pub fn keyboard_shortcut(keys: Vec<String>, config: Option<JsKeyboardConfig>) -> Result<()> {
     let parsed = parse_keys(&keys).map_err(map_err)?;
     keyboard_type_keys_with_config(&parsed, keyboard_config_from_js(config)).map_err(map_err)
+}
+
+// --- Events and recording ---
+
+#[napi(js_name = "startInputListener")]
+pub fn start_input_listener(callback: JsFunction) -> Result<()> {
+    let tsfn = create_string_tsfn(callback)?;
+    ensure_event_listener()?;
+    event_state().lock().unwrap().listener_callback = Some(tsfn);
+    Ok(())
+}
+
+#[napi(js_name = "stopInputListener")]
+pub fn stop_input_listener() -> Result<()> {
+    event_state().lock().unwrap().listener_callback = None;
+    stop_event_listener_if_idle();
+    Ok(())
+}
+
+#[napi(js_name = "registerHotkey")]
+pub fn register_hotkey(id: String, keys: Vec<String>, callback: JsFunction) -> Result<()> {
+    let tsfn = create_string_tsfn(callback)?;
+    ensure_event_listener()?;
+    let state = event_state();
+    let mut guard = state.lock().unwrap();
+    guard.hotkeys.register(id.clone(), keys);
+    guard.hotkey_callbacks.insert(id, tsfn);
+    Ok(())
+}
+
+#[napi(js_name = "unregisterHotkey")]
+pub fn unregister_hotkey(id: String) -> Result<()> {
+    {
+        let state = event_state();
+        let mut guard = state.lock().unwrap();
+        guard.hotkeys.unregister(&id);
+        guard.hotkey_callbacks.remove(&id);
+    }
+    stop_event_listener_if_idle();
+    Ok(())
+}
+
+#[napi(js_name = "startRecording")]
+pub fn start_recording_js(options: Option<JsRecordingOptions>) -> Result<()> {
+    spotterjs_core::start_recording(spotterjs_core::RecordingOptions {
+        move_throttle_ms: options.and_then(|o| o.move_throttle_ms.map(|v| v as u64)),
+    })
+    .map_err(map_err)
+}
+
+#[napi(js_name = "stopRecording")]
+pub fn stop_recording_js() -> Result<String> {
+    let script = spotterjs_core::stop_recording().map_err(map_err)?;
+    serde_json::to_string(&script)
+        .map_err(|e| Error::new(Status::GenericFailure, format!("serialize recording: {e}")))
+}
+
+#[napi(js_name = "playRecording")]
+pub fn play_recording(script_json: String, speed: Option<f64>) -> Result<()> {
+    spotterjs_core::play_script_json(&script_json, speed.unwrap_or(1.0)).map_err(map_err)
 }
 
 // --- Clipboard ---

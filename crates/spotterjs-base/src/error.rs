@@ -78,9 +78,7 @@ impl SpotterError {
             SpotterError::UnsupportedPlatform => "SPOTTER_NATIVE_UNSUPPORTED_PLATFORM",
             SpotterError::Plugin(_) => "SPOTTER_NATIVE_PLUGIN_ERROR",
             SpotterError::AccessibilityDisabled => "SPOTTER_NATIVE_ACCESSIBILITY_DISABLED",
-            SpotterError::AccessibilityNotSupported => {
-                "SPOTTER_NATIVE_ACCESSIBILITY_NOT_SUPPORTED"
-            }
+            SpotterError::AccessibilityNotSupported => "SPOTTER_NATIVE_ACCESSIBILITY_NOT_SUPPORTED",
             SpotterError::ElementNotFound(_) => "SPOTTER_NATIVE_ELEMENT_NOT_FOUND",
             SpotterError::PatternNotSupported(_) => "SPOTTER_NATIVE_PATTERN_NOT_SUPPORTED",
             SpotterError::TreeUnavailable(_) => "SPOTTER_NATIVE_TREE_UNAVAILABLE",
@@ -231,10 +229,7 @@ mod tests {
             SpotterError::MatchTimeout { timeout_ms: 500 }.context(),
             json!({ "timeoutMs": 500 })
         );
-        assert_eq!(
-            SpotterError::AccessibilityDisabled.context(),
-            json!({})
-        );
+        assert_eq!(SpotterError::AccessibilityDisabled.context(), json!({}));
     }
 
     #[test]

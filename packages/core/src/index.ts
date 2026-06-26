@@ -494,6 +494,15 @@ export { centerOf };
 
 export * from "@spotterjs/base";
 export { screen } from "./screen";
+export { events } from "./events";
+export type { EventSubscription, HotkeyRegistration, InputEvent } from "./events";
+export { recording } from "./recording";
+export type {
+  RecordedScript,
+  RecordingPlayOptions,
+  RecordingStartOptions,
+  ScriptAction,
+} from "./recording";
 export { windows } from "./windows";
 export { accessibility } from "./accessibility";
 export type {

@@ -4,6 +4,7 @@ import { accessibility, configureHost } from "@spotterjs/core";
 import { registerDesktopTools } from "./tools/desktop.js";
 import { registerHostTools } from "./tools/host.js";
 import { registerOcrTools } from "./tools/ocr.js";
+import { registerRecordingTools } from "./tools/recording.js";
 import { registerVisualTools } from "./tools/visual.js";
 
 export async function registerOptionalAndroidTools(
@@ -23,6 +24,9 @@ export async function runSpotterMcp(): Promise<void> {
   const androidEnabled =
     process.env.SPOTTERJS_ANDROID === "1" ||
     process.env.SPOTTERJS_ANDROID?.toLowerCase() === "true";
+  const recordingEnabled =
+    process.env.SPOTTERJS_RECORDING === "1" ||
+    process.env.SPOTTERJS_RECORDING?.toLowerCase() === "true";
 
   if (process.env.SPOTTERJS_WORKSPACE_ROOT) {
     configureHost({
@@ -41,6 +45,9 @@ export async function runSpotterMcp(): Promise<void> {
   registerHostTools(server);
   registerOcrTools(server);
   registerVisualTools(server);
+  if (recordingEnabled) {
+    registerRecordingTools(server);
+  }
   if (a11yEnabled) {
     accessibility.enable();
   }

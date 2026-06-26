@@ -301,11 +301,13 @@ pub fn keyboard_type(text: &str) -> Result<()> {
 }
 
 pub fn keyboard_type_with_config(text: &str, config: Option<KeyboardConfig>) -> Result<()> {
-    let mut e = enigo()?;
-    e.text(text)
-        .map_err(|err| SpotterError::Platform(format!("keyboard_type: {err}")))?;
-    auto_delay_for(config.unwrap_or_else(keyboard_config));
-    Ok(())
+    crate::events::guard::guard_synthetic_input(|| {
+        let mut e = enigo()?;
+        e.text(text)
+            .map_err(|err| SpotterError::Platform(format!("keyboard_type: {err}")))?;
+        auto_delay_for(config.unwrap_or_else(keyboard_config));
+        Ok(())
+    })
 }
 
 pub fn keyboard_press(keys: &[Key]) -> Result<()> {
@@ -313,13 +315,15 @@ pub fn keyboard_press(keys: &[Key]) -> Result<()> {
 }
 
 pub fn keyboard_press_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
-    let mut e = enigo()?;
-    for key in keys {
-        e.key(key.to_enigo(), Direction::Press)
-            .map_err(|err| SpotterError::Platform(format!("keyboard_press: {err}")))?;
-    }
-    auto_delay_for(config.unwrap_or_else(keyboard_config));
-    Ok(())
+    crate::events::guard::guard_synthetic_input(|| {
+        let mut e = enigo()?;
+        for key in keys {
+            e.key(key.to_enigo(), Direction::Press)
+                .map_err(|err| SpotterError::Platform(format!("keyboard_press: {err}")))?;
+        }
+        auto_delay_for(config.unwrap_or_else(keyboard_config));
+        Ok(())
+    })
 }
 
 pub fn keyboard_release(keys: &[Key]) -> Result<()> {
@@ -327,13 +331,15 @@ pub fn keyboard_release(keys: &[Key]) -> Result<()> {
 }
 
 pub fn keyboard_release_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
-    let mut e = enigo()?;
-    for key in keys.iter().rev() {
-        e.key(key.to_enigo(), Direction::Release)
-            .map_err(|err| SpotterError::Platform(format!("keyboard_release: {err}")))?;
-    }
-    auto_delay_for(config.unwrap_or_else(keyboard_config));
-    Ok(())
+    crate::events::guard::guard_synthetic_input(|| {
+        let mut e = enigo()?;
+        for key in keys.iter().rev() {
+            e.key(key.to_enigo(), Direction::Release)
+                .map_err(|err| SpotterError::Platform(format!("keyboard_release: {err}")))?;
+        }
+        auto_delay_for(config.unwrap_or_else(keyboard_config));
+        Ok(())
+    })
 }
 
 pub fn keyboard_type_keys(keys: &[Key]) -> Result<()> {
@@ -341,32 +347,34 @@ pub fn keyboard_type_keys(keys: &[Key]) -> Result<()> {
 }
 
 pub fn keyboard_type_keys_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
-    if keys.is_empty() {
-        return Ok(());
-    }
-    let cfg = config.unwrap_or_else(keyboard_config);
-    if keys.len() == 1 {
-        let mut e = enigo()?;
-        e.key(keys[0].to_enigo(), Direction::Click)
-            .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
-        auto_delay_for(cfg);
-        return Ok(());
-    }
-    #[cfg(windows)]
-    {
-        send_windows_shortcut(keys)?;
-        auto_delay_for(cfg);
-        return Ok(());
-    }
-    #[cfg(not(windows))]
-    {
-        let modifiers = &keys[..keys.len() - 1];
-        keyboard_press_with_config(modifiers, Some(cfg))?;
-        let mut e = enigo()?;
-        e.key(keys[keys.len() - 1].to_enigo(), Direction::Click)
-            .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
-        keyboard_release_with_config(modifiers, Some(cfg))
-    }
+    crate::events::guard::guard_synthetic_input(|| {
+        if keys.is_empty() {
+            return Ok(());
+        }
+        let cfg = config.unwrap_or_else(keyboard_config);
+        if keys.len() == 1 {
+            let mut e = enigo()?;
+            e.key(keys[0].to_enigo(), Direction::Click)
+                .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
+            auto_delay_for(cfg);
+            return Ok(());
+        }
+        #[cfg(windows)]
+        {
+            send_windows_shortcut(keys)?;
+            auto_delay_for(cfg);
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            let modifiers = &keys[..keys.len() - 1];
+            keyboard_press_with_config(modifiers, Some(cfg))?;
+            let mut e = enigo()?;
+            e.key(keys[keys.len() - 1].to_enigo(), Direction::Click)
+                .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
+            keyboard_release_with_config(modifiers, Some(cfg))
+        }
+    })
 }
 
 #[cfg(windows)]

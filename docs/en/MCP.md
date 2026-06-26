@@ -129,11 +129,11 @@ called with `debugImage: true`. The debug image path is returned as
 Debug images are opt-in. They preserve source dimensions so the returned
 coordinates still line up with the marked pixels.
 
-`score` keeps its existing meaning for each engine: NCC score for template
-matching and recognition confidence for OCR. `matchScore` is the normalized
-score for the requested match. For template matching, `matchScore` equals
-`score`; for OCR text matching, it describes how closely a recognized line
-matches the query.
+`score` keeps its existing meaning for each engine: backend-native score for
+template matching (NCC correlation or feature inlier quality) and recognition
+confidence for OCR. `matchScore` is the normalized score for the requested
+match. For template matching, `matchScore` equals `score`; for OCR text
+matching, it describes how closely a recognized line matches the query.
 
 ## Desktop Tools
 

@@ -6,8 +6,11 @@ extern crate windows_core;
 pub mod accessibility;
 pub mod capture;
 pub mod clipboard;
+pub mod color;
 pub mod desktop;
+pub mod diff;
 pub mod error;
+pub mod events;
 pub mod image;
 pub mod input;
 pub mod keyboard;
@@ -31,10 +34,21 @@ pub use accessibility::{
 };
 pub use capture::{capture_screen, capture_window};
 pub use clipboard::{clipboard_get, clipboard_set};
+pub use color::{
+    color_within, find_all_color, find_all_color_in_image, find_color, find_color_in_image,
+    get_pixel_color, pixel_color, wait_for_color,
+};
 pub use desktop::{
     find_apps, find_windows, get_foreground_app, list_desktop_apps, wait_for_window,
 };
+pub use diff::{region_changed, region_diff, wait_for_screen_stable, DiffStats};
 pub use error::{Result, SpotterError};
+pub use events::{
+    guard_synthetic_input, is_synthetic_input, play_script, play_script_json, play_script_with,
+    start_listener, start_recording, stop_recording, EventRecorder, EventSink, Hotkey,
+    HotkeyRegistry, InputEvent, ListenerHandle, ListenerOptions, NativePlaybackTarget,
+    PlaybackTarget, RecordedScript, RecordingOptions, ScriptAction,
+};
 pub use image::{
     encode_rgba_to_png, image_size_from_path, load_rgba_from_bytes, load_rgba_from_capture,
     load_rgba_from_path,
@@ -62,7 +76,8 @@ pub use matcher::{
 pub use screen::{clamp_region_to_screen, region_center, screen_height, screen_size, screen_width};
 pub use spotterjs_base::{MatchPlugin, OcrPlugin};
 pub use types::{
-    DesktopApp, MatchOptions, MouseButton, Point, Region, RgbaImage, WindowId, WindowInfo,
+    DesktopApp, MatchBackend, MatchOptions, MouseButton, Point, Region, Rgb, RgbaImage, WindowId,
+    WindowInfo,
 };
 pub use window::{
     focus_window, get_active_window, get_window_client_origin, get_window_region,

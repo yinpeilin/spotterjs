@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const core = vi.hoisted(() => ({
   imageFind: vi.fn(),
   imageFindAll: vi.fn(),
+  getPixelColor: vi.fn(),
+  findColor: vi.fn(),
+  findAllColor: vi.fn(),
+  waitForColor: vi.fn(),
+  waitForStable: vi.fn(),
 }));
 
 const capture = vi.hoisted(() => ({
@@ -79,6 +84,13 @@ vi.mock("@spotterjs/core", () => ({
   screen: {
     capture: vi.fn(() => capture.screen),
     captureWindow: vi.fn(() => capture.window),
+    color: {
+      get: core.getPixelColor,
+      find: core.findColor,
+      findAll: core.findAllColor,
+      wait: core.waitForColor,
+    },
+    waitForStable: core.waitForStable,
   },
   windows: {
     getActive: vi.fn(() => ({
@@ -131,6 +143,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   core.imageFind.mockReset();
   core.imageFindAll.mockReset();
+  core.getPixelColor.mockReset();
+  core.findColor.mockReset();
+  core.findAllColor.mockReset();
+  core.waitForColor.mockReset();
+  core.waitForStable.mockReset();
   ocr.read.mockReset();
   ocr.findAllText.mockReset();
   plugin.createOcr.mockReset();
@@ -314,8 +331,9 @@ describe("desktop_capture_and_find_template", () => {
         windowId: "win-1",
         image: { base64: bytes.toString("base64"), mimeType: "image/png" },
         confidence: 0.9,
-        scale: true,
-        all: true,
+      scale: true,
+      backend: "feature",
+      all: true,
         detail: "high",
         debugImage: true,
       })
@@ -331,6 +349,7 @@ describe("desktop_capture_and_find_template", () => {
       confidence: 0.9,
       region: undefined,
       scale: true,
+      backend: "feature",
     });
     expect(json).toMatchObject({
       imagePath: ".spotter/artifacts/window-capture.png",
@@ -430,5 +449,100 @@ describe("visual combo tool schemas", () => {
     });
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('source "window" requires windowId');
+  });
+});
+
+describe("visual color and stability tools", () => {
+  it("gets a pixel color", async () => {
+    core.getPixelColor.mockReturnValue({ r: 12, g: 34, b: 56 });
+
+    const json = parseToolJson(
+      await registerTools().get("desktop_get_pixel_color")!({ x: 7, y: 8 })
+    );
+
+    expect(core.getPixelColor).toHaveBeenCalledWith(7, 8);
+    expect(json).toEqual({ color: { r: 12, g: 34, b: 56 }, x: 7, y: 8 });
+  });
+
+  it("finds all matching colors from a hex color", async () => {
+    core.findAllColor.mockReturnValue([{ x: 4, y: 5 }]);
+
+    const json = parseToolJson(
+      await registerTools().get("desktop_find_color")!({
+        color: "#010203",
+        tolerance: 4,
+        region: { left: 10, top: 20, width: 30, height: 40 },
+        all: true,
+      })
+    );
+
+    expect(core.findAllColor).toHaveBeenCalledWith(
+      { r: 1, g: 2, b: 3 },
+      { tolerance: 4, region: { left: 10, top: 20, width: 30, height: 40 } }
+    );
+    expect(json).toEqual({ matches: [{ x: 4, y: 5 }], count: 1 });
+  });
+
+  it("waits for color and screen stability", async () => {
+    core.waitForColor.mockReturnValue(true);
+    core.waitForStable.mockReturnValue(true);
+
+    const colorJson = parseToolJson(
+      await registerTools().get("desktop_wait_for_color")!({
+        x: 1,
+        y: 2,
+        color: { r: 9, g: 8, b: 7 },
+        tolerance: 3,
+        timeoutMs: 250,
+        intervalMs: 10,
+      })
+    );
+    const stableJson = parseToolJson(
+      await registerTools().get("desktop_wait_for_stable")!({
+        region: { left: 1, top: 2, width: 30, height: 40 },
+        threshold: 0.01,
+        settleMs: 200,
+        timeoutMs: 1000,
+        intervalMs: 50,
+      })
+    );
+
+    expect(core.waitForColor).toHaveBeenCalledWith(1, 2, { r: 9, g: 8, b: 7 }, {
+      tolerance: 3,
+      timeoutMs: 250,
+      intervalMs: 10,
+    });
+    expect(core.waitForStable).toHaveBeenCalledWith({
+      region: { left: 1, top: 2, width: 30, height: 40 },
+      threshold: 0.01,
+      settleMs: 200,
+      timeoutMs: 1000,
+      intervalMs: 50,
+    });
+    expect(colorJson).toEqual({ matched: true });
+    expect(stableJson).toMatchObject({ stable: true });
+    expect(typeof stableJson.durationMs).toBe("number");
+  });
+
+  it("writes a software highlight debug capture", async () => {
+    const json = parseToolJson(
+      await registerTools().get("desktop_highlight_region")!({
+        region: { left: 10, top: 20, width: 30, height: 40 },
+        color: "#ff0000",
+      })
+    );
+
+    expect(debugDraw.writeDebugCapture).toHaveBeenCalledWith(
+      capture.screen,
+      [
+        {
+          kind: "region",
+          region: { left: 10, top: 20, width: 30, height: 40 },
+          color: [255, 0, 0, 255],
+        },
+      ],
+      { prefix: "desktop-highlight-region" }
+    );
+    expect(json.debugImagePath).toBe(".spotter/artifacts/visual-debug.png");
   });
 });

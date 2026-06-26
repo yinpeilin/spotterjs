@@ -31,6 +31,10 @@ const visualTools = vi.hoisted(() => ({
   registerVisualTools: vi.fn(),
 }));
 
+const recordingTools = vi.hoisted(() => ({
+  registerRecordingTools: vi.fn(),
+}));
+
 const androidTools = vi.hoisted(() => ({
   registerAndroidTools: vi.fn(),
 }));
@@ -61,6 +65,10 @@ vi.mock("./tools/visual.js", () => ({
   registerVisualTools: visualTools.registerVisualTools,
 }));
 
+vi.mock("./tools/recording.js", () => ({
+  registerRecordingTools: recordingTools.registerRecordingTools,
+}));
+
 vi.mock("./tools/android.js", () => ({
   registerAndroidTools: androidTools.registerAndroidTools,
 }));
@@ -70,6 +78,7 @@ import { registerOptionalAndroidTools, runSpotterMcp } from "./server.js";
 beforeEach(() => {
   delete process.env.SPOTTERJS_A11Y;
   delete process.env.SPOTTERJS_ANDROID;
+  delete process.env.SPOTTERJS_RECORDING;
   delete process.env.SPOTTERJS_WORKSPACE_ROOT;
   delete process.env.SPOTTERJS_ALLOW_SHELL;
   core.accessibility.enable.mockReset();
@@ -81,6 +90,7 @@ beforeEach(() => {
   hostTools.registerHostTools.mockReset();
   ocrTools.registerOcrTools.mockReset();
   visualTools.registerVisualTools.mockReset();
+  recordingTools.registerRecordingTools.mockReset();
   androidTools.registerAndroidTools.mockReset();
 });
 
@@ -128,6 +138,7 @@ describe("runSpotterMcp", () => {
     );
     expect(ocrTools.registerOcrTools).toHaveBeenCalledWith(expect.any(Object));
     expect(visualTools.registerVisualTools).toHaveBeenCalledWith(expect.any(Object));
+    expect(recordingTools.registerRecordingTools).not.toHaveBeenCalled();
   });
 
   it("registers Android companion tools when enabled", async () => {
@@ -136,5 +147,13 @@ describe("runSpotterMcp", () => {
     await runSpotterMcp();
 
     expect(androidTools.registerAndroidTools).toHaveBeenCalledWith(expect.any(Object));
+  });
+
+  it("registers recording tools when enabled", async () => {
+    process.env.SPOTTERJS_RECORDING = "1";
+
+    await runSpotterMcp();
+
+    expect(recordingTools.registerRecordingTools).toHaveBeenCalledWith(expect.any(Object));
   });
 });

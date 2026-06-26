@@ -4,6 +4,13 @@ const findTemplate = vi.fn();
 const findAllTemplates = vi.fn();
 const waitForTemplate = vi.fn();
 const tapAt = vi.fn();
+const getPixelColor = vi.fn();
+const findColor = vi.fn();
+const findAllColor = vi.fn();
+const waitForColor = vi.fn();
+const regionDiff = vi.fn();
+const waitForScreenStable = vi.fn();
+const encodeCapturePng = vi.fn();
 
 vi.mock("./native", () => ({
   loadNative: () => ({
@@ -15,6 +22,13 @@ vi.mock("./native", () => ({
     findAllTemplates,
     waitForTemplate,
     tapAt,
+    getPixelColor,
+    findColor,
+    findAllColor,
+    waitForColor,
+    regionDiff,
+    waitForScreenStable,
+    encodeCapturePng,
   }),
 }));
 
@@ -25,6 +39,13 @@ beforeEach(() => {
   findAllTemplates.mockReset();
   waitForTemplate.mockReset();
   tapAt.mockReset();
+  getPixelColor.mockReset();
+  findColor.mockReset();
+  findAllColor.mockReset();
+  waitForColor.mockReset();
+  regionDiff.mockReset();
+  waitForScreenStable.mockReset();
+  encodeCapturePng.mockReset();
 });
 
 describe("screen.findTemplate", () => {
@@ -146,5 +167,71 @@ describe("screen.tapTemplate", () => {
       matchScore: 0.92,
       matchAlgorithm: "ncc",
     });
+  });
+});
+
+describe("screen.color", () => {
+  it("parses hex colors and forwards tolerance and region", () => {
+    findColor.mockReturnValue({ x: 10, y: 20 });
+
+    const point = screen.color.find("#0a1B2c", {
+      tolerance: 7,
+      region: { left: 1, top: 2, width: 30, height: 40 },
+    });
+
+    expect(findColor).toHaveBeenCalledWith(
+      { r: 10, g: 27, b: 44 },
+      7,
+      { left: 1, top: 2, width: 30, height: 40 }
+    );
+    expect(point).toEqual({ x: 10, y: 20 });
+  });
+
+  it("finds all colors and reads a single pixel", () => {
+    getPixelColor.mockReturnValue({ r: 1, g: 2, b: 3 });
+    findAllColor.mockReturnValue([{ x: 4, y: 5 }]);
+
+    expect(screen.color.get(7, 8)).toEqual({ r: 1, g: 2, b: 3 });
+    expect(screen.color.findAll({ r: 1, g: 2, b: 3 })).toEqual([{ x: 4, y: 5 }]);
+    expect(getPixelColor).toHaveBeenCalledWith(7, 8);
+    expect(findAllColor).toHaveBeenCalledWith({ r: 1, g: 2, b: 3 }, 0, undefined);
+  });
+
+  it("waits for a color with explicit polling options", () => {
+    waitForColor.mockReturnValue(true);
+
+    expect(
+      screen.color.wait(5, 6, "#112233", {
+        tolerance: 4,
+        timeoutMs: 500,
+        intervalMs: 25,
+      })
+    ).toBe(true);
+
+    expect(waitForColor).toHaveBeenCalledWith(
+      5,
+      6,
+      { r: 17, g: 34, b: 51 },
+      4,
+      500,
+      25
+    );
+  });
+});
+
+describe("screen.diff", () => {
+  it("diffs two captures and waits for stability", () => {
+    const a = { data: Buffer.alloc(16), width: 2, height: 2 };
+    const b = { data: Buffer.alloc(16), width: 2, height: 2 };
+    regionDiff.mockReturnValue({ meanAbsDiff: 0.25, changedFraction: 0.5 });
+    waitForScreenStable.mockReturnValue(true);
+
+    expect(screen.diff(a, b, { perPixelThreshold: 3 })).toEqual({
+      meanAbsDiff: 0.25,
+      changedFraction: 0.5,
+    });
+    expect(screen.waitForStable({ threshold: 0.02, settleMs: 250 })).toBe(true);
+    expect(regionDiff).toHaveBeenCalledWith(a, b, 3);
+    expect(waitForScreenStable).toHaveBeenCalledWith(undefined, 0.02, 250, 5000, 100);
   });
 });

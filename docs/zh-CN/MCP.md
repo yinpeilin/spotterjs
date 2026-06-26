@@ -125,7 +125,7 @@ PNG。调试图路径通过 `debugImagePath` 返回，并写入 `.spotter/artifa
 
 Debug images 是 opt-in。它们保留源图尺寸，因此返回坐标仍能和标注像素对齐。
 
-`score` 保持各引擎原有含义：模板匹配里是 NCC score，OCR 里是识别置信度。
+`score` 保持各引擎原有含义：模板匹配里是后端自己的分数（NCC correlation 或 feature inlier quality），OCR 里是识别置信度。
 `matchScore` 是请求匹配逻辑的归一化分数。模板匹配中 `matchScore` 等于 `score`；
 OCR 文本匹配中，它表示识别行和查询文本的接近程度。
 

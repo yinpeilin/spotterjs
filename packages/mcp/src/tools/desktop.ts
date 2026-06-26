@@ -50,6 +50,10 @@ const matchOptionsSchema = {
     .max(1)
     .optional()
     .describe("Minimum template match confidence from 0 to 1."),
+  backend: z
+    .enum(["ncc", "feature"])
+    .optional()
+    .describe("Template matching backend. Defaults to ncc; feature is slower but more scale/rotation tolerant."),
   region: regionSchema,
   scale: z
     .union([
@@ -354,6 +358,7 @@ export function registerDesktopTools(server: McpServer, a11yEnabled: boolean): v
           confidence: options.confidence,
           region: undefined,
           scale: options.scale,
+          ...(options.backend ? { backend: options.backend } : {}),
         };
         const localMatches = all
           ? await coreImage.findAllTemplates(capture, needle, localOptions)
