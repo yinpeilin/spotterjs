@@ -1,18 +1,41 @@
 //! Template match orchestration — capture, search regions, window coords.
-//! Backend: `spotterjs-plugin-match-ncc` (NCC only).
+//! Backends: NCC by default, optional feature matching via `feature-match`.
 
 use crate::capture::{capture_screen, capture_window};
 use crate::image::load_rgba_from_bytes;
 use crate::needle_cache::load_needle_cached;
 use spotterjs_base::{
-    MatchOptions, MatchPlugin, MatchResult, Region, Result, RgbaImage, SpotterError, WindowId,
+    MatchBackend, MatchOptions, MatchPlugin, MatchResult, Region, Result, RgbaImage, SpotterError,
+    WindowId,
 };
+#[cfg(feature = "feature-match")]
+use spotterjs_plugin_match_feature::FeatureMatcher;
 use spotterjs_plugin_match_ncc::NccMatcher;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
 static NCC: NccMatcher = NccMatcher;
+#[cfg(feature = "feature-match")]
+static FEATURE: FeatureMatcher = FeatureMatcher;
+
+fn matcher_for(opts: &MatchOptions) -> Result<&'static dyn MatchPlugin> {
+    match opts.backend {
+        MatchBackend::Ncc => Ok(&NCC),
+        MatchBackend::Feature => {
+            #[cfg(feature = "feature-match")]
+            {
+                Ok(&FEATURE)
+            }
+            #[cfg(not(feature = "feature-match"))]
+            {
+                Err(SpotterError::Plugin(
+                    "feature match backend not enabled; rebuild with feature-match".into(),
+                ))
+            }
+        }
+    }
+}
 
 fn resolve_needle(path: &Path) -> Result<RgbaImage> {
     load_needle_cached(path)
@@ -61,7 +84,7 @@ pub fn find_template_in_haystack_rgba(
     needle: &RgbaImage,
     opts: &MatchOptions,
 ) -> Result<MatchResult> {
-    NCC.find(haystack, needle, opts)
+    matcher_for(opts)?.find(haystack, needle, opts)
 }
 
 /// Alias for in-memory haystack + needle matching.
@@ -78,7 +101,7 @@ pub fn find_all_template_buffers(
     needle: &RgbaImage,
     opts: &MatchOptions,
 ) -> Result<Vec<MatchResult>> {
-    NCC.find_all(haystack, needle, opts)
+    matcher_for(opts)?.find_all(haystack, needle, opts)
 }
 
 pub fn find_template_from_bytes(needle_bytes: &[u8], opts: MatchOptions) -> Result<MatchResult> {
@@ -92,7 +115,7 @@ pub fn find_template_with_needle(
 ) -> Result<MatchResult> {
     let (hay, offset_x, offset_y, local_opts) = capture_haystack_for_match(&opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
-    let found = NCC.find(&hay, &needle, &local_opts)?;
+    let found = matcher_for(&local_opts)?.find(&hay, &needle, &local_opts)?;
     Ok(translate_match_result(found, offset_x, offset_y))
 }
 
@@ -103,7 +126,7 @@ pub fn find_all_templates_with_needle(
 ) -> Result<Vec<MatchResult>> {
     let (hay, offset_x, offset_y, local_opts) = capture_haystack_for_match(&opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
-    let matches = NCC.find_all(&hay, &needle, &local_opts)?;
+    let matches = matcher_for(&local_opts)?.find_all(&hay, &needle, &local_opts)?;
     Ok(matches
         .into_iter()
         .map(|m| translate_match_result(m, offset_x, offset_y))
@@ -143,7 +166,7 @@ pub fn wait_for_template_buffers(
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
     let interval = Duration::from_millis(interval_ms.unwrap_or(200));
     loop {
-        match NCC.find(haystack, needle, &opts) {
+        match matcher_for(&opts).and_then(|matcher| matcher.find(haystack, needle, &opts)) {
             Ok(r) => return Ok(r),
             Err(SpotterError::MatchNotFound { .. }) => {
                 if Instant::now() >= deadline {
@@ -258,7 +281,7 @@ pub fn find_template_in_window_with_needle(
 ) -> Result<MatchResult> {
     let (hay, local_opts, ox, oy) = window_haystack_and_opts(window_id, opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
-    let found = NCC.find(&hay, &needle, &local_opts)?;
+    let found = matcher_for(&local_opts)?.find(&hay, &needle, &local_opts)?;
     Ok(translate_match_result(found, ox, oy))
 }
 
@@ -278,7 +301,7 @@ pub fn find_all_templates_in_window_with_needle(
 ) -> Result<Vec<MatchResult>> {
     let (hay, local_opts, ox, oy) = window_haystack_and_opts(window_id, opts)?;
     let needle = resolve_needle_optional(path, needle_bytes)?;
-    let matches = NCC.find_all(&hay, &needle, &local_opts)?;
+    let matches = matcher_for(&local_opts)?.find_all(&hay, &needle, &local_opts)?;
     Ok(matches
         .into_iter()
         .map(|m| translate_match_result(m, ox, oy))
@@ -435,5 +458,35 @@ mod tests {
         let err = wait_for_template_buffers(&hay, &needle, 0, opts, Some(0)).unwrap_err();
 
         assert!(matches!(err, SpotterError::MatchTimeout { timeout_ms: 0 }));
+    }
+
+    #[cfg(not(feature = "feature-match"))]
+    #[test]
+    fn feature_backend_without_feature_returns_plugin_error() {
+        let hay = haystack_with_patch(48, 48, 8, 12, 6, 6, [35, 35, 35], [255, 128, 0]);
+        let needle = needle_from_hay(&hay, 48, 8, 12, 6, 6);
+        let opts = MatchOptions {
+            confidence: 0.5,
+            backend: spotterjs_base::MatchBackend::Feature,
+            ..Default::default()
+        };
+
+        let err = find_template_in_haystack_rgba(&hay, &needle, &opts).unwrap_err();
+
+        assert!(matches!(err, SpotterError::Plugin(_)));
+        assert!(format!("{err}").contains("feature match backend not enabled"));
+    }
+
+    #[cfg(feature = "feature-match")]
+    #[test]
+    fn feature_backend_with_feature_selects_feature_plugin() {
+        let opts = MatchOptions {
+            backend: spotterjs_base::MatchBackend::Feature,
+            ..Default::default()
+        };
+
+        let matcher = matcher_for(&opts).unwrap();
+
+        assert_eq!(matcher.name(), "feature");
     }
 }

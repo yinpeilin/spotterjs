@@ -190,8 +190,14 @@ fn to_json(
     out.push_str("{\n");
     out.push_str(&format!("  \"runs\": {},\n", config.runs));
     out.push_str(&format!("  \"warmup\": {},\n", config.warmup));
-    out.push_str(&format!("  \"haystack\": {{ \"width\": {}, \"height\": {} }},\n", hay.width, hay.height));
-    out.push_str(&format!("  \"needle\": {{ \"width\": {}, \"height\": {} }},\n", needle.width, needle.height));
+    out.push_str(&format!(
+        "  \"haystack\": {{ \"width\": {}, \"height\": {} }},\n",
+        hay.width, hay.height
+    ));
+    out.push_str(&format!(
+        "  \"needle\": {{ \"width\": {}, \"height\": {} }},\n",
+        needle.width, needle.height
+    ));
     out.push_str("  \"results\": [\n");
     for (idx, row) in rows.iter().enumerate() {
         let comma = if idx + 1 == rows.len() { "" } else { "," };

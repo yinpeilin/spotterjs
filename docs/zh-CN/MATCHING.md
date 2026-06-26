@@ -1,6 +1,6 @@
-# 模板匹配 (NCC)
+# 模板匹配
 
-spotterjs uses **normalized cross-correlation** (NCC, `TM_CCOEFF_NORMED` semantics) in `spotterjs-plugin-match-ncc`, exposed through `@spotterjs/node` and `@spotterjs/core`.
+spotterjs 默认使用 **normalized cross-correlation**（NCC，`TM_CCOEFF_NORMED` 语义），由 `spotterjs-plugin-match-ncc` 提供。启用 `feature-match` Cargo feature 的 native 构建还可以通过 `backend: "feature"` 使用 AKAZE 特征匹配后端。
 
 ## 架构
 
@@ -9,6 +9,7 @@ screen.findTemplate / findAllTemplates / waitForTemplate
   → @spotterjs/node
   → spotterjs-core::matcher
   → spotterjs-plugin-match-ncc
+     或 spotterjs-plugin-match-feature [feature-match]
 
 Image decode (path / bytes)     → spotterjs-core::image   [Rust, PNG/JPEG/WebP]
 Image encode (MCP base64 PNG)   → spotterjs-core::image   [Rust]
@@ -24,6 +25,15 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 - **Fast NCC scan** — integral-image window stats + SIMD horizontal sliding dot product; row-parallel when `parallel` feature is on (default)
 - **Coarse-to-fine pyramid** — single-scale on haystack ≥1920×1080: 0.5× coarse top-3, then ROI refine
 - **Search region** — `region` crops before match; results are translated back to screen coordinates
+- **Backend selection** - 默认 `backend: "ncc"`；native 构建启用 `feature-match` 后可用 `backend: "feature"`。
+
+## 后端选择
+
+`backend: "ncc"` 适合同尺度、同主题的 UI 截图模板，速度快、定位精确；`scale` 选项作用于 NCC。
+
+`backend: "feature"` 使用 AKAZE keypoints、二值描述子、对称匹配、Lowe ratio test 和轻量 consensus 来估计区域。它更能处理缩放和轻微视觉变化，但速度更慢，对很小或低纹理 UI 元素更弱。它的 `score` 是 0..1 的 inlier quality，不是 NCC correlation，因此 `confidence` 阈值不能和 NCC 直接复用。Feature 后端的 `findAll` 当前返回最佳 feature match。
+
+Feature 后端默认不编进 native，以保持构建精简。构建 Rust crate 时启用 `spotterjs-core/feature-match` 或 `spotterjs-node/feature-match`。如果未启用该 feature 却请求 `backend: "feature"`，native 会返回 plugin error，而不是静默回退到 NCC。
 
 ## API 矩阵
 
@@ -39,7 +49,7 @@ See also [CLEANUP-AND-ARCHITECTURE.md](./CLEANUP-AND-ARCHITECTURE.md) for crate 
 - `TemplateImage`: a template input. A `string` is always a file path; a `Buffer` is always encoded image bytes (PNG/JPEG/WebP).
 - `CaptureImage`: raw RGBA capture data from `screen.capture`, `captureWindow`, or native buffer APIs.
 - `Region`: `{ left, top, width, height }`; high-level APIs use screen coordinates.
-- `MatchResult`: `{ region, center, score, matchScore, matchAlgorithm }`; `score` remains the NCC score, `matchScore` is the normalized match score, and `region` / `center` are screen coordinates.
+- `MatchResult`: `{ region, center, score, matchScore, matchAlgorithm }`; `score` 是后端自己的分数，NCC 下是 NCC score，feature 下是 inlier-quality score；`matchScore` 暴露同一个归一化值，`region` / `center` 是屏幕坐标。
 
 ## 搜索区域
 
@@ -63,6 +73,12 @@ await screen.findTemplate("./button.png", {
 
 // In-memory needle (encoded image bytes)
 await screen.findTemplate(fs.readFileSync("./icon.png"), { confidence: 0.9 });
+
+// Feature backend (requires native feature-match build)
+await screen.findTemplate("./scaled-icon.png", {
+  backend: "feature",
+  confidence: 0.4,
+});
 
 // findAllTemplates in a screen sub-region
 const matches = await screen.findAllTemplates("./button.png", {

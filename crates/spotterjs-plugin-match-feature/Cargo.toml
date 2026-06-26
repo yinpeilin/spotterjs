@@ -1,0 +1,13 @@
+[package]
+name = "spotterjs-plugin-match-feature"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "AKAZE feature matching plugin for spotterjs"
+
+[dependencies]
+spotterjs-base = { path = "../spotterjs-base" }
+akaze.workspace = true
+bitarray.workspace = true
+image23.workspace = true
+space.workspace = true

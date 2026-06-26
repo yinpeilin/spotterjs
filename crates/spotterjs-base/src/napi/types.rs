@@ -16,6 +16,13 @@ pub struct JsMatchResult {
 }
 
 #[napi(object)]
+pub struct JsRgb {
+    pub r: u32,
+    pub g: u32,
+    pub b: u32,
+}
+
+#[napi(object)]
 pub struct JsCaptureImage {
     pub data: Buffer,
     pub width: u32,
@@ -30,4 +37,5 @@ pub struct JsMatchOptions {
     pub scale_min: Option<f64>,
     pub scale_max: Option<f64>,
     pub scale_step: Option<f64>,
+    pub backend: Option<String>,
 }

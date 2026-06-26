@@ -1,14 +1,17 @@
 [workspace]
 resolver = "2"
+exclude = ["vendor/bitarray-0.2.6"]
 members = [
     "crates/spotterjs-base",
     "crates/spotterjs-core",
+    "crates/spotterjs-plugin-match-feature",
     "crates/spotterjs-plugin-match-ncc",
     "crates/spotterjs-node",
 ]
 default-members = [
     "crates/spotterjs-base",
     "crates/spotterjs-core",
+    "crates/spotterjs-plugin-match-feature",
     "crates/spotterjs-plugin-match-ncc",
     "crates/spotterjs-node",
 ]
@@ -25,8 +28,13 @@ thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+image23 = { package = "image", version = "0.23.14", default-features = false }
 enigo = "0.6"
+rdev = "0.5.3"
 arboard = "3.4"
+akaze = "0.7.0"
+bitarray = { version = "0.2.6", features = ["space"] }
+space = "0.10.3"
 windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
@@ -46,3 +54,6 @@ base64 = "0.22"
 napi = "2"
 napi-derive = "2"
 napi-build = "2"
+
+[patch.crates-io]
+bitarray = { path = "vendor/bitarray-0.2.6" }

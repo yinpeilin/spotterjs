@@ -99,8 +99,15 @@ export interface Point {
   y: number;
 }
 
+/** RGB color with 8-bit channel values. */
+export interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
 /**
- * Template image input for NCC matching.
+ * Template image input for template matching.
  *
  * - `string` always means an image file path.
  * - `Buffer` always means encoded image bytes (PNG/JPEG/WebP), not raw RGBA.
@@ -108,7 +115,10 @@ export interface Point {
 export type TemplateImage = string | Buffer;
 
 /** Matching algorithm that produced a normalized match score. */
-export type MatchAlgorithm = "ncc" | "ocr-text";
+export type MatchAlgorithm = "ncc" | "feature" | "ocr-text";
+
+/** Template matching backend. */
+export type MatchBackend = "ncc" | "feature";
 
 /** Text matching strategy used for OCR text lookup diagnostics. */
 export type TextMatchKind = "exact" | "contains" | "similarity" | "none";
@@ -144,12 +154,12 @@ export interface MatchResult {
   region: Region;
   /** Center point of {@link region}. */
   center: Point;
-  /** NCC match score. Higher values are stronger matches. */
+  /** Backend-native match score. Higher values are stronger matches. */
   score: number;
-  /** Normalized match score. For NCC this is the same value as {@link score}. */
+  /** Normalized match score. For template matching this is the same value as {@link score}. */
   matchScore: number;
   /** Match algorithm used to produce this result. */
-  matchAlgorithm: "ncc";
+  matchAlgorithm: MatchBackend;
 }
 
 /**
@@ -168,7 +178,7 @@ export interface CaptureImage {
 }
 
 /**
- * Options for NCC template matching.
+ * Options for template matching.
  *
  * See the template matching guide for path buffers, encoded buffers, search
  * regions, scale search, and coordinate behavior.
@@ -191,7 +201,7 @@ export interface MatchOptions {
    */
   region?: Region;
   /**
-   * Enable multi-scale matching by resizing the needle across a range.
+   * Enable NCC multi-scale matching by resizing the needle across a range.
    *
    * `true` uses native defaults. Object form overrides the range and step.
    */
@@ -205,6 +215,11 @@ export interface MatchOptions {
         /** Scale step. Native default is typically `0.05`. */
         step?: number;
       };
+  /**
+   * Matching backend. `ncc` is fast and precise for same-scale UI; `feature`
+   * is slower but more tolerant of scale and rotation.
+   */
+  backend?: MatchBackend;
 }
 
 /**

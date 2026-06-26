@@ -31,7 +31,9 @@ fn validate_scale_options(opts: &MatchOptions) -> Result<()> {
         ));
     }
     if ((opts.scale_max - opts.scale_min) / opts.scale_step).ceil() > 256.0 {
-        return Err(SpotterError::Plugin("scale range has too many steps".into()));
+        return Err(SpotterError::Plugin(
+            "scale range has too many steps".into(),
+        ));
     }
     Ok(())
 }

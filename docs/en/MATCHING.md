@@ -1,10 +1,11 @@
-# Template Matching (NCC)
+# Template Matching
 
 [中文文档](../zh-CN/MATCHING.md)
 
 spotterjs uses normalized cross-correlation (NCC, `TM_CCOEFF_NORMED`
-semantics) in `spotterjs-plugin-match-ncc`, exposed through `@spotterjs/node`
-and `@spotterjs/core`.
+semantics) by default through `spotterjs-plugin-match-ncc`. Builds that enable
+the `feature-match` Cargo feature can also use an AKAZE feature backend through
+`backend: "feature"`.
 
 ## Architecture
 
@@ -13,6 +14,7 @@ screen.findTemplate / findAllTemplates / waitForTemplate
   -> @spotterjs/node
   -> spotterjs-core::matcher
   -> spotterjs-plugin-match-ncc
+     or spotterjs-plugin-match-feature [feature-match]
 
 Image decode (path / bytes)   -> spotterjs-core::image   [Rust, PNG/JPEG/WebP]
 Image encode (PNG / base64)   -> spotterjs-core::image   [Rust]
@@ -26,6 +28,26 @@ Screen / window capture       -> spotterjs-core::capture [platform GDI / X11]
 - Fast NCC scan: integral-image window stats and optimized dot products.
 - Coarse-to-fine pyramid for large single-scale haystacks.
 - Search regions: `region` crops before matching and translates results back to screen coordinates.
+- Backend selection: `backend: "ncc"` by default, or `backend: "feature"` when
+  native binaries are built with `feature-match`.
+
+## Backends
+
+`backend: "ncc"` is fast and precise when the needle is a same-scale screenshot
+of the target UI. `scale` options apply to NCC.
+
+`backend: "feature"` uses AKAZE keypoints, binary descriptors, symmetric
+matching, Lowe ratio filtering, and a small consensus step to estimate the
+region. It is more tolerant of scale and mild visual changes, but is slower and
+weaker on very small or low-texture UI. Its `score` is an inlier-quality value
+from 0 to 1, not an NCC correlation score, so confidence thresholds are not
+directly interchangeable with NCC. Feature `findAll` currently returns the best
+feature match.
+
+The feature backend is gated to keep default native builds slim. Enable
+`spotterjs-core/feature-match` or `spotterjs-node/feature-match` when building
+native crates. Without that feature, requesting `backend: "feature"` returns a
+native plugin error instead of silently falling back to NCC.
 
 ## API Matrix
 
@@ -44,8 +66,9 @@ Screen / window capture       -> spotterjs-core::capture [platform GDI / X11]
   `screen.captureWindow`, Android capture, or native buffer APIs.
 - `Region`: `{ left, top, width, height }`.
 - `MatchResult`: `{ region, center, score, matchScore, matchAlgorithm }`.
-  `score` remains the NCC score; `matchScore` is the normalized match score
-  shared with other match APIs and is the same value for NCC results.
+  `score` remains the backend-native score; for NCC it is the NCC score, and
+  for feature matching it is an inlier-quality score. `matchScore` is the same
+  normalized value exposed consistently across match APIs.
 
 High-level desktop APIs return screen coordinates. Android APIs return Android
 device screenshot coordinates. `image.findTemplate` returns coordinates relative to the
@@ -72,6 +95,11 @@ await screen.findTemplate("./button.png", {
 });
 
 await screen.findTemplate(fs.readFileSync("./icon.png"), { confidence: 0.9 });
+
+await screen.findTemplate("./scaled-icon.png", {
+  backend: "feature",
+  confidence: 0.4,
+});
 
 const matches = await screen.findAllTemplates("./button.png", {
   confidence: 0.9,

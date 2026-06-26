@@ -1,5 +1,6 @@
 import {
   centerOf,
+  type MatchBackend,
   type MatchOptions,
   type MatchResult,
   type Region,
@@ -18,6 +19,7 @@ export function toNativeOpts(opts?: MatchOptions) {
     scaleMin: scaleConfig?.min,
     scaleMax: scaleConfig?.max,
     scaleStep: scaleConfig?.step,
+    ...(opts.backend ? { backend: opts.backend } : {}),
   };
 }
 
@@ -26,12 +28,15 @@ export type NativeMatchResult = {
   score: number;
 };
 
-export function toMatchResult(native: NativeMatchResult): MatchResult {
+export function toMatchResult(
+  native: NativeMatchResult,
+  backend: MatchBackend = "ncc"
+): MatchResult {
   return {
     region: native.region,
     center: centerOf(native.region),
     score: native.score,
     matchScore: native.score,
-    matchAlgorithm: "ncc",
+    matchAlgorithm: backend,
   };
 }

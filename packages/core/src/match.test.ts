@@ -57,6 +57,7 @@ describe("findNeedle", () => {
       confidence: 0.85,
       region: { left: 1, top: 2, width: 3, height: 4 },
       scale: { min: 0.8, max: 1.2, step: 0.05 },
+      backend: "feature",
     });
 
     expect(findTemplate).toHaveBeenCalledWith("needle.png", undefined, {
@@ -66,6 +67,7 @@ describe("findNeedle", () => {
       scaleMin: 0.8,
       scaleMax: 1.2,
       scaleStep: 0.05,
+      backend: "feature",
     });
   });
 
@@ -111,6 +113,21 @@ describe("findNeedle", () => {
       score: 0.91,
       matchScore: 0.91,
       matchAlgorithm: "ncc",
+    });
+  });
+
+  it("marks feature backend results with the feature algorithm", async () => {
+    findTemplate.mockReturnValue({
+      region: { left: 10, top: 20, width: 5, height: 7 },
+      score: 0.72,
+    });
+
+    const match = await findNeedle("needle.png", { backend: "feature" });
+
+    expect(match).toMatchObject({
+      score: 0.72,
+      matchScore: 0.72,
+      matchAlgorithm: "feature",
     });
   });
 

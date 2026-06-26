@@ -9,4 +9,4 @@ pub mod napi;
 
 pub use error::{Result, SpotterError};
 pub use plugin::{MatchPlugin, OcrPlugin};
-pub use types::{MatchOptions, MatchResult, Point, Region, RgbaImage, WindowId};
+pub use types::{MatchBackend, MatchOptions, MatchResult, Point, Region, Rgb, RgbaImage, WindowId};

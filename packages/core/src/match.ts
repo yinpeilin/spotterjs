@@ -25,6 +25,7 @@ function matchContext(needle: TemplateImage, options?: MatchOptions): SpotterErr
     confidence: options?.confidence,
     region: options?.region,
     scale: options?.scale,
+    backend: options?.backend,
   };
 }
 
@@ -39,7 +40,7 @@ export async function findNeedle(
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
   return callNative("findNeedle", matchContext(needle, options), () =>
-    toMatchResult(native.findTemplate(path, buffer, toNativeOpts(options)))
+    toMatchResult(native.findTemplate(path, buffer, toNativeOpts(options)), options?.backend)
   );
 }
 
@@ -54,7 +55,9 @@ export async function findAllNeedle(
   const native = loadNative();
   const { path, buffer } = needleArgs(needle);
   return callNative("findAllNeedle", matchContext(needle, options), () =>
-    native.findAllTemplates(path, buffer, toNativeOpts(options)).map(toMatchResult)
+    native
+      .findAllTemplates(path, buffer, toNativeOpts(options))
+      .map((match) => toMatchResult(match, options?.backend))
   );
 }
 
@@ -80,7 +83,8 @@ export async function waitForNeedle(
           timeoutMs,
           toNativeOpts(matchOptions),
           intervalMs
-        )
+        ),
+        matchOptions.backend
       )
   );
 }
@@ -97,7 +101,8 @@ export function findNeedleInWindow(
     { ...matchContext(needle, options), windowId },
     () =>
       toMatchResult(
-        native.findTemplateInWindow(windowId, path, buffer, toNativeOpts(options))
+        native.findTemplateInWindow(windowId, path, buffer, toNativeOpts(options)),
+        options?.backend
       )
   );
 }
@@ -115,7 +120,7 @@ export function findAllNeedleInWindow(
     () =>
       native
         .findAllTemplatesInWindow(windowId, path, buffer, toNativeOpts(options))
-        .map(toMatchResult)
+        .map((match) => toMatchResult(match, options?.backend))
   );
 }
 

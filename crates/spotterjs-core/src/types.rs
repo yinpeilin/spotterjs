@@ -1,6 +1,6 @@
 //! Re-exports shared types from `spotterjs-base` plus core-only types.
 
-pub use spotterjs_base::{MatchOptions, Point, Region, RgbaImage, WindowId};
+pub use spotterjs_base::{MatchBackend, MatchOptions, Point, Region, Rgb, RgbaImage, WindowId};
 
 use serde::{Deserialize, Serialize};
 

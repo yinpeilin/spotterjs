@@ -10,16 +10,20 @@ default = ["accessibility"]
 accessibility = []
 accessibility-windows = ["accessibility"]
 accessibility-linux = ["accessibility", "linux-x11", "dep:atspi", "dep:atspi-common", "dep:zbus", "dep:tokio"]
+feature-match = ["dep:spotterjs-plugin-match-feature"]
+input-listen = ["dep:rdev"]
 linux-x11 = ["dep:x11rb"]
 
 [dependencies]
 spotterjs-base = { path = "../spotterjs-base" }
+spotterjs-plugin-match-feature = { path = "../spotterjs-plugin-match-feature", optional = true }
 spotterjs-plugin-match-ncc = { path = "../spotterjs-plugin-match-ncc" }
 thiserror.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 image.workspace = true
 enigo.workspace = true
+rdev = { workspace = true, optional = true }
 arboard.workspace = true
 parking_lot = "0.12"
 

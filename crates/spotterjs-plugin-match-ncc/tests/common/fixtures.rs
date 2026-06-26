@@ -126,6 +126,7 @@ pub fn default_opts() -> MatchOptions {
         scale_min: 0.8,
         scale_max: 1.2,
         scale_step: 0.1,
+        ..Default::default()
     }
 }
 

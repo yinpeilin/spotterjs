@@ -67,11 +67,42 @@ pub struct Point {
     pub y: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Rgb {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
 #[derive(Debug, Clone)]
 pub struct RgbaImage {
     pub width: u32,
     pub height: u32,
     pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MatchBackend {
+    Ncc,
+    Feature,
+}
+
+impl MatchBackend {
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "ncc" => Some(Self::Ncc),
+            "feature" => Some(Self::Feature),
+            _ => None,
+        }
+    }
+
+    pub fn as_name(self) -> &'static str {
+        match self {
+            Self::Ncc => "ncc",
+            Self::Feature => "feature",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -82,6 +113,7 @@ pub struct MatchOptions {
     pub scale_min: f64,
     pub scale_max: f64,
     pub scale_step: f64,
+    pub backend: MatchBackend,
 }
 
 impl Default for MatchOptions {
@@ -93,6 +125,7 @@ impl Default for MatchOptions {
             scale_min: 0.8,
             scale_max: 1.2,
             scale_step: 0.1,
+            backend: MatchBackend::Ncc,
         }
     }
 }
@@ -170,5 +203,29 @@ mod tests {
         assert_eq!(opts.scale_min, 0.8);
         assert_eq!(opts.scale_max, 1.2);
         assert_eq!(opts.scale_step, 0.1);
+        assert_eq!(opts.backend, MatchBackend::Ncc);
+    }
+
+    #[test]
+    fn rgb_is_shared_data_type() {
+        let color = Rgb {
+            r: 12,
+            g: 34,
+            b: 56,
+        };
+
+        assert_eq!(color.r, 12);
+        assert_eq!(color.g, 34);
+        assert_eq!(color.b, 56);
+    }
+
+    #[test]
+    fn match_backend_parses_stable_names() {
+        assert_eq!(MatchBackend::from_name("ncc"), Some(MatchBackend::Ncc));
+        assert_eq!(
+            MatchBackend::from_name("feature"),
+            Some(MatchBackend::Feature)
+        );
+        assert_eq!(MatchBackend::from_name("unknown"), None);
     }
 }
