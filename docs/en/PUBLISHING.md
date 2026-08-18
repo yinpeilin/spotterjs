@@ -132,8 +132,3 @@ Verify MCP:
 ```bash
 npx @modelcontextprotocol/inspector npx @spotterjs/mcp
 ```
-
-## Commercial License
-
-For commercial authorization, contact `ypl123698745@qq.com` or use
-[GitHub Issues](https://github.com/yinpeilin/spotterjs/issues).

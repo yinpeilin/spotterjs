@@ -2,7 +2,7 @@
     "name": "@spotterjs/mcp",
     "version": "1.0.5",
     "description": "spotterjs MCP server - desktop automation, workspace files, and shell",
-    "license": "SEE LICENSE IN LICENSE",
+    "license": "MIT",
     "type": "module",
     "repository": {
         "type": "git",

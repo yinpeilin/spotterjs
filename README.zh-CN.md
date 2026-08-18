@@ -2,14 +2,34 @@
 
 [English](./README.md)
 
-spotterjs 是 TypeScript-first 的桌面自动化工具集，底层由 Rust native
-addons 支撑。它提供屏幕截图、鼠标和键盘输入、窗口发现、无障碍自动化、
-NCC 模板匹配、OCR、Android companion 自动化，以及面向代码 Agent 的
-MCP server。
+TypeScript 桌面自动化，底层是 Rust。截图、点击、模板匹配、无障碍树、MCP。
 
-- 源码：[GitHub repository](https://github.com/yinpeilin/spotterjs)
-- npm 包：`@spotterjs/core` 和可选插件
+![Find a Save button at 0.94 confidence and click it with four lines of TypeScript](./assets/spotterjs-hero.png)
+
+```bash
+npm install @spotterjs/core
+```
+
+```typescript
+import { mouse, screen } from "@spotterjs/core";
+
+const match = await screen.findTemplate("./save.png", {
+  confidence: 0.9,
+  scale: true,
+});
+
+mouse.tap(match.center.x, match.center.y);
+```
+
+当前预构建 native 包支持 **Windows x64 (MSVC)** 和 **Linux x64 (glibc)**。macOS 尚未发布。
+
+- 源码：[github.com/yinpeilin/spotterjs](https://github.com/yinpeilin/spotterjs)
 - 文档：[English](./docs/en/README.md) / [中文](./docs/zh-CN/README.md)
+- 许可证：[MIT](./LICENSE)
+
+## 为什么做这个
+
+很多桌面应用没有可用 API。spotterjs 面向「看屏幕、找控件、再点击」这类场景。截图、输入、窗口、无障碍和 NCC 模板匹配走 Rust native addon。可选的 MCP server 把同一套能力交给代码 Agent。
 
 ## 适用场景
 
@@ -27,16 +47,18 @@ TypeScript 脚本，或通过 MCP 暴露给代码 Agent 使用。
 查看缓存连接，用 `android_launch_app`、`android_wait_for_element`、
 `android_find_template_and_tap` 等工具分别操作每台设备。
 
-## 安装
+## 包矩阵
 
-```bash
-npm install @spotterjs/core
-```
-
-当前预构建 native 包支持：
-
-- Windows x64 (MSVC)
-- Linux x64 (glibc)
+| Package | 是否必需 | 用途 |
+|---------|----------|------|
+| `@spotterjs/core` | 是 | 屏幕、鼠标、键盘、窗口、无障碍、host I/O 和模板匹配 |
+| `@spotterjs/base` | 传递依赖 | 共享 TypeScript 类型 |
+| `@spotterjs/node` | 传递依赖 | capture、input、windows、accessibility、image 和 NCC matching 的 native loader |
+| `@spotterjs/node-win32-x64-msvc` | 可选 | Windows x64 native binary |
+| `@spotterjs/node-linux-x64-gnu` | 可选 | Linux x64 glibc native binary |
+| `@spotterjs/mcp` | 可选 | 面向 desktop、Android、OCR 和 workspace tools 的 MCP server |
+| `@spotterjs/plugin-android` | 可选 | 通过 mobile companion app 实现 Android 自动化 |
+| `@spotterjs/plugin-ocr` | 可选 | 基于 ONNX Runtime 的 OCR |
 
 ## 快速开始
 
@@ -63,39 +85,11 @@ console.log({
 });
 ```
 
-运行：
-
 ```bash
 npx tsx check-spotter.ts
 ```
 
-验证截图能力后，可以用模板匹配点击可见按钮或图标：
-
-```typescript
-import { mouse, screen } from "@spotterjs/core";
-
-const match = await screen.findTemplate("./button.png", {
-  confidence: 0.9,
-  scale: true,
-});
-
-mouse.tap(match.center.x, match.center.y);
-```
-
 `screen.findTemplate` 接受图片路径，或编码后的 PNG/JPEG/WebP `Buffer`。匹配结果使用屏幕坐标。
-
-## 包矩阵
-
-| Package | 是否必需 | 用途 |
-|---------|----------|------|
-| `@spotterjs/core` | 是 | 屏幕、鼠标、键盘、窗口、无障碍、host I/O 和模板匹配 |
-| `@spotterjs/base` | 传递依赖 | 共享 TypeScript 类型 |
-| `@spotterjs/node` | 传递依赖 | capture、input、windows、accessibility、image 和 NCC matching 的 native loader |
-| `@spotterjs/node-win32-x64-msvc` | 可选 | Windows x64 native binary |
-| `@spotterjs/node-linux-x64-gnu` | 可选 | Linux x64 glibc native binary |
-| `@spotterjs/mcp` | 可选 | 面向 desktop、Android、OCR 和 workspace tools 的 MCP server |
-| `@spotterjs/plugin-android` | 可选 | 通过 mobile companion app 实现 Android 自动化 |
-| `@spotterjs/plugin-ocr` | 可选 | 基于 ONNX Runtime 的 OCR |
 
 ## 文档地图
 
@@ -108,6 +102,7 @@ mouse.tap(match.center.x, match.center.y);
 - [OCR 插件](./docs/zh-CN/guides/ocr.md)：模型缓存、下载源、本地模型、坐标和测试。
 - [示例](./docs/zh-CN/examples.md)：Paint 示例、smoke 脚本、集成脚本和 benchmark。
 - [排障指南](./docs/zh-CN/troubleshooting.md)：native 加载、匹配、Android companion、OCR 和 MCP 问题。
+- [发布说明](./docs/zh-CN/launch-notes.md)：GitHub About、topics 和 Show HN 文案。
 
 维护者文档：
 
@@ -136,9 +131,4 @@ npm run build:native
 
 ## 许可证
 
-**spotterjs License 1.0**。详见 [LICENSE](./LICENSE) 和
-[中文说明](./LICENSE.zh-CN)。
-
-- 免费使用：个人学习、教学、非商业研究和本地评估。
-- 商业使用：产品、SaaS、付费交付、企业生产等场景需要授权。请联系
-  `ypl123698745@qq.com` 或提交 GitHub issue。
+[MIT](./LICENSE)。可以用于产品、SaaS 和内部工具。中文摘要见 [LICENSE.zh-CN](./LICENSE.zh-CN)。

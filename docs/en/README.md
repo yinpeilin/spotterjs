@@ -11,6 +11,7 @@ or maintaining the repository.
 - [Getting started](./getting-started.md): install packages, run the first script, and verify the local environment.
 - [Examples](./examples.md): Paint examples, smoke scripts, WeChat integration scripts, and benchmark commands.
 - [Troubleshooting](./troubleshooting.md): common native, matching, Android companion, OCR, MCP, and documentation issues.
+- [Launch notes](./launch-notes.md): GitHub About, topics, and Show HN copy.
 
 ## Guides
 

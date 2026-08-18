@@ -21,6 +21,7 @@ spotterjs 是面向桌面和 Android companion 自动化的 TypeScript-first 工
 - [快速开始](./getting-started.md)：安装包、运行第一个脚本，并验证本地环境。
 - [示例](./examples.md)：Paint 示例、smoke 脚本、微信集成脚本和 benchmark 命令。
 - [排障指南](./troubleshooting.md)：native、匹配、Android companion、OCR、MCP 和文档问题。
+- [发布说明](./launch-notes.md)：GitHub About、topics 和 Show HN 文案。
 
 ## 指南
 

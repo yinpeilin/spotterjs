@@ -122,7 +122,3 @@ MCP 包验证：
 ```bash
 npx @modelcontextprotocol/inspector npx @spotterjs/mcp
 ```
-
-## 授权说明
-
-商用授权请联系 `ypl123698745@qq.com` 或通过 [GitHub Issues](https://github.com/yinpeilin/spotterjs/issues) 处理。

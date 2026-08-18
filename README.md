@@ -2,25 +2,47 @@
 
 [中文文档](./README.zh-CN.md)
 
-spotterjs is a TypeScript-first desktop automation toolkit backed by Rust native
-addons. It provides screen capture, mouse and keyboard input, window discovery,
-accessibility automation, NCC template matching, OCR, Android companion automation,
-and an MCP server for code agents.
+TypeScript desktop automation with a Rust core. Screenshot, click, template-match, accessibility trees, MCP.
 
-- Source: [GitHub repository](https://github.com/yinpeilin/spotterjs)
-- npm packages: `@spotterjs/core` and optional plugins
-- Documentation: [English](./docs/en/README.md) / [中文](./docs/zh-CN/README.md)
-
-## Install
+![Find a Save button at 0.94 confidence and click it with four lines of TypeScript](./assets/spotterjs-hero.png)
 
 ```bash
 npm install @spotterjs/core
 ```
 
-Prebuilt native packages currently target:
+```typescript
+import { mouse, screen } from "@spotterjs/core";
 
-- Windows x64 (MSVC)
-- Linux x64 (glibc)
+const match = await screen.findTemplate("./save.png", {
+  confidence: 0.9,
+  scale: true,
+});
+
+mouse.tap(match.center.x, match.center.y);
+```
+
+Prebuilt native packages currently target **Windows x64 (MSVC)** and **Linux x64 (glibc)**. macOS is not published yet.
+
+- Source: [github.com/yinpeilin/spotterjs](https://github.com/yinpeilin/spotterjs)
+- Docs: [English](./docs/en/README.md) / [中文](./docs/zh-CN/README.md)
+- License: [MIT](./LICENSE)
+
+## Why this exists
+
+Many desktop apps have no usable API. spotterjs is for the cases where you still need to see the screen, find a control, and click it. Capture, input, windows, accessibility, and NCC template matching run in a Rust native addon. An optional MCP server exposes the same tools to coding agents.
+
+## Packages
+
+| Package | Required | Purpose |
+|---------|----------|---------|
+| `@spotterjs/core` | Yes | Screen, mouse, keyboard, windows, accessibility, host I/O, and template matching |
+| `@spotterjs/base` | Transitive | Shared TypeScript types |
+| `@spotterjs/node` | Transitive | Native loader for capture, input, windows, accessibility, image, and NCC matching |
+| `@spotterjs/node-win32-x64-msvc` | Optional | Windows x64 native binary |
+| `@spotterjs/node-linux-x64-gnu` | Optional | Linux x64 glibc native binary |
+| `@spotterjs/mcp` | Optional | MCP server for desktop, Android, OCR, and workspace tools |
+| `@spotterjs/plugin-android` | Optional | Android automation through the mobile companion app |
+| `@spotterjs/plugin-ocr` | Optional | OCR with ONNX Runtime |
 
 ## Quick Start
 
@@ -47,40 +69,11 @@ console.log({
 });
 ```
 
-Run it:
-
 ```bash
 npx tsx check-spotter.ts
 ```
 
-After that works, use template matching to click a visible button or icon:
-
-```typescript
-import { mouse, screen } from "@spotterjs/core";
-
-const match = await screen.findTemplate("./button.png", {
-  confidence: 0.9,
-  scale: true,
-});
-
-mouse.tap(match.center.x, match.center.y);
-```
-
-`screen.findTemplate` accepts either an image path or an encoded PNG/JPEG/WebP `Buffer`.
-Match results use screen coordinates.
-
-## Packages
-
-| Package | Required | Purpose |
-|---------|----------|---------|
-| `@spotterjs/core` | Yes | Screen, mouse, keyboard, windows, accessibility, host I/O, and template matching |
-| `@spotterjs/base` | Transitive | Shared TypeScript types |
-| `@spotterjs/node` | Transitive | Native loader for capture, input, windows, accessibility, image, and NCC matching |
-| `@spotterjs/node-win32-x64-msvc` | Optional | Windows x64 native binary |
-| `@spotterjs/node-linux-x64-gnu` | Optional | Linux x64 glibc native binary |
-| `@spotterjs/mcp` | Optional | MCP server for desktop, Android, OCR, and workspace tools |
-| `@spotterjs/plugin-android` | Optional | Android automation through the mobile companion app |
-| `@spotterjs/plugin-ocr` | Optional | OCR with ONNX Runtime |
+`screen.findTemplate` accepts either an image path or an encoded PNG/JPEG/WebP `Buffer`. Match results use screen coordinates.
 
 ## Documentation Map
 
@@ -93,6 +86,7 @@ Match results use screen coordinates.
 - [OCR plugin](./docs/en/guides/ocr.md): model cache, download sources, local models, coordinates, and testing.
 - [Examples](./docs/en/examples.md): Paint examples, smoke scripts, integration scripts, and benchmarks.
 - [Troubleshooting](./docs/en/troubleshooting.md): native loading, matching, Android companion, OCR, and MCP issues.
+- [Launch notes](./docs/en/launch-notes.md): GitHub About, topics, and Show HN copy.
 
 Maintainer docs:
 
@@ -121,9 +115,4 @@ npm run build:native
 
 ## License
 
-**spotterjs License 1.0**. See [LICENSE](./LICENSE) and
-[中文说明](./LICENSE.zh-CN).
-
-- Free: personal learning, teaching, non-commercial research, and local evaluation.
-- Commercial: products, SaaS, paid delivery, enterprise production, and similar use
-  require authorization. Contact `ypl123698745@qq.com` or open a GitHub issue.
+[MIT](./LICENSE). You can use spotterjs in products, SaaS, and internal tools. See also the [中文摘要](./LICENSE.zh-CN).

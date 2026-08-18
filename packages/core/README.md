@@ -97,5 +97,4 @@ text explains parameters, coordinate spaces, errors, and side effects.
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires
-authorization. See [LICENSE](../../LICENSE).
+MIT. See [LICENSE](../../LICENSE).

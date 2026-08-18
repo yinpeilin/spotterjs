@@ -19,7 +19,7 @@ default-members = [
 [workspace.package]
 version = "1.0.4"
 edition = "2021"
-license = "LicenseRef-spotterjs-1.0"
+license = "MIT"
 authors = ["spotterjs Contributors"]
 repository = "https://github.com/yinpeilin/spotterjs"
 

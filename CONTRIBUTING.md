@@ -57,4 +57,4 @@ npm run changeset
 
 ## License
 
-By contributing, you agree that your contributions are licensed under [LICENSE](LICENSE) (spotterjs License 1.0). Commercial use of the project by third parties requires separate authorization from the copyright holder.
+By contributing, you agree that your contributions are licensed under the MIT License. See [LICENSE](LICENSE).

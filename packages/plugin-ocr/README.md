@@ -62,5 +62,4 @@ and integration tests are documented in the [OCR guide](../../docs/en/guides/ocr
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires
-authorization. See [LICENSE](../../LICENSE).
+MIT. See [LICENSE](../../LICENSE).
