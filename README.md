@@ -71,6 +71,10 @@ Match results use screen coordinates.
 
 ## CLI + Skill for agents
 
+The former `@spotterjs/mcp` package is retired. Agent integrations now use
+`@spotterjs/cli` and its bundled Skill. Remove the old MCP server entry from your
+agent configuration when migrating.
+
 Build the source checkout and discover commands:
 
 ```bash

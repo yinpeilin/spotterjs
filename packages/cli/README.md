@@ -3,6 +3,9 @@
 Run spotterjs desktop automation, OCR, Android companion, and workspace commands
 from a shell with JSON input and output. The package also includes an agent Skill.
 
+This package replaces the retired `@spotterjs/mcp` package. Remove the old MCP
+server entry from your agent configuration and install the CLI and bundled Skill.
+
 ```bash
 npm install -g @spotterjs/cli
 spotterjs list

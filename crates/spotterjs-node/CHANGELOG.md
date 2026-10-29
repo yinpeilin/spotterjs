@@ -1,5 +1,21 @@
 # @spotterjs/node
 
+## 1.1.0
+
+### Patch Changes
+
+- 7287ef5: Constrain Windows accessibility attachment fallbacks to the requested window and its
+  descendants, so a covering application cannot become the target. Return structured
+  errors for null, invalid, or stale window handles instead of panicking.
+- 7287ef5: Use native Unicode text input by default, add keyboard.type, and fix Windows newline,
+  tab, UTF-16 surrogate release and held-key behavior. Keep explicit paste mode with
+  configurable clipboard restore delay and preserve clipboard contents copied during input.
+  Track aliases of the same physical modifier consistently so pressing Ctrl and releasing
+  LeftControl (and equivalent Shift, Alt, or Meta aliases) cannot leave a key held.
+- 7287ef5: Serialize recorded input and playback scripts with the public camelCase timing fields
+  `tMs`, `delayMs`, and `durationMs`. Continue accepting legacy snake_case timing fields
+  when parsing saved recordings so existing recordings remain replayable.
+
 ## 1.0.4
 
 ### Patch Changes

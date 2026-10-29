@@ -85,6 +85,9 @@ mouse.tap(match.center.x, match.center.y);
 
 ## Agent 使用 CLI + Skill
 
+原 `@spotterjs/mcp` 包已退役。Agent 集成统一使用 `@spotterjs/cli` 及其随包 Skill，
+迁移时请从 Agent 配置中移除旧的 MCP server 配置。
+
 源码版本先构建，再运行本地入口：
 
 ```bash

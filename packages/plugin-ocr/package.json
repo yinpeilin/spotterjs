@@ -1,6 +1,6 @@
 {
   "name": "@spotterjs/plugin-ocr",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "OCR plugin for spotterjs using ONNX Runtime",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@spotterjs/base": "1.0.5",
-    "@spotterjs/core": "1.0.5",
+    "@spotterjs/core": "1.1.0",
     "onnxruntime-node": "^1.26.0",
     "sharp": "^0.34.5"
   },
