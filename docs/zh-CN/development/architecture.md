@@ -1,6 +1,6 @@
 # 架构说明
 
-spotterjs 是一个 TypeScript + Rust monorepo。TypeScript 包负责用户 API、MCP 和插件入口，Rust crate 负责平台能力、图像处理和 native binding。
+spotterjs 是一个 TypeScript + Rust monorepo。TypeScript 包负责用户 API、CLI 和插件入口，Rust crate 负责平台能力、图像处理和 native binding。
 
 ## 工作区结构
 
@@ -8,7 +8,7 @@ spotterjs 是一个 TypeScript + Rust monorepo。TypeScript 包负责用户 API�
 |------|------|
 | `packages/core` | 用户主入口，封装桌面自动化高层 API |
 | `packages/base` | 共享 TypeScript 类型 |
-| `packages/mcp` | MCP Server，暴露 desktop / android / host 工具 |
+| `packages/cli` | JSON CLI、命令注册、适配器和随包 Agent Skill |
 | `packages/plugin-ocr` | OCR 插件，ONNX 模型下载和识别流程 |
 | `packages/plugin-android` | Android companion 自动化插件 |
 | `crates/spotterjs-base` | Rust 共享类型、错误和 N-API 转换 |
@@ -34,7 +34,7 @@ spotterjs 是一个 TypeScript + Rust monorepo。TypeScript 包负责用户 API�
 
 - `@spotterjs/core` 是桌面自动化主入口，用户脚本应优先从这里导入。
 - `@spotterjs/base` 只放共享类型，避免引入 native 加载副作用。
-- `@spotterjs/mcp` 负责把核心能力适配成 MCP tool schema，不改变 core API。
+- `@spotterjs/cli` 负责把核心能力适配成 CLI command schema，不改变 core API。
 - 插件包只暴露自己的领域能力，不把内部解析、路径发现、命令 escaping helper 当作稳定 API。
 
 ## Rust crate 边界
@@ -53,18 +53,23 @@ spotterjs 是一个 TypeScript + Rust monorepo。TypeScript 包负责用户 API�
 
 发布时先发布平台包，再发布 `@spotterjs/node`，最后发布依赖它的 TypeScript 包。详细流程见 [发布手册](../PUBLISHING.md)。
 
-## MCP 边界
+## CLI 边界
 
-MCP Server 暴露三类工具：
+CLI 暴露以下命令：
 
 - desktop：桌面截图、输入、窗口、模板匹配、可选无障碍。
 - android：启用 `SPOTTERJS_ANDROID=1` 后注册 companion app 工具。
+- ocr：由 `@spotterjs/plugin-ocr` 提供的 OCR 命令。
 - host：工作区文件、打开文件和可选 shell。
 
-MCP 的安全边界在 server 层处理：文件必须在 workspace root 内，shell 默认关闭，敏感文件写入默认禁止。
+CLI 校验命令参数并输出结构化 JSON。有关联的动作使用当前进程内的 sequence 队列；
+不同 CLI 调用不共享会话和锁，Android 缓存连接在本次进程退出时关闭。
+
+Host 文件必须在 workspace root 内，shell 默认关闭，敏感 host 文件默认禁止写入。
+这些检查并不构成桌面或 Android 操作的操作系统沙箱。随包 Skill 说明命令发现和观察—操作—验证流程。
 
 ## 设计原则
 
 - 用户优先使用高层 API，`@spotterjs/core/unstable-native` 的 `loadNative()` 只作为不稳定逃生舱。
 - 文档中的包 README 保持短入口，深度内容放在 `docs/`。
-- 新增平台能力时，同时补 TypeScript API、MCP 行为、测试和文档。
+- 新增平台能力时，同时补 TypeScript API、CLI 行为、测试和文档。

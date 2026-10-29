@@ -308,6 +308,8 @@ const accessibilityBase = {
  */
 export type A11yApi = {
   enable(config?: A11yConfig): void;
+  /** Release accessibility resources after the automation scope completes. */
+  disable(): void;
   attach(windowId: string): string;
   find(rootId: string, query: A11yQuery, maxDepth?: number): string;
   waitFor(
@@ -366,6 +368,7 @@ function clickElement(elementId: string): Region {
 
 export const accessibility: A11yApi = {
   enable: accessibilityBase.enable,
+  disable: accessibilityBase.disable,
 
   attach(windowId: string): string {
     return accessibilityBase.attachWindow(windowId);

@@ -18,3 +18,12 @@ eng.traineddata
 .DS_Store
 *.log
 .npm/
+apps/mobile-companion/.dart_tool/
+apps/mobile-companion/.flutter-plugins
+apps/mobile-companion/.flutter-plugins-dependencies
+apps/mobile-companion/build/
+apps/mobile-companion/android/.gradle/
+apps/mobile-companion/android/local.properties
+apps/mobile-companion/android/app/debug/
+apps/mobile-companion/android/app/profile/
+apps/mobile-companion/android/app/release/

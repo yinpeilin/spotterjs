@@ -5,9 +5,16 @@ use spotterjs_core::{capture_screen, clipboard_get, clipboard_set, screen_size, 
 #[test]
 #[ignore = "requires display and user session"]
 fn clipboard_round_trip() {
+    let previous = clipboard_get().ok();
     let token = format!("spotter-test-{}", std::process::id());
     clipboard_set(&token).expect("set clipboard");
-    let read = clipboard_get().expect("get clipboard");
+    let read = clipboard_get();
+    if let Some(previous) = previous {
+        if clipboard_get().ok().as_deref() == Some(token.as_str()) {
+            clipboard_set(&previous).expect("restore clipboard");
+        }
+    }
+    let read = read.expect("get clipboard");
     assert_eq!(read, token);
 }
 

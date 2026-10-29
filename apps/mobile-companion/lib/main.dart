@@ -230,9 +230,9 @@ class _HeroPanel extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: accent.withAlpha((0.12 * 255).round()),
+                  color: accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: accent.withAlpha((0.28 * 255).round())),
+                  border: Border.all(color: accent.withValues(alpha: 0.28)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

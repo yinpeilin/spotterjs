@@ -5,7 +5,7 @@
 spotterjs 是 TypeScript-first 的桌面自动化工具集，底层由 Rust native
 addons 支撑。它提供屏幕截图、鼠标和键盘输入、窗口发现、无障碍自动化、
 NCC 模板匹配、OCR、Android companion 自动化，以及面向代码 Agent 的
-MCP server。
+CLI + Skill。
 
 - 源码：[GitHub repository](https://github.com/yinpeilin/spotterjs)
 - npm 包：`@spotterjs/core` 和可选插件
@@ -14,18 +14,17 @@ MCP server。
 ## 适用场景
 
 spotterjs 适合把「看屏幕、找目标、点按钮、输入文本、读状态」这类人工操作写成
-TypeScript 脚本，或通过 MCP 暴露给代码 Agent 使用。
+TypeScript 脚本，或通过 CLI 暴露给代码 Agent 使用。
 
 - **桌面应用自动化：** 对 Windows / Linux 桌面应用做冒烟测试、重复配置、截图取证、窗口聚焦和键鼠输入。
 - **视觉定位和 OCR：** 目标应用没有稳定 API 时，用模板匹配、OCR 或无障碍树定位按钮、图标和文本。
-- **Agent 驱动的本机操作：** 在 Cursor、Claude Desktop 等 MCP client 中，让 Agent 读取工作区文件、观察桌面、执行安全范围内的操作。
-- **Android companion 自动化：** 在电脑端写 TypeScript 或 MCP 调用，通过 WebSocket 控制一台或多台 Android 设备。
+- **Agent 驱动的本机操作：** 在 Codex、Claude Code 等支持 shell 和 Skill 的 Agent 中，让 Agent 读取工作区文件、观察桌面、执行安全范围内的操作。
+- **Android companion 自动化：** 在电脑端写 TypeScript 或 CLI 调用，通过 WebSocket 控制一台或多台 Android 设备。
 - **跨设备流程验证：** 把桌面端配置、网页后台、手机端 App、短信或消息确认串成一个自动化闭环。
 
-如果你的目标是「电脑端写代码操作多台设备」，推荐使用 MCP 的
-`android_connect` 为每台手机分配不同 `deviceId`，再用 `android_list_devices`
-查看缓存连接，用 `android_launch_app`、`android_wait_for_element`、
-`android_find_template_and_tap` 等工具分别操作每台设备。
+如果你的目标是「电脑端写代码操作多台设备」，可以在同一 CLI sequence 中用
+`android_connect` 为每台手机分配不同 `deviceId`，再按设备执行命令。缓存连接随本次进程结束；
+不同调用之间，每次传 `url` 和 `sessionToken` 重连。详见 [CLI + Skill](./docs/zh-CN/CLI.md)。
 
 ## 安装
 
@@ -84,6 +83,21 @@ mouse.tap(match.center.x, match.center.y);
 
 `screen.findTemplate` 接受图片路径，或编码后的 PNG/JPEG/WebP `Buffer`。匹配结果使用屏幕坐标。
 
+## Agent 使用 CLI + Skill
+
+源码版本先构建，再运行本地入口：
+
+```bash
+npm ci
+npm run build:ts
+node packages/cli/dist/cli.js list
+node packages/cli/dist/cli.js run desktop_list_windows
+```
+
+使用 `node packages/cli/dist/cli.js skill install --target <技能父目录>` 安装随包 Skill。
+已发布版本可以使用 `npx @spotterjs/cli`，或全局安装 `@spotterjs/cli`。
+JSON 参数、多行中文输入和完整流程见 [CLI + Skill](./docs/zh-CN/CLI.md)。
+
 ## 包矩阵
 
 | Package | 是否必需 | 用途 |
@@ -93,7 +107,7 @@ mouse.tap(match.center.x, match.center.y);
 | `@spotterjs/node` | 传递依赖 | capture、input、windows、accessibility、image 和 NCC matching 的 native loader |
 | `@spotterjs/node-win32-x64-msvc` | 可选 | Windows x64 native binary |
 | `@spotterjs/node-linux-x64-gnu` | 可选 | Linux x64 glibc native binary |
-| `@spotterjs/mcp` | 可选 | 面向 desktop、Android、OCR 和 workspace tools 的 MCP server |
+| `@spotterjs/cli` | 可选 | 面向 desktop、Android、OCR 和 workspace 的 JSON CLI 与 Agent Skill |
 | `@spotterjs/plugin-android` | 可选 | 通过 mobile companion app 实现 Android 自动化 |
 | `@spotterjs/plugin-ocr` | 可选 | 基于 ONNX Runtime 的 OCR |
 
@@ -103,11 +117,12 @@ mouse.tap(match.center.x, match.center.y);
 - [桌面自动化](./docs/zh-CN/guides/desktop-automation.md)：窗口、截图、输入、剪贴板和坐标。
 - [模板匹配](./docs/zh-CN/MATCHING.md)：NCC 参数、编码 Buffer、region 和性能。
 - [无障碍自动化](./docs/zh-CN/guides/accessibility.md)：UIA / AT-SPI 树、查询和诊断。
-- [MCP Server](./docs/zh-CN/MCP.md)：client 配置、tools、响应结构和安全策略。
+- [CLI + Skill](./docs/zh-CN/CLI.md)：命令发现、JSON 参数与结果、序列编排和 Skill 安装。
 - [Android companion](./docs/zh-CN/guides/android-companion.md)：WebSocket 配对、session 复用、设备输入和 accessibility tree API。
+- [Mobile companion app](./docs/zh-CN/guides/mobile-companion.md)：Flutter 环境、检查命令、APK 构建和发布注意事项。
 - [OCR 插件](./docs/zh-CN/guides/ocr.md)：模型缓存、下载源、本地模型、坐标和测试。
 - [示例](./docs/zh-CN/examples.md)：Paint 示例、smoke 脚本、集成脚本和 benchmark。
-- [排障指南](./docs/zh-CN/troubleshooting.md)：native 加载、匹配、Android companion、OCR 和 MCP 问题。
+- [排障指南](./docs/zh-CN/troubleshooting.md)：native 加载、匹配、Android companion、OCR 和 CLI 问题。
 
 维护者文档：
 

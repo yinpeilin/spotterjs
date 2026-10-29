@@ -96,7 +96,7 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
         preprocess: readOptions?.preprocess ?? options.preprocess,
       });
       const lines = await engine.read(prepared.image);
-      return lines.map((line) => translateLine(line, prepared.offset));
+      return lines.map((line) => translateLine(line, prepared.offset, prepared.scale));
     },
 
     async findText(image, text, findOptions) {
@@ -130,7 +130,7 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
 async function prepareImage(
   source: OcrImage,
   options?: OcrReadOptions
-): Promise<{ image: CaptureImage; offset: Point }> {
+): Promise<{ image: CaptureImage; offset: Point; scale: Point }> {
   const image = validateCaptureImage(await loadImage(source), "image");
   const origin = options?.origin ?? { x: 0, y: 0 };
   validatePoint(origin, "origin");
@@ -141,9 +141,10 @@ async function prepareImage(
   return {
     image: preprocessed,
     offset: {
-      x: origin.x + (searchRegion?.left ?? 0),
-      y: origin.y + (searchRegion?.top ?? 0),
+      x: origin.x + Math.max(0, searchRegion?.left ?? 0),
+      y: origin.y + Math.max(0, searchRegion?.top ?? 0),
     },
+    scale: { x: cropped.width / preprocessed.width, y: cropped.height / preprocessed.height },
   };
 }
 
@@ -207,18 +208,21 @@ function validatePoint(point: Point, label: string): void {
   }
 }
 
-function translateLine(line: OcrTextLine, offset: Point): OcrTextLine {
+function translateLine(line: OcrTextLine, offset: Point, scale: Point): OcrTextLine {
   const region: Region = {
-    left: line.region.left + offset.x,
-    top: line.region.top + offset.y,
-    width: line.region.width,
-    height: line.region.height,
+    left: Math.round(line.region.left * scale.x) + offset.x,
+    top: Math.round(line.region.top * scale.y) + offset.y,
+    width: Math.max(1, Math.round(line.region.width * scale.x)),
+    height: Math.max(1, Math.round(line.region.height * scale.y)),
   };
 
   return {
     ...line,
     region,
-    box: line.box.map((p) => ({ x: p.x + offset.x, y: p.y + offset.y })) as OcrTextLine["box"],
+    box: line.box.map((p) => ({
+      x: Math.round(p.x * scale.x) + offset.x,
+      y: Math.round(p.y * scale.y) + offset.y,
+    })) as OcrTextLine["box"],
     center: centerOf(region),
   };
 }

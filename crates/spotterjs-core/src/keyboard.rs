@@ -8,13 +8,14 @@ use std::thread;
 use std::time::Duration;
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
-    VIRTUAL_KEY, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B, VK_BACK,
-    VK_C, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12,
-    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H, VK_HOME, VK_I, VK_J, VK_K,
-    VK_L, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M, VK_N, VK_NEXT, VK_O, VK_P,
-    VK_PRIOR, VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S,
-    VK_SPACE, VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
+    MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC, VIRTUAL_KEY, VK_0,
+    VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B, VK_BACK, VK_C, VK_D,
+    VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12, VK_F2, VK_F3,
+    VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H, VK_HOME, VK_I, VK_J, VK_K, VK_L,
+    VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M, VK_N, VK_NEXT, VK_O, VK_P, VK_PRIOR,
+    VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S, VK_SPACE,
+    VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -286,7 +287,12 @@ pub fn set_keyboard_config(config: KeyboardConfig) {
 }
 
 fn enigo() -> Result<Enigo> {
-    Enigo::new(&Settings::default()).map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
+    // Each API call creates a handle; dropping it must not release keys held by down().
+    Enigo::new(&Settings {
+        release_keys_when_dropped: false,
+        ..Settings::default()
+    })
+    .map_err(|e| SpotterError::Platform(format!("enigo init: {e}")))
 }
 
 fn auto_delay_for(config: KeyboardConfig) {
@@ -301,12 +307,42 @@ pub fn keyboard_type(text: &str) -> Result<()> {
 }
 
 pub fn keyboard_type_with_config(text: &str, config: Option<KeyboardConfig>) -> Result<()> {
+    if text.contains('\0') {
+        return Err(SpotterError::Platform(
+            "keyboard_type: text contains a null character".into(),
+        ));
+    }
+    if text.is_empty() {
+        return Ok(());
+    }
     crate::events::guard::guard_synthetic_input(|| {
-        let mut e = enigo()?;
-        e.text(text)
-            .map_err(|err| SpotterError::Platform(format!("keyboard_type: {err}")))?;
-        auto_delay_for(config.unwrap_or_else(keyboard_config));
-        Ok(())
+        let cfg = config.unwrap_or_else(keyboard_config);
+        #[cfg(windows)]
+        {
+            let mut chars = text.chars().peekable();
+            while let Some(c) = chars.next() {
+                // Treat CRLF as one newline. Do not also emit its Unicode code units.
+                let c = if c == '\r' {
+                    if chars.peek() == Some(&'\n') {
+                        chars.next();
+                    }
+                    '\n'
+                } else {
+                    c
+                };
+                send_windows_inputs(&windows_text_inputs(c))?;
+                auto_delay_for(cfg);
+            }
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            let mut e = enigo()?;
+            e.text(text)
+                .map_err(|err| SpotterError::Platform(format!("keyboard_type: {err}")))?;
+            auto_delay_for(cfg);
+            Ok(())
+        }
     })
 }
 
@@ -459,17 +495,80 @@ fn windows_vk(key: Key) -> VIRTUAL_KEY {
 
 #[cfg(windows)]
 fn windows_key_input(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+    let extended = matches!(
+        vk,
+        VK_RCONTROL
+            | VK_RMENU
+            | VK_LWIN
+            | VK_RWIN
+            | VK_DELETE
+            | VK_UP
+            | VK_DOWN
+            | VK_LEFT
+            | VK_RIGHT
+            | VK_HOME
+            | VK_END
+            | VK_PRIOR
+            | VK_NEXT
+    );
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: vk,
-                wScan: 0,
-                dwFlags: flags,
+                wScan: unsafe { MapVirtualKeyW(vk.0 as u32, MAPVK_VK_TO_VSC) } as u16,
+                dwFlags: if extended {
+                    flags | KEYEVENTF_EXTENDEDKEY
+                } else {
+                    flags
+                },
                 time: 0,
                 dwExtraInfo: 0,
             },
         },
+    }
+}
+
+#[cfg(windows)]
+fn windows_text_inputs(c: char) -> Vec<INPUT> {
+    if c == '\n' {
+        return vec![
+            windows_key_input(VK_RETURN, KEYBD_EVENT_FLAGS::default()),
+            windows_key_input(VK_RETURN, KEYEVENTF_KEYUP),
+        ];
+    }
+    let mut buffer = [0; 2];
+    let mut inputs = Vec::with_capacity(4);
+    for unit in c.encode_utf16(&mut buffer) {
+        for flags in [KEYEVENTF_UNICODE, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP] {
+            inputs.push(INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: VIRTUAL_KEY(0),
+                        wScan: *unit,
+                        dwFlags: flags,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            });
+        }
+    }
+    inputs
+}
+
+#[cfg(windows)]
+fn send_windows_inputs(inputs: &[INPUT]) -> Result<()> {
+    let sent = unsafe { SendInput(inputs, size_of::<INPUT>() as i32) };
+    if sent == inputs.len() as u32 {
+        Ok(())
+    } else {
+        Err(SpotterError::Platform(format!(
+            "keyboard: SendInput sent {sent}/{} events: {}",
+            inputs.len(),
+            std::io::Error::last_os_error()
+        )))
     }
 }
 
@@ -491,16 +590,7 @@ fn send_windows_shortcut(keys: &[Key]) -> Result<()> {
         inputs.push(windows_key_input(windows_vk(*modifier), KEYEVENTF_KEYUP));
     }
 
-    let sent = unsafe { SendInput(&inputs, size_of::<INPUT>() as i32) };
-    if sent == inputs.len() as u32 {
-        Ok(())
-    } else {
-        Err(SpotterError::Platform(format!(
-            "keyboard_shortcut: SendInput sent {sent}/{} events: {}",
-            inputs.len(),
-            std::io::Error::last_os_error()
-        )))
-    }
+    send_windows_inputs(&inputs)
 }
 
 pub fn parse_key(s: &str) -> Result<Key> {
@@ -514,6 +604,57 @@ pub fn parse_keys(names: &[String]) -> Result<Vec<Key>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_null_text_before_emitting_input() {
+        assert!(keyboard_type("before\0after").is_err());
+        assert!(keyboard_type("").is_ok());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn unicode_surrogate_releases_match_their_own_code_units() {
+        let inputs = windows_text_inputs('😀');
+        let scans: Vec<_> = inputs
+            .iter()
+            .map(|input| unsafe { input.Anonymous.ki.wScan })
+            .collect();
+        assert_eq!(scans, vec![0xD83D, 0xD83D, 0xDE00, 0xDE00]);
+        for (i, input) in inputs.iter().enumerate() {
+            let key = unsafe { input.Anonymous.ki };
+            assert_eq!(key.wVk, VIRTUAL_KEY(0));
+            assert_eq!(
+                key.dwFlags,
+                if i % 2 == 0 {
+                    KEYEVENTF_UNICODE
+                } else {
+                    KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
+                }
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn newline_is_one_enter_and_tab_is_literal_unicode() {
+        let newline = windows_text_inputs('\n');
+        assert_eq!(newline.len(), 2);
+        assert_eq!(unsafe { newline[0].Anonymous.ki.wVk }, VK_RETURN);
+        let tab = windows_text_inputs('\t');
+        assert_eq!(tab.len(), 2);
+        assert_eq!(unsafe { tab[0].Anonymous.ki.wVk }, VIRTUAL_KEY(0));
+        assert_eq!(unsafe { tab[0].Anonymous.ki.wScan }, 9);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn right_modifiers_and_navigation_have_extended_key_flags() {
+        for key in [VK_RCONTROL, VK_RMENU, VK_LEFT, VK_DELETE] {
+            let input = windows_key_input(key, KEYBD_EVENT_FLAGS::default());
+            assert_ne!(unsafe { input.Anonymous.ki.wScan }, 0);
+            assert_eq!(unsafe { input.Anonymous.ki.dwFlags }, KEYEVENTF_EXTENDEDKEY);
+        }
+    }
 
     #[test]
     fn parse_common_keys() {

@@ -536,6 +536,43 @@ describe("OCR engine", () => {
     expect(prepared.data[0]).toBe(prepared.data[1]);
     expect(prepared.data[1]).toBe(prepared.data[2]);
   });
+
+  it("restores source coordinates after preprocessing before applying crop and origin offsets", async () => {
+    const engine = fakeEngine([{
+      text: "Save", score: 1,
+      region: { left: 2, top: 4, width: 6, height: 4 },
+      box: [{ x: 2, y: 4 }, { x: 8, y: 4 }, { x: 8, y: 8 }, { x: 2, y: 8 }],
+      center: { x: 5, y: 6 },
+    }]);
+    const ocr = await createOcr({ engine, preprocess: { scale: 2 } });
+    const [line] = await ocr.read({ data: Buffer.alloc(10 * 10 * 4, 255), width: 10, height: 10 }, {
+      origin: { x: 100, y: 200 },
+      searchRegion: { left: 2, top: 3, width: 5, height: 5 },
+    });
+
+    expect(vi.mocked(engine.read).mock.calls[0][0]).toMatchObject({ width: 10, height: 10 });
+    expect(line.region).toEqual({ left: 103, top: 205, width: 3, height: 2 });
+    expect(line.box).toEqual([{ x: 103, y: 205 }, { x: 106, y: 205 }, { x: 106, y: 207 }, { x: 103, y: 207 }]);
+    expect(line.center).toEqual({ x: 104, y: 206 });
+  });
+
+  it("uses the clipped crop origin when the requested search region starts outside the image", async () => {
+    const engine = fakeEngine([{
+      text: "Save", score: 1,
+      region: { left: 0, top: 0, width: 2, height: 2 },
+      box: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 2 }],
+      center: { x: 1, y: 1 },
+    }]);
+    const ocr = await createOcr({ engine });
+    const [line] = await ocr.read({ data: Buffer.alloc(4 * 4 * 4, 255), width: 4, height: 4 }, {
+      origin: { x: 100, y: 200 },
+      searchRegion: { left: -2, top: -1, width: 4, height: 3 },
+    });
+
+    expect(vi.mocked(engine.read).mock.calls[0][0]).toMatchObject({ width: 2, height: 2 });
+    expect(line.region).toEqual({ left: 100, top: 200, width: 2, height: 2 });
+    expect(line.box[0]).toEqual({ x: 100, y: 200 });
+  });
 });
 
 describe("image helpers", () => {

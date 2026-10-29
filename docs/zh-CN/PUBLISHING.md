@@ -20,6 +20,34 @@ npm run build:native
 npm run smoke
 ```
 
+如果改动涉及 `apps/mobile-companion`，还需要运行：
+
+```bash
+npm run mobile:check
+npm run mobile:build:release
+```
+
+## 本地验证尚未发布的 CLI
+
+在首次发布新的 `@spotterjs/cli` 包之前，用已构建的源码入口和本地包验证器检查当前检出：
+
+```bash
+npm run build
+node packages/cli/dist/cli.js --help
+node packages/cli/dist/cli.js list --all
+node packages/cli/dist/cli.js schema desktop_a11y_action
+npm run verify:cli-install
+```
+
+验证器打包当前 workspaces，准备本机 native 平台包，在新建的临时项目中安装这些 tarball，
+验证安装后的可执行文件、命令 schema、stdin/Unicode JSON、序列、Skill 安装和 native 加载。
+运行前先完整构建所有包，包括 native 代码。`verify-pack` 单独检查包内容，不执行发布；
+检查 CLI 包内包含 `dist/cli.js`、运行时文件、`skills/spotterjs/SKILL.md`、
+Skill 参考文件和 `LICENSE`。
+
+发布后验证部分的 `npx @spotterjs/cli` 使用 registry 中的已发布包，不能用于选择当前源码版本。
+保留原有包的历史 changelog，新 CLI 的发布记录由其自己的 changeset 生成。
+
 ## Git 远程
 
 ```bash
@@ -81,7 +109,13 @@ npm publish ./crates/spotterjs-node/linux-x64-gnu
 
 ### JS 加载器
 
-平台包发布后：
+平台包发布后，先检查精确的 optional dependency 版本在 npm 中可用：
+
+```bash
+npm run verify:native-published
+```
+
+然后发布 loader：
 
 ```bash
 npm publish -w @spotterjs/node
@@ -94,9 +128,9 @@ npm publish -w @spotterjs/node
 ```bash
 npm publish -w @spotterjs/base
 npm publish -w @spotterjs/core
-npm publish -w @spotterjs/mcp
 npm publish -w @spotterjs/plugin-ocr
 npm publish -w @spotterjs/plugin-android
+npm publish -w @spotterjs/cli
 ```
 
 如果使用 changesets publish：
@@ -106,6 +140,18 @@ npm run release
 ```
 
 发布前确认 `NPM_TOKEN` 可用，并且 npm registry 指向公开 registry。
+
+## Mobile companion APK
+
+手机端 companion app 以 Android APK 分发，不作为 npm 包发布。从仓库根目录构建 split-ABI release APK：
+
+```bash
+npm run mobile:build:release
+```
+
+产物位于 `apps/mobile-companion/build/app/outputs/flutter-apk/`。
+
+公开分发前，需要把 `apps/mobile-companion/android/app/build.gradle.kts` 中的 debug signing config 替换为项目正式 keystore 策略。当前 debug-signed release build 只适合内部测试，不应公开发布。
 
 ## 发布后验证
 
@@ -117,10 +163,12 @@ npm install @spotterjs/core
 node -e "const s=require('@spotterjs/core'); console.log(Object.keys(s).slice(0, 5))"
 ```
 
-MCP 包验证：
+CLI 包验证：
 
 ```bash
-npx @modelcontextprotocol/inspector npx @spotterjs/mcp
+npx @spotterjs/cli --help
+npx @spotterjs/cli list
+npx @spotterjs/cli skill path
 ```
 
 ## 授权说明

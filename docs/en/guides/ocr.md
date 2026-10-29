@@ -100,6 +100,8 @@ Common codes include `SPOTTER_OCR_MODEL_PROFILE_UNKNOWN`,
 
 OCR results are relative to the input image by default. When you OCR a cropped
 screen image, pass `origin` to translate results back to screen coordinates.
+Preprocessing scale is reversed before returning geometry, so regions, boxes,
+and centers remain in source pixels before crop and origin offsets are added.
 
 ```typescript
 const line = await ocr.findText(cap, "Send", {
@@ -108,12 +110,12 @@ const line = await ocr.findText(cap, "Send", {
 });
 ```
 
-When using OCR after MCP capture, capture tools default to `detail: "high"` and
+When using OCR after CLI capture, capture tools default to `detail: "high"` and
 may downscale the artifact. Use `detail: "original"` for small text, dense UI,
 or pixel-level positioning, then pass the returned `imagePath` to
 `ocr_read_image` or `ocr_find_text`.
 
-For live desktop OCR through MCP, prefer `desktop_capture_and_ocr` when the
+For live desktop OCR through CLI, prefer `desktop_capture_and_ocr` when the
 agent does not need a separate capture step:
 
 ```json

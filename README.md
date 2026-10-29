@@ -5,7 +5,7 @@
 spotterjs is a TypeScript-first desktop automation toolkit backed by Rust native
 addons. It provides screen capture, mouse and keyboard input, window discovery,
 accessibility automation, NCC template matching, OCR, Android companion automation,
-and an MCP server for code agents.
+and a CLI with a bundled Skill for code agents.
 
 - Source: [GitHub repository](https://github.com/yinpeilin/spotterjs)
 - npm packages: `@spotterjs/core` and optional plugins
@@ -69,6 +69,22 @@ mouse.tap(match.center.x, match.center.y);
 `screen.findTemplate` accepts either an image path or an encoded PNG/JPEG/WebP `Buffer`.
 Match results use screen coordinates.
 
+## CLI + Skill for agents
+
+Build the source checkout and discover commands:
+
+```bash
+npm ci
+npm run build:ts
+node packages/cli/dist/cli.js list
+node packages/cli/dist/cli.js run desktop_list_windows
+```
+
+Install the bundled Skill into an agent skills directory with
+`node packages/cli/dist/cli.js skill install --target <skills-directory>`.
+For published releases, use `npx @spotterjs/cli` or install `@spotterjs/cli` globally.
+See [CLI + Skill](./docs/en/CLI.md) for JSON parameters and safe text input.
+
 ## Packages
 
 | Package | Required | Purpose |
@@ -78,7 +94,7 @@ Match results use screen coordinates.
 | `@spotterjs/node` | Transitive | Native loader for capture, input, windows, accessibility, image, and NCC matching |
 | `@spotterjs/node-win32-x64-msvc` | Optional | Windows x64 native binary |
 | `@spotterjs/node-linux-x64-gnu` | Optional | Linux x64 glibc native binary |
-| `@spotterjs/mcp` | Optional | MCP server for desktop, Android, OCR, and workspace tools |
+| `@spotterjs/cli` | Optional | JSON CLI and agent Skill for desktop, Android, OCR, and workspace commands |
 | `@spotterjs/plugin-android` | Optional | Android automation through the mobile companion app |
 | `@spotterjs/plugin-ocr` | Optional | OCR with ONNX Runtime |
 
@@ -88,11 +104,12 @@ Match results use screen coordinates.
 - [Desktop automation](./docs/en/guides/desktop-automation.md): windows, capture, input, clipboard, and coordinates.
 - [Template matching](./docs/en/MATCHING.md): NCC options, encoded buffers, regions, and performance.
 - [Accessibility automation](./docs/en/guides/accessibility.md): UIA / AT-SPI trees, queries, and diagnostics.
-- [MCP server](./docs/en/MCP.md): client configuration, tools, response shapes, and security policy.
+- [CLI + Skill](./docs/en/CLI.md): command discovery, JSON input/output, sequences, and agent Skill installation.
 - [Android companion](./docs/en/guides/android-companion.md): WebSocket pairing, session reuse, device input, and accessibility tree API.
+- [Mobile companion app](./docs/en/guides/mobile-companion.md): Flutter setup, checks, APK builds, and release notes.
 - [OCR plugin](./docs/en/guides/ocr.md): model cache, download sources, local models, coordinates, and testing.
 - [Examples](./docs/en/examples.md): Paint examples, smoke scripts, integration scripts, and benchmarks.
-- [Troubleshooting](./docs/en/troubleshooting.md): native loading, matching, Android companion, OCR, and MCP issues.
+- [Troubleshooting](./docs/en/troubleshooting.md): native loading, matching, Android companion, OCR, and CLI issues.
 
 Maintainer docs:
 

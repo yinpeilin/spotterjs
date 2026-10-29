@@ -142,66 +142,33 @@ companion app 会序列化 Android accessibility 节点，包括 text、resource
 class name、package name、content description、bounds、center、状态标记、
 depth、path 和 children。
 
-## MCP 中使用
+## CLI 中使用
 
-在 MCP Server 中启用 Android 工具：
+在当前 shell 启用 Android 命令：
 
-```json
-{
-  "env": {
-    "SPOTTERJS_ANDROID": "1"
-  }
-}
+```powershell
+$env:SPOTTERJS_ANDROID = '1'
+spotterjs schema android_connect
+spotterjs sequence --file phones.json
 ```
 
-使用 `android_connect` 传 `{ "url": "...", "code": "..." }` 完成配对，或传
-`{ "url": "...", "sessionToken": "..." }` 复用已有 session。
-
-`android_connect` 会返回 `deviceId`，默认是 `"default"`。后续工具可以只传
-`{ "deviceId": "default" }`，也可以继续使用旧式 `{ "url": "...", "sessionToken": "..." }`。
-
-多设备时，为每台设备显式指定 `deviceId`：
+把连接和后续命令放到同一个计划文件，在同一进程中复用会话：
 
 ```json
-{
-  "deviceId": "pixel-lab",
-  "url": "ws://192.168.1.23:17341",
-  "code": "123456"
-}
+[
+  { "name": "android_connect", "arguments": { "deviceId": "phone-1", "url": "ws://192.168.1.23:17341", "code": "123456" } },
+  { "name": "android_launch_app", "arguments": { "deviceId": "phone-1", "packageName": "com.android.settings" } },
+  { "name": "android_current_app", "arguments": { "deviceId": "phone-1" } }
+]
 ```
 
-```json
-{
-  "deviceId": "samsung-lab",
-  "url": "ws://192.168.1.24:17341",
-  "sessionToken": "saved-session-token"
-}
-```
+多设备使用不同的 `deviceId`。`android_list_devices` 只列出当前进程缓存的连接，
+进程退出即关闭。配对后安全保存返回的 session token，下次可以认证重连。
+独立 CLI 调用不能复用上一次进程的 `deviceId`；每次动作都传 `url` 和 `sessionToken`。
+同一 sequence 内，后续命令可以只传已缓存的 `deviceId`。
 
-后续调用只需要传对应的 `deviceId`。`android_list_devices` 可以列出 MCP
-server 当前缓存的设备；`android_disconnect` 可以关闭某台设备的连接。
-
-典型 MCP 闭环：
-
-```json
-{ "url": "ws://192.168.1.23:17341", "code": "123456" }
-```
-
-```json
-{ "deviceId": "default", "packageName": "com.android.settings" }
-```
-
-```json
-{
-  "deviceId": "default",
-  "textContains": "Settings",
-  "waitTimeoutMs": 5000,
-  "pollMs": 250,
-  "maxDepth": 8
-}
-```
-
-工具列表和请求形状见 [MCP Server](../MCP.md)。
+JSON 文件、结构化结果、会话生命周期和失败处理见 [CLI + Skill](../CLI.md)
+和[序列编排](./sequences.md)。
 
 ## Smoke 测试
 
@@ -224,8 +191,8 @@ npm run smoke:android
 
 ## 截图和模板匹配
 
-先在 app 的权限面板中授权屏幕截图，再调用视觉 MCP 工具。companion 会通过已配对
-WebSocket 返回 PNG 帧；MCP server 会写入 `.spotter/artifacts`，并返回
+先在 app 的权限面板中授权屏幕截图，再调用视觉 CLI 工具。companion 会通过已配对
+WebSocket 返回 PNG 帧；CLI 会写入 `.spotter/artifacts`，并返回
 `coordinateSpace: "android-device"`。
 
 ```json

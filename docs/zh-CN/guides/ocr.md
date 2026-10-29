@@ -64,12 +64,12 @@ const line = await ocr.findText(cap, "Send", {
 });
 ```
 
-通过 MCP 截图后再做 OCR 时，截图工具默认会用 `detail: "high"` 控制
+通过 CLI 截图后再做 OCR 时，截图工具默认会用 `detail: "high"` 控制
 artifact 尺寸。识别小字、密集 UI 或需要像素级定位时，先用
 `detail: "original"` 获取原尺寸 PNG，再把返回的 `imagePath` 传给
 `ocr_read_image` 或 `ocr_find_text`。
 
-通过 MCP 做实时桌面 OCR 时，如果 agent 不需要单独控制截图步骤，优先使用
+通过 CLI 做实时桌面 OCR 时，如果 agent 不需要单独控制截图步骤，优先使用
 `desktop_capture_and_ocr`：
 
 ```json
@@ -85,6 +85,9 @@ artifact 尺寸。识别小字、密集 UI 或需要像素级定位时，先用
 这个组合工具只截图一次，默认以 `detail: "original"` 写出 artifact，并在同一张原始内存截图上执行 OCR。
 返回结果使用 `coordinateSpace: "screen"`。不传 `text` 时返回 `lines`；传入 `text` 时返回
 `matches`。开启 `debugImage: true` 后，未匹配场景也会带上 scored `candidates` 方便排查。
+
+预处理放大不会改变结果坐标系：返回前会把 region、box 和 center 换算回输入原图像素，
+再叠加实际裁剪位置和 `origin` 偏移。
 
 ## 模型缓存
 

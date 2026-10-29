@@ -1,6 +1,6 @@
 # Contributing
 
-欢迎参与 spotterjs。这个仓库同时包含 TypeScript 包、Rust crate、native package、MCP Server、插件和脚本，请在改动前先确认对应边界。
+欢迎参与 spotterjs。这个仓库同时包含 TypeScript 包、Rust crate、native package、CLI、插件和脚本，请在改动前先确认对应边界。
 
 ## Setup
 
@@ -33,7 +33,7 @@ More details:
 
 - [文档入口](docs/README.md)
 - [模板匹配](docs/MATCHING.md)
-- [MCP Server](docs/MCP.md)
+- [CLI](docs/CLI.md)
 - [架构说明](docs/development/architecture.md)
 - [文档规范](docs/development/documentation-style.md)
 

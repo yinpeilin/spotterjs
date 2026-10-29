@@ -1,0 +1,61 @@
+{
+  "name": "@spotterjs/cli",
+  "version": "1.0.5",
+  "description": "spotterjs command-line automation and agent skill",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yinpeilin/spotterjs.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/yinpeilin/spotterjs/issues"
+  },
+  "homepage": "https://github.com/yinpeilin/spotterjs#readme",
+  "main": "dist/runtime.js",
+  "types": "dist/runtime.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js",
+      "default": "./dist/runtime.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bin": {
+    "spotterjs": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "prepublishOnly": "npm run build && node ../../scripts/sync-license.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@spotterjs/base": "1.0.5",
+    "@spotterjs/core": "1.0.5",
+    "@spotterjs/plugin-android": "1.0.5",
+    "@spotterjs/plugin-ocr": "1.0.5",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^3.0.0"
+  }
+}

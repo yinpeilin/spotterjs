@@ -84,6 +84,56 @@ fn recorded_script_json_roundtrips() {
     let decoded: RecordedScript = serde_json::from_str(&json).unwrap();
 
     assert_eq!(decoded, script);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&json).unwrap(),
+        serde_json::json!({
+            "events": [{"type": "type", "text": "hello", "delayMs": 12}],
+            "durationMs": 12
+        })
+    );
+}
+
+#[test]
+fn recordings_accept_legacy_field_names_and_emit_the_typescript_contract() {
+    let legacy = serde_json::json!({
+        "duration_ms": 30,
+        "events": [
+            {"type": "move", "x": 1, "y": 2, "delay_ms": 5},
+            {"type": "click", "button": "left", "x": 1, "y": 2, "delay_ms": 5},
+            {"type": "scroll", "dx": 0, "dy": 1, "delay_ms": 5},
+            {"type": "keyDown", "key": "A", "delay_ms": 5},
+            {"type": "keyUp", "key": "A", "delay_ms": 5},
+            {"type": "type", "text": "中文 😀", "delay_ms": 5}
+        ]
+    });
+    let script: RecordedScript = serde_json::from_value(legacy).unwrap();
+    let public = serde_json::to_value(&script).unwrap();
+    assert_eq!(public["durationMs"], 30);
+    assert!(public.get("duration_ms").is_none());
+    for action in public["events"].as_array().unwrap() {
+        assert_eq!(action["delayMs"], 5);
+        assert!(action.get("delay_ms").is_none());
+    }
+    assert_eq!(
+        serde_json::from_value::<RecordedScript>(public).unwrap(),
+        script
+    );
+}
+
+#[test]
+fn listener_events_use_camel_case_timestamps_and_accept_legacy_input() {
+    for legacy in [
+        serde_json::json!({"type": "mouseMove", "x": 1, "y": 2, "t_ms": 42}),
+        serde_json::json!({"type": "mouseButton", "button": "left", "pressed": true, "x": 1, "y": 2, "t_ms": 42}),
+        serde_json::json!({"type": "wheel", "dx": 0, "dy": 1, "t_ms": 42}),
+        serde_json::json!({"type": "key", "key": "A", "pressed": true, "t_ms": 42}),
+    ] {
+        let event: InputEvent = serde_json::from_value(legacy).unwrap();
+        let public = serde_json::to_value(&event).unwrap();
+        assert_eq!(public["tMs"], 42);
+        assert!(public.get("t_ms").is_none());
+        assert_eq!(serde_json::from_value::<InputEvent>(public).unwrap(), event);
+    }
 }
 
 #[test]

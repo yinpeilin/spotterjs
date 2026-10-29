@@ -105,11 +105,11 @@ the real desktop, so run them on a machine where that is safe.
 | Semantic UI controls | [`accessibility`](./guides/accessibility.md) |
 | Text in screenshots | [`@spotterjs/plugin-ocr`](./guides/ocr.md) |
 | Android devices | [`@spotterjs/plugin-android`](./guides/android-companion.md) |
-| Code-agent tools | [`@spotterjs/mcp`](./MCP.md) |
+| Code-agent tools | [`@spotterjs/cli`](./CLI.md) |
 
 ## Next Steps
 
 - Build a desktop script: [Desktop automation](./guides/desktop-automation.md).
 - Match visual templates: [Template matching](./MATCHING.md).
-- Connect an MCP client: [MCP server](./MCP.md).
+- Automate from an agent shell: [CLI + Skill](./CLI.md).
 - Debug common setup issues: [Troubleshooting](./troubleshooting.md).

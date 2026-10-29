@@ -17,7 +17,7 @@ import { listDir, readFile, stat, writeFile } from "./fs";
 import { openPath } from "./open";
 
 /**
- * Sandboxed workspace I/O for agent and MCP scenarios.
+ * Sandboxed workspace I/O for agent and CLI scenarios.
  *
  * - All user paths are constrained to `workspaceRoot`.
  * - Writes to sensitive files such as `.env` are blocked by default.

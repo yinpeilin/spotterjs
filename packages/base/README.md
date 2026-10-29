@@ -6,7 +6,7 @@ spotterjs packages.
 Most users get this package through `@spotterjs/core`, but it can be installed
 directly when you need public types for integrations, plugins, or tests.
 
-中文文档：本包的类型说明与坐标约定也适用于中文指南中的 `@spotterjs/core`、MCP 和 OCR 示例。
+中文文档：本包的类型说明与坐标约定也适用于中文指南中的 `@spotterjs/core`、CLI 和 OCR 示例。
 
 ## Install
 

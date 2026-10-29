@@ -50,12 +50,12 @@ async function focusAndWait(windowId, title) {
   for (let i = 0; i < 20; i += 1) {
     windows.focus(windowId);
     await sleep(150);
-    const active = windows.active();
+    const active = windows.getActive();
     if (active.id === windowId || active.title === title) {
       return active;
     }
   }
-  return windows.active();
+  return windows.getActive();
 }
 
 async function waitForState(statePath, expected) {
@@ -97,7 +97,7 @@ async function runCase(name, write) {
   }
 
   await sleep(300);
-  const region = windows.region(win.id);
+  const region = windows.getRegion(win.id);
   mouse.tap(
     region.left + Math.floor(region.width / 2),
     region.top + 80
@@ -138,7 +138,7 @@ async function run() {
     const previous = `previous-${Date.now()}`;
     clipboard.set(previous);
     const text = `paste-${Date.now()} \u4e2d\u6587 caf\u00e9 123`;
-    keyboard.write(text, { restoreClipboard: true });
+    keyboard.write(text, { mode: "paste", restoreClipboard: true });
     await sleep(500);
     console.log(`clipboardAfterPaste=${JSON.stringify(clipboard.get())}`);
     if (clipboard.get() !== previous) {

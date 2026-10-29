@@ -1,7 +1,7 @@
 import * as path from "path";
 
 /**
- * Workspace host I/O configuration for agent and MCP scenarios.
+ * Workspace host I/O configuration for agent and CLI scenarios.
  *
  * Defaults are read from environment variables and can be overridden with
  * {@link configureHost}.

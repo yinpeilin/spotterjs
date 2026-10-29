@@ -22,7 +22,7 @@ vi.mock("./native", () => ({
   }),
 }));
 
-import { keyboard } from "./index";
+import { keyboard, type KeyName } from "./index";
 
 beforeEach(() => {
   keyboardTypeText.mockReset();
@@ -36,10 +36,60 @@ beforeEach(() => {
 });
 
 describe("keyboard", () => {
-  it("writes text by pasting through the clipboard and restores the previous clipboard", () => {
-    clipboardGet.mockReturnValue("previous");
+  it.each([
+    "hello 中文 😀",
+    "!@#$%^&*(){}[]\\\"'`~",
+    "a\nb\r\nc\td",
+    "Enter",
+    "abc".repeat(10_000),
+  ])("types literal text using native input by default", (text) => {
+    keyboard.type(text, { autoDelayMs: 0 });
+    expect(keyboardTypeText).toHaveBeenCalledWith(text, { autoDelayMs: 0 });
+    expect(clipboardGet).not.toHaveBeenCalled();
+    expect(clipboardSet).not.toHaveBeenCalled();
+  });
 
-    keyboard.write("hello");
+  it("does nothing for empty text in either mode", () => {
+    keyboard.write("");
+    keyboard.write("", { mode: "paste" });
+    expect(keyboardTypeText).not.toHaveBeenCalled();
+    expect(clipboardSet).not.toHaveBeenCalled();
+    expect(keyboardShortcut).not.toHaveBeenCalled();
+  });
+
+  it.each(["a\0b", "\uD800", "\uDC00"])(
+    "rejects invalid text before emitting any input",
+    (text) => {
+      expect(() => keyboard.type(text)).toThrow("valid Unicode");
+      expect(keyboardTypeText).not.toHaveBeenCalled();
+      expect(clipboardSet).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([NaN, Infinity, -1])("rejects invalid delays", (autoDelayMs) => {
+    expect(() => keyboard.write("hello", { autoDelayMs })).toThrow("delays");
+    expect(keyboardTypeText).not.toHaveBeenCalled();
+  });
+
+  it("allows extra time for slow paste targets", () => {
+    const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
+    keyboard.write("hello", { mode: "paste", pasteDelayMs: 800 });
+    expect(wait.mock.calls[0][3]).toBe(800);
+    wait.mockRestore();
+  });
+
+  it("preserves new clipboard contents copied during a paste", () => {
+    clipboardGet
+      .mockReturnValueOnce("previous")
+      .mockReturnValue("new user copy");
+    keyboard.write("hello", { mode: "paste" });
+    expect(clipboardSet).toHaveBeenCalledTimes(1);
+    expect(clipboardSet).toHaveBeenCalledWith("hello");
+  });
+  it("writes text by pasting through the clipboard and restores the previous clipboard", () => {
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
+
+    keyboard.write("hello", { mode: "paste" });
 
     expect(clipboardGet).toHaveBeenCalled();
     expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
@@ -50,12 +100,12 @@ describe("keyboard", () => {
 
   it("waits long enough for paste-mode text to be consumed before restoring the clipboard", () => {
     const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
-    clipboardGet.mockReturnValue("previous");
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
 
-    keyboard.write("hello");
+    keyboard.write("hello", { mode: "paste" });
 
     expect(wait).toHaveBeenCalledTimes(1);
-    expect(wait.mock.calls[0][3]).toBe(50);
+    expect(wait.mock.calls[0][3]).toBe(250);
     expect(wait.mock.invocationCallOrder[0]).toBeLessThan(
       clipboardSet.mock.invocationCallOrder[1]
     );
@@ -65,10 +115,12 @@ describe("keyboard", () => {
 
   it("still writes text when the previous clipboard text is unavailable", () => {
     clipboardGet.mockImplementation(() => {
-      throw new Error("[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty");
+      throw new Error(
+        "[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty"
+      );
     });
 
-    keyboard.write("hello");
+    keyboard.write("hello", { mode: "paste" });
 
     expect(clipboardSet).toHaveBeenCalledTimes(1);
     expect(clipboardSet).toHaveBeenCalledWith("hello");
@@ -76,9 +128,9 @@ describe("keyboard", () => {
   });
 
   it("restores an empty previous clipboard text", () => {
-    clipboardGet.mockReturnValue("");
+    clipboardGet.mockReturnValueOnce("").mockReturnValue("hello");
 
-    keyboard.write("hello");
+    keyboard.write("hello", { mode: "paste" });
 
     expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
     expect(clipboardSet).toHaveBeenNthCalledWith(2, "");
@@ -89,7 +141,7 @@ describe("keyboard", () => {
       throw new Error("clipboard_get should not be called");
     });
 
-    keyboard.write("hello", { restoreClipboard: false });
+    keyboard.write("hello", { mode: "paste", restoreClipboard: false });
 
     expect(clipboardGet).not.toHaveBeenCalled();
     expect(clipboardSet).toHaveBeenCalledTimes(1);
@@ -98,12 +150,14 @@ describe("keyboard", () => {
   });
 
   it("restores the previous clipboard when paste hotkey typing fails", () => {
-    clipboardGet.mockReturnValue("previous");
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
     keyboardShortcut.mockImplementation(() => {
       throw new Error("native key failed");
     });
 
-    expect(() => keyboard.write("hello")).toThrow("native key failed");
+    expect(() => keyboard.write("hello", { mode: "paste" })).toThrow(
+      "native key failed"
+    );
 
     expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
     expect(keyboardShortcut).toHaveBeenCalledWith(["Ctrl", "V"]);
@@ -112,13 +166,17 @@ describe("keyboard", () => {
 
   it("does not restore clipboard text that was unavailable when paste fails", () => {
     clipboardGet.mockImplementation(() => {
-      throw new Error("[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty");
+      throw new Error(
+        "[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty"
+      );
     });
     keyboardShortcut.mockImplementation(() => {
       throw new Error("native key failed");
     });
 
-    expect(() => keyboard.write("hello")).toThrow("native key failed");
+    expect(() => keyboard.write("hello", { mode: "paste" })).toThrow(
+      "native key failed"
+    );
 
     expect(clipboardSet).toHaveBeenCalledTimes(1);
     expect(clipboardSet).toHaveBeenCalledWith("hello");
@@ -126,12 +184,14 @@ describe("keyboard", () => {
   });
 
   it("propagates clipboard set failures without sending the paste hotkey", () => {
-    clipboardGet.mockReturnValue("previous");
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
     clipboardSet.mockImplementationOnce(() => {
       throw new Error("clipboard_set failed");
     });
 
-    expect(() => keyboard.write("hello")).toThrow("clipboard_set failed");
+    expect(() => keyboard.write("hello", { mode: "paste" })).toThrow(
+      "clipboard_set failed"
+    );
 
     expect(clipboardSet).toHaveBeenCalledTimes(1);
     expect(keyboardPressKeys).not.toHaveBeenCalled();
@@ -141,18 +201,22 @@ describe("keyboard", () => {
   });
 
   it("passes per-call delay through paste-mode hotkey calls", () => {
-    clipboardGet.mockReturnValue("previous");
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
 
-    keyboard.write("hello", { autoDelayMs: 30 });
+    keyboard.write("hello", { mode: "paste", autoDelayMs: 30 });
 
-    expect(keyboardShortcut).toHaveBeenCalledWith(["Ctrl", "V"], { autoDelayMs: 30 });
+    expect(keyboardShortcut).toHaveBeenCalledWith(["Ctrl", "V"], {
+      autoDelayMs: 30,
+    });
   });
 
   it("uses the platform paste shortcut in paste mode", () => {
-    const platform = vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
-    clipboardGet.mockReturnValue("previous");
+    const platform = vi
+      .spyOn(process, "platform", "get")
+      .mockReturnValue("darwin");
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
 
-    keyboard.write("hello");
+    keyboard.write("hello", { mode: "paste" });
 
     expect(keyboardShortcut).toHaveBeenCalledWith(["Meta", "V"]);
 
@@ -165,12 +229,12 @@ describe("keyboard", () => {
   });
 
   it("keeps writeText as an alias of write", () => {
-    clipboardGet.mockReturnValue("previous");
+    clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
 
     keyboard.writeText("hello");
 
-    expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
-    expect(keyboardShortcut).toHaveBeenCalledWith(["Ctrl", "V"]);
+    expect(keyboardTypeText).toHaveBeenCalledWith("hello");
+    expect(clipboardSet).not.toHaveBeenCalled();
   });
 
   it("does not touch the clipboard in native text input mode", () => {
@@ -227,6 +291,29 @@ describe("keyboard", () => {
   it("uses rawUp to force a native key-up event", () => {
     keyboard.rawUp(["Ctrl"]);
     expect(keyboardReleaseKeys).toHaveBeenCalledWith(["Ctrl"]);
+  });
+
+  it.each([
+    ["Ctrl", "LeftControl"], ["LeftControl", "control"],
+    ["Shift", "LeftShift"], ["LeftShift", "shift"],
+    ["Alt", "LeftAlt"], ["LeftAlt", "alt"],
+    ["Meta", "LeftSuper"], ["Win", "LeftSuper"], ["Cmd", "LeftSuper"],
+    ["LeftSuper", "meta"],
+  ])("releases the same physical modifier across aliases %s / %s", (down, up) => {
+    keyboard.down(down as KeyName);
+    keyboard.up(up as KeyName);
+    expect(keyboardReleaseKeys).toHaveBeenCalledOnce();
+    expect(keyboardReleaseKeys).toHaveBeenCalledWith([up]);
+    keyboard.up(down as KeyName);
+    expect(keyboardReleaseKeys).toHaveBeenCalledOnce();
+  });
+
+  it("keeps left and right modifiers distinct", () => {
+    keyboard.down("RightControl");
+    keyboard.up("Ctrl");
+    expect(keyboardReleaseKeys).not.toHaveBeenCalled();
+    keyboard.up("RightControl");
+    expect(keyboardReleaseKeys).toHaveBeenCalledWith(["RightControl"]);
   });
 
   it("runs multi-key hotkeys through the native shortcut API", () => {

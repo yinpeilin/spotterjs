@@ -80,7 +80,7 @@ See [Android companion automation](./guides/android-companion.md).
 
 See [OCR plugin](./guides/ocr.md).
 
-## MCP Host Tools Cannot Read or Write Files
+## CLI Host Tools Cannot Read or Write Files
 
 Check:
 
@@ -89,7 +89,7 @@ Check:
 - The write target is not a denied file such as `.env` or `credentials.json`.
 - `host_exec` has `SPOTTERJS_ALLOW_SHELL=1` when shell execution is needed.
 
-See [MCP server](./MCP.md).
+See [CLI](./CLI.md).
 
 ## Structured Error Codes
 
@@ -99,8 +99,8 @@ First-party libraries throw `SpotterError` with
 
 Common setup codes include `SPOTTER_NATIVE_PACKAGE_MISSING`,
 `SPOTTER_NATIVE_LOAD_FAILED`, `SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`, and
-`SPOTTER_ANDROID_COMPANION_TIMEOUT`. MCP tool failures include the same
-`code`, compressed `context`, and `domain` in the text result.
+`SPOTTER_ANDROID_COMPANION_TIMEOUT`. CLI command failures include the same
+`code`, summarized `context`, and `domain` in the JSON `error` object.
 
 ## Markdown Check Fails
 

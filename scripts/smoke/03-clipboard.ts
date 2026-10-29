@@ -3,12 +3,22 @@ import { info, runSmokeScript } from "../lib/log";
 
 export async function run(): Promise<void> {
   const token = `spotterjs-smoke-${process.pid}`;
-  clipboard.set(token);
-  const read = clipboard.get();
-  if (read !== token) {
-    throw new Error(`clipboard mismatch: expected "${token}", got "${read}"`);
+  let previous: string | undefined;
+  try { previous = clipboard.get(); } catch { /* Clipboard may have no text. */ }
+  try {
+    clipboard.set(token);
+    const read = clipboard.get();
+    if (read !== token) {
+      throw new Error(`clipboard mismatch: expected "${token}", got "${read}"`);
+    }
+    info(`clipboard round-trip ok (${token.length} chars)`);
+  } finally {
+    if (previous !== undefined) {
+      try {
+        if (clipboard.get() === token) clipboard.set(previous);
+      } catch { /* Preserve clipboard contents copied while the smoke was running. */ }
+    }
   }
-  info(`clipboard round-trip ok (${token.length} chars)`);
 }
 
 const isDirect =

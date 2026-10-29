@@ -130,6 +130,8 @@ export type KeyboardTapOptions = {
 export type KeyboardWriteOptions = KeyboardTapOptions & {
   mode?: "paste" | "native";
   restoreClipboard?: boolean;
+  /** Wait before restoring a paste-mode clipboard. Increase for slow applications. */
+  pasteDelayMs?: number;
 };
 
 type NativeKeyboardConfig = {
@@ -146,7 +148,7 @@ type NativeKeyboardWithConfig = ReturnType<typeof loadNative> & {
 
 const pressedKeys = new Set<string>();
 let keyboardDefaultAutoDelayMs = 10;
-const pasteSettleDelayMs = 50;
+const pasteSettleDelayMs = 250;
 
 function keyList(keys: KeyInput): string[] {
   return (Array.isArray(keys) ? keys : [keys]).map((key) => String(key));
@@ -173,19 +175,19 @@ function normalizeKeyName(key: string): string {
     end: "End",
     pageup: "PageUp",
     pagedown: "PageDown",
-    ctrl: "Ctrl",
-    control: "Ctrl",
+    ctrl: "LeftControl",
+    control: "LeftControl",
     leftcontrol: "LeftControl",
     rightcontrol: "RightControl",
-    shift: "Shift",
+    shift: "LeftShift",
     leftshift: "LeftShift",
     rightshift: "RightShift",
-    alt: "Alt",
+    alt: "LeftAlt",
     leftalt: "LeftAlt",
     rightalt: "RightAlt",
-    meta: "Meta",
-    win: "Win",
-    cmd: "Cmd",
+    meta: "LeftSuper",
+    win: "LeftSuper",
+    cmd: "LeftSuper",
     leftsuper: "LeftSuper",
     rightsuper: "RightSuper",
   };
@@ -197,7 +199,9 @@ function nativeKeyboard(): NativeKeyboardWithConfig {
   return loadNative() as NativeKeyboardWithConfig;
 }
 
-function nativeKeyboardConfig(options?: KeyboardTapOptions): NativeKeyboardConfig | undefined {
+function nativeKeyboardConfig(
+  options?: KeyboardTapOptions
+): NativeKeyboardConfig | undefined {
   return options?.autoDelayMs === undefined
     ? undefined
     : { autoDelayMs: options.autoDelayMs };
@@ -207,8 +211,11 @@ function effectiveKeyboardDelayMs(options?: KeyboardTapOptions): number {
   return options?.autoDelayMs ?? keyboardDefaultAutoDelayMs;
 }
 
-function effectivePasteSettleDelayMs(options?: KeyboardTapOptions): number {
-  return Math.max(effectiveKeyboardDelayMs(options), pasteSettleDelayMs);
+function effectivePasteSettleDelayMs(options?: KeyboardWriteOptions): number {
+  return Math.max(
+    effectiveKeyboardDelayMs(options),
+    options?.pasteDelayMs ?? pasteSettleDelayMs
+  );
 }
 
 function sleepSync(ms: number) {
@@ -296,7 +303,16 @@ function pasteText(text: string, options?: KeyboardWriteOptions) {
     sleepSync(effectivePasteSettleDelayMs(options));
   } finally {
     if (shouldRestore && previous !== undefined) {
-      callNative("keyboard.write.restoreClipboard", {}, () => n.clipboardSet(previous));
+      let unchanged = false;
+      try {
+        unchanged = n.clipboardGet() === text;
+      } catch {
+        /* Clipboard no longer contains our text. */
+      }
+      if (unchanged)
+        callNative("keyboard.write.restoreClipboard", {}, () =>
+          n.clipboardSet(previous)
+        );
     }
   }
 }
@@ -310,7 +326,9 @@ function pasteText(text: string, options?: KeyboardWriteOptions) {
 export const mouse = {
   /** Return the current cursor position in screen coordinates. */
   getPosition() {
-    return callNative("mouse.getPosition", {}, () => loadNative().getPosition());
+    return callNative("mouse.getPosition", {}, () =>
+      loadNative().getPosition()
+    );
   },
 
   /** Move the cursor to `(x, y)` using native movement settings. */
@@ -320,7 +338,9 @@ export const mouse = {
 
   /** Move the cursor through each point in order. */
   movePath(points: Array<{ x: number; y: number }>) {
-    callNative("mouse.movePath", { points }, () => loadNative().mouseMovePath(points));
+    callNative("mouse.movePath", { points }, () =>
+      loadNative().mouseMovePath(points)
+    );
   },
 
   /** Move directly to `(x, y)` with a straight-line native movement. */
@@ -332,7 +352,9 @@ export const mouse = {
 
   /** Click a mouse button. Defaults to the left button. */
   click(button?: "left" | "right" | "middle") {
-    callNative("mouse.click", { button }, () => loadNative().mouseClick(button));
+    callNative("mouse.click", { button }, () =>
+      loadNative().mouseClick(button)
+    );
   },
 
   /** Double-click a mouse button. Defaults to the left button. */
@@ -344,12 +366,16 @@ export const mouse = {
 
   /** Press and hold a mouse button. */
   press(button?: "left" | "right" | "middle") {
-    callNative("mouse.press", { button }, () => loadNative().mousePress(button));
+    callNative("mouse.press", { button }, () =>
+      loadNative().mousePress(button)
+    );
   },
 
   /** Release a mouse button. */
   release(button?: "left" | "right" | "middle") {
-    callNative("mouse.release", { button }, () => loadNative().mouseRelease(button));
+    callNative("mouse.release", { button }, () =>
+      loadNative().mouseRelease(button)
+    );
   },
 
   /** Drag to `(x, y)` while holding a mouse button. */
@@ -386,7 +412,9 @@ export const mouse = {
 
   /** Move to `(x, y)` and click. */
   tap(x: number, y: number, button?: "left" | "right" | "middle") {
-    callNative("mouse.tap", { x, y, button }, () => loadNative().tapAt(x, y, button));
+    callNative("mouse.tap", { x, y, button }, () =>
+      loadNative().tapAt(x, y, button)
+    );
   },
 
   /**
@@ -411,13 +439,52 @@ export const mouse = {
  * intentionally need to send a native key-up event without local state checks.
  */
 export const keyboard = {
-  /** Type Unicode text. */
+  /** Type literal Unicode text. Defaults to native input without using the clipboard. */
   write(text: string, options?: KeyboardWriteOptions) {
-    if (options?.mode === "native") {
+    if (
+      typeof text !== "string" ||
+      text.includes("\0") ||
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(
+        text
+      )
+    ) {
+      throw new SpotterError(
+        "SPOTTER_CORE_INVALID_ARGUMENT",
+        "Text must be valid Unicode without null characters",
+        { domain: "core" }
+      );
+    }
+    for (const delay of [options?.autoDelayMs, options?.pasteDelayMs]) {
+      if (delay !== undefined && (!Number.isFinite(delay) || delay < 0)) {
+        throw new SpotterError(
+          "SPOTTER_CORE_INVALID_ARGUMENT",
+          "Keyboard delays must be finite non-negative numbers",
+          { domain: "core" }
+        );
+      }
+    }
+    if (
+      options?.mode !== undefined &&
+      options.mode !== "native" &&
+      options.mode !== "paste"
+    ) {
+      throw new SpotterError(
+        "SPOTTER_CORE_INVALID_ARGUMENT",
+        "Unknown text input mode",
+        { domain: "core" }
+      );
+    }
+    if (text.length === 0) return;
+    if (options?.mode !== "paste") {
       callKeyboardTypeText(text, options);
       return;
     }
     pasteText(text, options);
+  },
+
+  /** Type literal text. Alias for {@link keyboard.write}; use tap/hotkey for key names. */
+  type(text: string, options?: KeyboardWriteOptions) {
+    keyboard.write(text, options);
   },
 
   /** Type Unicode text. Alias for {@link keyboard.write}. */
@@ -442,8 +509,9 @@ export const keyboard = {
   /** Release keys recorded by {@link keyboard.down}; unknown keys are skipped. */
   up(keys: KeyInput, options?: KeyboardTapOptions) {
     const names = keyList(keys);
-    const releasable = names
-      .filter((name) => pressedKeys.has(normalizeKeyName(name)));
+    const releasable = names.filter((name) =>
+      pressedKeys.has(normalizeKeyName(name))
+    );
     if (releasable.length === 0) return;
     callKeyboardReleaseKeys(releasable, options);
     for (const name of releasable) {
@@ -495,7 +563,11 @@ export { centerOf };
 export * from "@spotterjs/base";
 export { screen } from "./screen";
 export { events } from "./events";
-export type { EventSubscription, HotkeyRegistration, InputEvent } from "./events";
+export type {
+  EventSubscription,
+  HotkeyRegistration,
+  InputEvent,
+} from "./events";
 export { recording } from "./recording";
 export type {
   RecordedScript,
@@ -530,10 +602,5 @@ export {
   type ImageSize,
   type ImageSource,
 } from "./image";
-export {
-  matchTapScreen,
-  toLocal,
-  toMatchBox,
-  toScreen,
-} from "./match-coords";
+export { matchTapScreen, toLocal, toMatchBox, toScreen } from "./match-coords";
 export type { MatchBox, WindowFrame } from "./match-coords";

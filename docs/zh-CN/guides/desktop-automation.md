@@ -40,7 +40,7 @@ const cap = screen.capture();
 const regionCap = screen.capture({ left: 0, top: 0, width: 800, height: 600 });
 ```
 
-需要传给 MCP、网页或日志系统时，使用 PNG 编码工具：
+需要传给 CLI、网页或日志系统时，使用 PNG 编码工具：
 
 ```typescript
 import { image } from "@spotterjs/core";
@@ -65,6 +65,19 @@ const text = clipboard.get();
 
 `keyboard.up()` 只释放由 `keyboard.down()` 记录的按键。需要强制释放底层按键时，使用 raw API 前先确认当前键盘状态，避免影响用户正在使用的桌面。
 
+`keyboard.type`、`keyboard.write`、`keyboard.writeText` 输入文字，默认使用原生 Unicode 输入，
+不操作剪贴板。特殊符号按字面输入；按键名称和组合键使用 `tap`、`hotkey`。
+Windows 上 `autoDelayMs` 是字符间隔，CRLF 只发送一次换行，Tab 按文字输入。
+
+```typescript
+keyboard.type('中文 😀 !@#$\n第二行\t文字', { autoDelayMs: 10 });
+keyboard.write('批量粘贴', { mode: 'paste', pasteDelayMs: 600 });
+```
+
+旧版默认粘贴的调用可显式指定 `mode: 'paste'`。粘贴模式只能保存并恢复剪贴板中的文字，
+默认等待 250 ms 后恢复；慢应用可增大 `pasteDelayMs`。期间剪贴板被其他程序修改时，不覆盖新内容。
+有关联的聚焦、输入和截图动作见 [CLI 序列编排](./sequences.md)。
+
 ## 模板匹配
 
 ```typescript
@@ -81,9 +94,9 @@ mouse.tap(found.center.x, found.center.y);
 
 更多匹配细节见 [模板匹配](../MATCHING.md)。
 
-## MCP 组合工具
+## CLI 组合工具
 
-当 MCP agent 驱动桌面时，可以用组合工具减少重复截图和人工编排：
+当 CLI agent 驱动桌面时，可以用组合工具减少重复截图和人工编排：
 
 ```json
 {

@@ -12,7 +12,7 @@ screen.findTemplate / findAllTemplates / waitForTemplate
      或 spotterjs-plugin-match-feature [feature-match]
 
 Image decode (path / bytes)     → spotterjs-core::image   [Rust, PNG/JPEG/WebP]
-Image encode (MCP base64 PNG)   → spotterjs-core::image   [Rust]
+Image encode (PNG/JPEG/WebP)   → spotterjs-core::image   [Rust]
 Screen / window capture       → spotterjs-core::capture [platform GDI / X11]
 ```
 
@@ -102,7 +102,7 @@ const native = loadNative();
 const { width, height } = native.getImageSize("./button.png");
 const img = native.loadImageFromPath("./button.png"); // RGBA8
 const png = native.encodeCapturePng(hay);             // Buffer
-const b64 = native.encodeCapturePngBase64(hay);         // MCP
+const b64 = native.encodeCapturePngBase64(hay);         // optional Base64 image encoding
 ```
 
 After `captureScreen()`:

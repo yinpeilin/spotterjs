@@ -1,4 +1,11 @@
 import type { MatchOptions, MatchResult } from "../src";
+import { accessibility, keyboard } from "../src";
+
+const releaseAccessibility: () => void = accessibility.disable;
+void releaseAccessibility;
+
+keyboard.type("中文 😀 !@#$\nline\ttab", { autoDelayMs: 0 });
+keyboard.write("paste", { mode: "paste", pasteDelayMs: 600 });
 
 const opts: MatchOptions = {
   confidence: 0.9,

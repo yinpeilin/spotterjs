@@ -1,5 +1,7 @@
 # NCC 性能优化 + Rust 图像 I/O 实现计划
 
+> 历史设计记录（2026-05-21）。本文中的协议与任务流程描述保留当时背景；当前 Agent 接入方式见 [CLI + Skill](../zh-CN/CLI.md)。
+
 > **面向 AI 代理的工作者：** 必需子技能：subagent-driven-development（推荐）或 executing-plans。步骤使用 `- [ ]` 跟踪进度。
 
 **目标：** 将 NCC 匹配性能提升一个数量级（multi-scale 从 ~21s 降到 ~1s 以内），并明确/统一「图像读取只在 Rust 层、跨平台」的架构边界。

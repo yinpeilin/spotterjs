@@ -98,46 +98,34 @@ The companion app serializes Android accessibility nodes with text, resource
 ID, class name, package name, content description, bounds, center, state flags,
 depth, path, and children.
 
-## MCP Usage
+## CLI usage
 
-Enable Android tools in the MCP server:
+Enable Android commands in the calling shell:
 
-```json
-{
-  "env": {
-    "SPOTTERJS_ANDROID": "1"
-  }
-}
+```powershell
+$env:SPOTTERJS_ANDROID = '1'
+spotterjs schema android_connect
+spotterjs sequence --file phones.json
 ```
 
-Use `android_connect` with `{ "url": "...", "code": "..." }` to pair, or with
-`{ "url": "...", "sessionToken": "..." }` to reuse an existing session.
-
-`android_connect` returns a `deviceId` (`"default"` unless provided). Later
-tools can pass only `{ "deviceId": "default" }`, while the old
-`{ "url": "...", "sessionToken": "..." }` shape remains supported.
-
-Typical MCP loop:
+A plan keeps connect and follow-up commands in one process:
 
 ```json
-{ "url": "ws://192.168.1.23:17341", "code": "123456" }
+[
+  { "name": "android_connect", "arguments": { "deviceId": "phone-1", "url": "ws://192.168.1.23:17341", "code": "123456" } },
+  { "name": "android_launch_app", "arguments": { "deviceId": "phone-1", "packageName": "com.android.settings" } },
+  { "name": "android_current_app", "arguments": { "deviceId": "phone-1" } }
+]
 ```
 
-```json
-{ "deviceId": "default", "packageName": "com.android.settings" }
-```
+Use a distinct `deviceId` for each phone. `android_list_devices` lists only
+connections cached by the current process; they close when it exits. Save the
+returned session token securely for later reconnects. Independent CLI invocations
+must pass `url` and `sessionToken` on each Android action. Within a sequence,
+follow-up commands can use just the cached `deviceId`.
 
-```json
-{
-  "deviceId": "default",
-  "textContains": "Settings",
-  "waitTimeoutMs": 5000,
-  "pollMs": 250,
-  "maxDepth": 8
-}
-```
-
-Tool names and request shapes are documented in [MCP server](../MCP.md).
+See [CLI + Skill](../CLI.md) and [Sequences](./sequences.md) for input files,
+structured results, session lifetime, and failure behavior.
 
 ## Smoke Test
 
@@ -161,9 +149,9 @@ npm run smoke:android
 
 ## Screen Capture And Templates
 
-Use the app permission panel to grant screen capture before calling visual MCP
-tools. The companion sends captures as PNG frames over the paired WebSocket;
-the MCP server writes them to `.spotter/artifacts` and returns
+Use the app permission panel to grant screen capture before calling visual CLI
+commands. The companion sends captures as PNG frames over the paired WebSocket;
+the CLI writes them to `.spotter/artifacts` and returns
 `coordinateSpace: "android-device"`.
 
 ```json

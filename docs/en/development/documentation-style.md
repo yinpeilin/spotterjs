@@ -41,7 +41,7 @@ APIs that are exported only for local composition.
 
 - Use direct, concrete sentences.
 - Keep examples runnable.
-- Use `TypeScript`, `Rust`, `Node.js`, `MCP`, `N-API`, `ADB`, `ONNX Runtime`,
+- Use `TypeScript`, `Rust`, `Node.js`, `CLI`, `N-API`, `ADB`, `ONNX Runtime`,
   and other standard technical names in English.
 - Use backticks for packages, commands, paths, environment variables, and APIs.
 - Prefer explicit coordinate labels such as "screen coordinates" or
@@ -77,7 +77,8 @@ APIs that are exported only for local composition.
 - [ ] New user-facing behavior appears in the relevant English guide.
 - [ ] The matching Chinese page is updated.
 - [ ] Public API comments are English and mention coordinate spaces where relevant.
-- [ ] MCP tool changes are reflected in `docs/en/MCP.md` and `docs/zh-CN/MCP.md`.
+- [ ] CLI command changes are reflected in `docs/en/CLI.md` and `docs/zh-CN/CLI.md`.
+- [ ] CLI workflow changes are reflected in the bundled `packages/cli/skills/spotterjs/SKILL.md`.
 - [ ] Package README links still point to valid files.
 - [ ] Markdown files are valid UTF-8 and contain no replacement characters.
 - [ ] `npm run docs:check` passes.

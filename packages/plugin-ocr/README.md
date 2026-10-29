@@ -57,6 +57,10 @@ await createOcr({
 });
 ```
 
+Detection preserves image aspect with padding to the configured ONNX input size;
+recognition preserves crop aspect and pads normalized input columns. Results stay
+in the source image's coordinates, including when preprocessing upscales the image.
+
 Model cache, download sources, local models, private distribution, coordinates,
 and integration tests are documented in the [OCR guide](../../docs/en/guides/ocr.md).
 

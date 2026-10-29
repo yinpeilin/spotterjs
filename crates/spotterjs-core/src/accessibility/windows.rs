@@ -35,7 +35,7 @@ use windows::Win32::UI::Accessibility::{
     UIA_WindowControlTypeId, UIA_PATTERN_ID,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumChildWindows, GetClassNameW, GetClientRect, IsWindowVisible,
+    EnumChildWindows, GetClassNameW, GetClientRect, IsChild, IsWindow, IsWindowVisible,
 };
 
 #[derive(Clone)]
@@ -188,6 +188,44 @@ fn hwnd_from_id(id: WindowId) -> HWND {
 
 fn hwnd_to_u64(hwnd: HWND) -> u64 {
     hwnd.0 as usize as u64
+}
+
+fn ancestry_belongs_to_target(
+    target: u64,
+    ancestors: impl IntoIterator<Item = u64>,
+    is_child: impl Fn(u64, u64) -> bool,
+) -> bool {
+    target != 0
+        && ancestors
+            .into_iter()
+            .any(|hwnd| hwnd != 0 && (hwnd == target || is_child(target, hwnd)))
+}
+
+unsafe fn element_belongs_to_window(
+    session: &UiaSessionInner,
+    element: &IUIAutomationElement,
+    target: HWND,
+) -> bool {
+    // UIA descendants such as WebView controls may have no HWND of their own.
+    // Walk the raw ancestry to establish ownership without depending on the
+    // current filtered tree view or accepting another window at this point.
+    let ancestors = std::iter::successors(Some(element.clone()), |current| {
+        session.walker.GetParentElement(current).ok()
+    })
+    .take(128)
+    .map(|ancestor| {
+        ancestor
+            .CurrentNativeWindowHandle()
+            .map(hwnd_to_u64)
+            .unwrap_or(0)
+    });
+    ancestry_belongs_to_target(hwnd_to_u64(target), ancestors, |parent, child| {
+        IsChild(
+            HWND(parent as usize as *mut std::ffi::c_void),
+            HWND(child as usize as *mut std::ffi::c_void),
+        )
+        .as_bool()
+    })
 }
 
 unsafe fn element_from_hwnd(
@@ -396,7 +434,7 @@ unsafe fn select_attach_target(
     top_hwnd: HWND,
     max_depth: u32,
     walker: &IUIAutomationTreeWalker,
-) -> AttachSelection {
+) -> Result<AttachSelection> {
     let probes = probe_hwnd_candidates(session, top_hwnd, max_depth, walker);
     let mut best_idx = 0usize;
     let mut best_score = 0u32;
@@ -410,13 +448,10 @@ unsafe fn select_attach_target(
 
     let mut strategy = "top_level".to_string();
     let mut chosen_hwnd = top_hwnd;
-    let mut chosen_el = probes
-        .first()
-        .map(|(_, el, _)| el.clone())
-        .unwrap_or_else(|| {
-            element_from_hwnd(&session.automation, top_hwnd)
-                .unwrap_or_else(|_| panic!("top hwnd must resolve"))
-        });
+    let mut chosen_el = match probes.first() {
+        Some((_, element, _)) => element.clone(),
+        None => element_from_hwnd(&session.automation, top_hwnd)?,
+    };
 
     if let Some((hwnd, el, _)) = probes.get(best_idx) {
         chosen_hwnd = *hwnd;
@@ -455,35 +490,41 @@ unsafe fn select_attach_target(
     if best_health.total_nodes < THIN_TREE_NODES {
         if let Some(pt) = client_center_screen(top_hwnd) {
             if let Ok(el) = session.automation.ElementFromPoint(pt) {
-                let health = tree_health_on_element(walker, &el, max_depth);
-                if score_health(&health) > best_score {
-                    if let Ok(native) = el.CurrentNativeWindowHandle() {
-                        chosen_hwnd = native;
+                if element_belongs_to_window(session, &el, top_hwnd) {
+                    let health = tree_health_on_element(walker, &el, max_depth);
+                    if score_health(&health) > best_score {
+                        if let Ok(native) = el.CurrentNativeWindowHandle() {
+                            if !native.0.is_null()
+                                && (native == top_hwnd || IsChild(top_hwnd, native).as_bool())
+                            {
+                                chosen_hwnd = native;
+                            }
+                        }
+                        chosen_el = el;
+                        strategy = "element_from_point".into();
+                        for c in &mut candidates {
+                            c.chosen = false;
+                        }
+                        candidates.push(AttachCandidate {
+                            hwnd: hwnd_to_u64(chosen_hwnd),
+                            class_name: win32_class_name(chosen_hwnd),
+                            total_nodes: health.total_nodes,
+                            list_item_count: health.list_item_count,
+                            edit_count: health.edit_count,
+                            chosen: true,
+                        });
                     }
-                    chosen_el = el;
-                    strategy = "element_from_point".into();
-                    for c in &mut candidates {
-                        c.chosen = false;
-                    }
-                    candidates.push(AttachCandidate {
-                        hwnd: hwnd_to_u64(chosen_hwnd),
-                        class_name: win32_class_name(chosen_hwnd),
-                        total_nodes: health.total_nodes,
-                        list_item_count: health.list_item_count,
-                        edit_count: health.edit_count,
-                        chosen: true,
-                    });
                 }
             }
         }
     }
 
-    AttachSelection {
+    Ok(AttachSelection {
         hwnd: chosen_hwnd,
         element: chosen_el,
         strategy,
         candidates,
-    }
+    })
 }
 
 fn build_diagnosis(
@@ -511,7 +552,7 @@ fn build_diagnosis(
 
 pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport> {
     let top_hwnd = hwnd_from_id(id);
-    if top_hwnd.0.is_null() {
+    if top_hwnd.0.is_null() || !unsafe { IsWindow(Some(top_hwnd)).as_bool() } {
         return Err(SpotterError::InvalidWindowId(id.to_hex()));
     }
     let cfg = config();
@@ -527,7 +568,7 @@ pub fn attach_window_report(id: WindowId, max_depth: u32) -> Result<AttachReport
         with_session_mut(|session| unsafe {
             session.active_tree_view = active_tree_view;
             let walker = walker_for(session, Some(active_tree_view));
-            let selection = select_attach_target(session, top_hwnd, max_depth, walker);
+            let selection = select_attach_target(session, top_hwnd, max_depth, walker)?;
             let health_initial = tree_health_on_element(walker, &selection.element, max_depth);
             let event_handler_registered = if client_mode {
                 register_structure_handler(session, selection.hwnd, &selection.element)
@@ -1154,5 +1195,40 @@ mod tests {
             UIA_ButtonControlTypeId.0,
             "DefinitelyUnknown"
         ));
+    }
+
+    #[test]
+    fn point_fallback_accepts_target_and_real_child_windows() {
+        assert!(ancestry_belongs_to_target(100, [100], |_, _| false));
+        assert!(ancestry_belongs_to_target(100, [101], |target, child| {
+            target == 100 && child == 101
+        }));
+    }
+
+    #[test]
+    fn point_fallback_accepts_hwndless_controls_only_with_target_ancestry() {
+        assert!(ancestry_belongs_to_target(100, [0, 0, 100], |_, _| false));
+        assert!(!ancestry_belongs_to_target(100, [0, 200, 1], |_, _| false));
+    }
+
+    #[test]
+    fn point_fallback_rejects_an_overlapping_unrelated_window() {
+        assert!(!ancestry_belongs_to_target(
+            100,
+            [201, 200, 1],
+            |target, child| { target == 200 && child == 201 }
+        ));
+        assert!(!ancestry_belongs_to_target(100, [0], |_, _| true));
+        assert!(!ancestry_belongs_to_target(0, [0, 100], |_, _| true));
+    }
+
+    #[test]
+    fn attach_rejects_invalid_handles_without_a_uia_session() {
+        for id in [WindowId(0), WindowId(u64::MAX)] {
+            assert!(matches!(
+                attach_window_report(id, 12),
+                Err(SpotterError::InvalidWindowId(_))
+            ));
+        }
     }
 }

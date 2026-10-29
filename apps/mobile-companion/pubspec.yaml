@@ -1,5 +1,5 @@
 name: mobile_companion
-description: Spotter mobile companion app for pairing Android devices with MCP clients.
+description: Spotter mobile companion app for Android automation from desktop scripts and the spotterjs CLI.
 publish_to: 'none'
 version: 1.0.0+1
 

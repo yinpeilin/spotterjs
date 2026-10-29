@@ -61,6 +61,8 @@ class ScreenCaptureService : Service() {
             }
             if (resultCode == Activity.RESULT_OK && data != null) {
                 startProjection(resultCode, data)
+            } else {
+                stopSelf(startId)
             }
         }
         return START_NOT_STICKY
@@ -78,7 +80,11 @@ class ScreenCaptureService : Service() {
     private fun startProjection(resultCode: Int, data: Intent) {
         stopProjection()
         val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val projection = manager.getMediaProjection(resultCode, data)
+        val projection = manager.getMediaProjection(resultCode, data) ?: run {
+            // A missing consent session must leave capture unavailable.
+            stopSelf()
+            return
+        }
         val callback = object : MediaProjection.Callback() {
             override fun onStop() {
                 releaseCaptureResources()

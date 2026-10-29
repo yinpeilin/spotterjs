@@ -14,7 +14,7 @@ export function encodePng(capture: CaptureImage): Buffer {
 /**
  * Encode an RGBA {@link CaptureImage} as a Base64 PNG string.
  *
- * Useful for JSON APIs and MCP payloads.
+ * Useful for JSON APIs and CLI payloads.
  */
 export function encodePngBase64(capture: CaptureImage): string {
   return image.encodeBase64(capture);

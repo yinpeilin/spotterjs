@@ -74,7 +74,7 @@ npm run smoke:match-tap
 
 更多说明见 [OCR 插件](./guides/ocr.md)。
 
-## MCP Host Tools 无法读写文件
+## CLI Host Tools 无法读写文件
 
 检查：
 
@@ -83,7 +83,7 @@ npm run smoke:match-tap
 - 写入目标是否为 `.env`、`credentials.json` 等默认禁止文件。
 - 需要 shell 执行时，`host_exec` 是否启用了 `SPOTTERJS_ALLOW_SHELL=1`。
 
-更多说明见 [MCP Server](./MCP.md)。
+更多说明见 [CLI](./CLI.md)。
 
 ## 结构化错误 code
 
@@ -93,8 +93,8 @@ first-party 库统一抛出 `SpotterError`，code 形如
 
 常见安装和环境 code 包括 `SPOTTER_NATIVE_PACKAGE_MISSING`、
 `SPOTTER_NATIVE_LOAD_FAILED`、`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED` 和
-`SPOTTER_ANDROID_COMPANION_TIMEOUT`。MCP 工具失败时也会在文本结果中带上同一套
-`code`、压缩后的 `context` 和 `domain`。
+`SPOTTER_ANDROID_COMPANION_TIMEOUT`。CLI 命令失败时会在 JSON `error` 对象中带上同一套
+`code`、摘要后的 `context` 和 `domain`。
 
 ## Markdown 检查失败
 

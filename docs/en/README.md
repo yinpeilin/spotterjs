@@ -3,14 +3,14 @@
 [中文文档](../zh-CN/README.md)
 
 spotterjs is a TypeScript-first desktop automation toolkit backed by Rust native
-addons. Use this documentation when you are writing scripts, building MCP tools,
+addons. Use this documentation when you are writing scripts, building CLI commands,
 or maintaining the repository.
 
 ## Start Here
 
 - [Getting started](./getting-started.md): install packages, run the first script, and verify the local environment.
 - [Examples](./examples.md): Paint examples, smoke scripts, WeChat integration scripts, and benchmark commands.
-- [Troubleshooting](./troubleshooting.md): common native, matching, Android companion, OCR, MCP, and documentation issues.
+- [Troubleshooting](./troubleshooting.md): common native, matching, Android companion, OCR, CLI, and documentation issues.
 
 ## Guides
 
@@ -20,14 +20,16 @@ or maintaining the repository.
 
 ## Integrations
 
-- [MCP server](./MCP.md): MCP client configuration, desktop / Android / OCR / host tools, response shapes, and security policy.
+- [CLI sequences](./guides/sequences.md): validated desktop and Android steps in one process.
+- [CLI + Skill](./CLI.md): command discovery, JSON arguments and results, sequences, and agent Skill installation.
 - [Android companion automation](./guides/android-companion.md): WebSocket pairing, session reuse, device input, and accessibility tree access.
+- [Mobile companion app](./guides/mobile-companion.md): Flutter app setup, checks, APK builds, protocol boundary, and release notes.
 - [OCR plugin](./guides/ocr.md): model download, cache directories, local models, coordinates, and integration tests.
 
 ## API Entrypoints
 
 - [`@spotterjs/core`](../../packages/core/README.md): desktop automation API.
-- [`@spotterjs/mcp`](../../packages/mcp/README.md): MCP server package.
+- [`@spotterjs/cli`](../../packages/cli/README.md): CLI package.
 - [`@spotterjs/plugin-android`](../../packages/plugin-android/README.md): Android companion plugin.
 - [`@spotterjs/plugin-ocr`](../../packages/plugin-ocr/README.md): OCR plugin.
 

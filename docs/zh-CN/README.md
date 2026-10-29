@@ -3,24 +3,24 @@
 [English](../en/README.md)
 
 spotterjs 是面向桌面和 Android companion 自动化的 TypeScript-first 工具集。
-写脚本、构建 MCP tools 或维护仓库时，可以从这里进入对应文档。
+写脚本、运行 CLI 命令 或维护仓库时，可以从这里进入对应文档。
 
 ## 可以用来做什么
 
 - **桌面重复操作自动化：** 自动打开应用、聚焦窗口、截图、点击、输入、读剪贴板，适合冒烟测试、数据录入和批量配置。
 - **没有 API 的界面自动化：** 通过 OCR、NCC 模板匹配和无障碍树识别界面元素，再用坐标或元素中心点操作。
-- **代码 Agent 的眼睛和手：** 通过 MCP Server 让 Agent 观察桌面、读写工作区文件、调用受控 shell，并把截图 artifact 留在仓库内复查。
-- **Android 真机编排：** 在电脑端用 TypeScript 或 MCP 连接 companion app，控制多台 Android 设备执行安装后验证、账号流程、跨端消息确认等任务。
+- **代码 Agent 的眼睛和手：** 通过 CLI 让 Agent 观察桌面、读写工作区文件、调用受控 shell，并把截图 artifact 留在仓库内复查。
+- **Android 真机编排：** 在电脑端用 TypeScript 或 CLI 连接 companion app，控制多台 Android 设备执行安装后验证、账号流程、跨端消息确认等任务。
 - **跨端业务闭环：** 把桌面后台、浏览器、Windows 应用、Android App 和 OCR 检查组合成端到端脚本。
 
 多设备场景建议从 [Android companion 自动化](./guides/android-companion.md#从电脑端控制多台设备)
-和 [MCP Server 的 Android 工具](./MCP.md#android-多设备编排) 开始。
+和 [CLI 的序列和 Android 会话](./CLI.md#序列和-android-会话) 开始。
 
 ## 快速上手
 
 - [快速开始](./getting-started.md)：安装包、运行第一个脚本，并验证本地环境。
 - [示例](./examples.md)：Paint 示例、smoke 脚本、微信集成脚本和 benchmark 命令。
-- [排障指南](./troubleshooting.md)：native、匹配、Android companion、OCR、MCP 和文档问题。
+- [排障指南](./troubleshooting.md)：native、匹配、Android companion、OCR、CLI 和文档问题。
 
 ## 指南
 
@@ -30,14 +30,16 @@ spotterjs 是面向桌面和 Android companion 自动化的 TypeScript-first 工
 
 ## 集成能力
 
-- [MCP Server](./MCP.md)：MCP client 配置、desktop / Android / OCR / host tools、响应结构和安全策略。
+- [CLI 序列编排](./guides/sequences.md)：在同一进程内校验并顺序执行桌面和 Android 动作。
+- [CLI + Skill](./CLI.md)：命令发现、JSON 参数与结果、序列编排和 Agent Skill 安装。
 - [Android companion 自动化](./guides/android-companion.md)：WebSocket 配对、session 复用、设备输入和 accessibility tree。
+- [Mobile companion app](./guides/mobile-companion.md)：Flutter app 环境、检查命令、APK 构建、协议边界和发布注意事项。
 - [OCR 插件](./guides/ocr.md)：模型下载、缓存目录、本地模型、坐标和集成测试。
 
 ## API 入口
 
 - [`@spotterjs/core`](../../packages/core/README.md)：桌面自动化 API。
-- [`@spotterjs/mcp`](../../packages/mcp/README.md)：MCP server 包。
+- [`@spotterjs/cli`](../../packages/cli/README.md)：CLI 包。
 - [`@spotterjs/plugin-android`](../../packages/plugin-android/README.md)：Android companion 插件。
 - [`@spotterjs/plugin-ocr`](../../packages/plugin-ocr/README.md)：OCR 插件。
 

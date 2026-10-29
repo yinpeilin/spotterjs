@@ -1,5 +1,9 @@
 # spotterjs scripts
 
+`npm run smoke:keyboard` 验证真实 Windows 测试输入框中的 Unicode、标点、换行、Tab、重复文字、
+长文本和连续多次输入，会操作本机桌面。追加 `-- native long` 可只运行长文本场景，
+运行 `node scripts/smoke/keyboard-text-e2e.mjs --cli` 可验证经独立 CLI 子进程的完整输入链路。
+
 这个目录包含 Smoke、integration、benchmark 和维护脚本。总览见 [文档示例地图](../docs/examples.md) 和 [测试指南](../docs/development/testing.md)。
 
 ## 构建
@@ -21,6 +25,9 @@ npm run smoke:ncc:synthetic
 npm run smoke:match-tap
 npm run smoke:desktop
 npm run smoke:android
+npm run smoke:cli
+npm run smoke:cli:a11y
+npm run smoke:writor
 ```
 
 Smoke 脚本会控制本机桌面或连接的 Android 设备。运行前请确认当前环境可以接受窗口聚焦、鼠标移动、键盘输入或设备点击。
@@ -49,5 +56,7 @@ npm run integration:wechat:send
 - `sync-license.mjs`：同步许可证到各包。
 - `verify-pack.mjs`：检查发布包内容。
 - `check-doc-links.mjs`：检查 Markdown 本地相对链接。
+- `mobile-companion.mjs`：运行 Flutter mobile companion app 检查和 APK 构建命令。
+- `setup-mobile-companion.ps1`：配置 Flutter/Android companion app 本地构建环境。
 - `prepare-native-package.mjs` / `prepare-native-packages.mjs`：准备 native optional package。
 - `prepare-ocr-models.mjs`：准备 OCR 模型 manifest。

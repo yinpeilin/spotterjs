@@ -103,5 +103,5 @@ npm run smoke
 
 - 想写桌面脚本：读 [桌面自动化](./guides/desktop-automation.md)。
 - 想通过 UI 树找控件：读 [无障碍自动化](./guides/accessibility.md)。
-- 想接 MCP 客户端：读 [MCP Server](./MCP.md)。
+- 想让 Agent 通过命令行操作：读 [CLI + Skill](./CLI.md)。
 - 遇到 native、匹配或平台问题：读 [排障指南](./troubleshooting.md)。

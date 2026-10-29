@@ -14,7 +14,7 @@ const workspaces = [
   "@spotterjs/plugin-ocr",
   "@spotterjs/plugin-android",
   "@spotterjs/node",
-  "@spotterjs/mcp",
+  "@spotterjs/cli",
 ];
 const nativePackages = [
   {

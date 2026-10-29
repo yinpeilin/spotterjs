@@ -52,7 +52,7 @@ const regionCap = screen.capture({ left: 0, top: 0, width: 800, height: 600 });
 ```
 
 Use the image facade when you need to save, upload, log, or pass captures
-through JSON/MCP:
+through JSON/CLI:
 
 ```typescript
 import { image } from "@spotterjs/core";
@@ -79,6 +79,21 @@ const text = clipboard.get();
 `keyboard.up()` releases only keys previously recorded by `keyboard.down()`.
 Use raw key APIs only when you understand the current desktop state.
 
+`keyboard.type`, `keyboard.write` and `keyboard.writeText` input literal Unicode text.
+They now default to native input without using the clipboard. Use `tap`/`hotkey` for key names.
+On Windows, `autoDelayMs` is the interval between characters; CRLF emits one newline and Tab
+is inserted as text.
+
+```typescript
+keyboard.type('中文 😀 !@#$\nnext line\ttext', { autoDelayMs: 10 });
+keyboard.write('bulk paste', { mode: 'paste', pasteDelayMs: 600 });
+```
+
+To retain the old paste behavior, explicitly pass `mode: 'paste'`. This mode saves/restores
+clipboard text only, waiting 250 ms by default. Increase `pasteDelayMs` for slow applications.
+New clipboard contents copied during a paste are preserved. See [CLI sequences](./sequences.md)
+for related focus/input/capture steps and process-local session lifetime.
+
 ## Template Matching
 
 ```typescript
@@ -96,9 +111,9 @@ area but does not rebase returned coordinates.
 
 For deeper matching details, see [Template matching](../MATCHING.md).
 
-## MCP Combo Tools
+## CLI Combo Tools
 
-When an MCP agent is driving the desktop, use combo tools to reduce repeated
+When a CLI agent is driving the desktop, use combo tools to reduce repeated
 captures and manual orchestration:
 
 ```json

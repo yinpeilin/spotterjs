@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const accessibilityEnable = vi.fn();
+const accessibilityDisable = vi.fn();
 const accessibilityAttachWindow = vi.fn();
 const accessibilityAttachWindowReport = vi.fn();
 const accessibilityFind = vi.fn();
@@ -19,6 +20,7 @@ const tapAt = vi.fn();
 vi.mock("./native", () => ({
   loadNative: () => ({
     accessibilityEnable,
+    accessibilityDisable,
     accessibilityAttachWindow,
     accessibilityAttachWindowReport,
     accessibilityFind,
@@ -72,6 +74,7 @@ describe("accessibility", () => {
     const rootId = accessibility.attach("window-1");
     const elementId = accessibility.find(rootId, { name: "OK" });
     accessibility.invoke(elementId);
+    accessibility.disable();
 
     expect(accessibilityEnable).toHaveBeenCalledWith({
       attachDelayMs: 100,
@@ -94,6 +97,10 @@ describe("accessibility", () => {
       12
     );
     expect(accessibilityInvoke).toHaveBeenCalledWith("element-1");
+    expect(accessibilityDisable).toHaveBeenCalledOnce();
+    expect(accessibilityDisable.mock.invocationCallOrder[0]).toBeGreaterThan(
+      accessibilityInvoke.mock.invocationCallOrder[0]
+    );
   });
 
   it("clicks an element center and returns its bounds", () => {

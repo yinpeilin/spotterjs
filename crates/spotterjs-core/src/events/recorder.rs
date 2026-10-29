@@ -6,11 +6,16 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum InputEvent {
     MouseMove {
         x: i32,
         y: i32,
+        #[serde(alias = "t_ms")]
         t_ms: u64,
     },
     MouseButton {
@@ -18,16 +23,19 @@ pub enum InputEvent {
         pressed: bool,
         x: i32,
         y: i32,
+        #[serde(alias = "t_ms")]
         t_ms: u64,
     },
     Wheel {
         dx: i32,
         dy: i32,
+        #[serde(alias = "t_ms")]
         t_ms: u64,
     },
     Key {
         key: String,
         pressed: bool,
+        #[serde(alias = "t_ms")]
         t_ms: u64,
     },
 }
@@ -44,34 +52,44 @@ impl InputEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ScriptAction {
     Move {
         x: i32,
         y: i32,
+        #[serde(alias = "delay_ms")]
         delay_ms: u64,
     },
     Click {
         button: String,
         x: i32,
         y: i32,
+        #[serde(alias = "delay_ms")]
         delay_ms: u64,
     },
     Scroll {
         dx: i32,
         dy: i32,
+        #[serde(alias = "delay_ms")]
         delay_ms: u64,
     },
     KeyDown {
         key: String,
+        #[serde(alias = "delay_ms")]
         delay_ms: u64,
     },
     KeyUp {
         key: String,
+        #[serde(alias = "delay_ms")]
         delay_ms: u64,
     },
     Type {
         text: String,
+        #[serde(alias = "delay_ms")]
         delay_ms: u64,
     },
 }
@@ -90,8 +108,10 @@ impl ScriptAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecordedScript {
     pub events: Vec<ScriptAction>,
+    #[serde(alias = "duration_ms")]
     pub duration_ms: u64,
 }
 

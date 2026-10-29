@@ -1,7 +1,7 @@
 # Spotter Mobile Companion
 
-Flutter Android companion app for pairing a phone with a Spotter desktop or MCP
-bridge. The app is the phone-side software path for Android automation commands.
+Flutter Android companion app for pairing a phone with a Spotter desktop script or CLI
+process. The app is the phone-side software path for Android automation commands.
 
 ## China Mirror Setup
 
@@ -32,9 +32,30 @@ sdkmanager --sdk_root=$env:LOCALAPPDATA\Android\Sdk --install platform-tools
 
 ## Development Commands
 
+From the repository root:
+
+```powershell
+npm run mobile:doctor
+npm run mobile:check
+npm run mobile:build:debug
+npm run mobile:build:release
+```
+
+The root scripts use Flutter from `PATH`, or fall back to the helper SDK at
+`$env:USERPROFILE\.spotter-tools\flutter`. Set `SPOTTERJS_FLUTTER_BIN` to
+override the executable path.
+
+Once app dependencies are available, run
+`node scripts/mobile-companion.mjs check --no-pub` to analyze and test without
+resolving pub dependencies again. Run `flutter pub get` inside the app after a
+fresh checkout or dependency change. APK build commands also accept `--no-pub`.
+
+Direct Flutter commands:
+
 ```powershell
 cd apps\mobile-companion
 flutter pub get
+flutter analyze
 flutter test
 flutter build apk --debug
 ```
@@ -57,6 +78,9 @@ Get-ChildItem .\build\app\outputs\flutter-apk\app-*-release.apk |
 The release build enables R8/resource shrinking in the Android Gradle project
 and splits native libraries by ABI so each device only gets one matching APK.
 That keeps the packages smaller than a universal APK.
+
+The current release build uses the debug signing config for internal testing.
+Replace it with the project release keystore before public distribution.
 
 To inspect an APK for debug-only payloads:
 

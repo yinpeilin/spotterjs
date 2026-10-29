@@ -3,7 +3,7 @@
 [中文文档](../../zh-CN/development/architecture.md)
 
 spotterjs is a TypeScript + Rust monorepo. TypeScript packages provide public
-APIs, MCP adapters, and plugin entrypoints. Rust crates provide platform
+APIs, CLI command adapters, and plugin entrypoints. Rust crates provide platform
 automation, image processing, native bindings, and NCC matching.
 
 ## Workspace Layout
@@ -12,7 +12,7 @@ automation, image processing, native bindings, and NCC matching.
 |------|----------------|
 | `packages/core` | Main user-facing desktop automation API |
 | `packages/base` | Shared TypeScript types |
-| `packages/mcp` | MCP server exposing desktop, Android, OCR, and host tools |
+| `packages/cli` | JSON CLI, command registry, adapters, and bundled agent Skill |
 | `packages/plugin-ocr` | OCR plugin, model download, and recognition pipeline |
 | `packages/plugin-android` | Android companion automation plugin |
 | `crates/spotterjs-base` | Rust shared types, errors, and N-API conversions |
@@ -40,7 +40,7 @@ plugin path.
 
 - `@spotterjs/core` is the primary desktop automation package.
 - `@spotterjs/base` contains shared types and should not load native code.
-- `@spotterjs/mcp` adapts core capabilities into MCP tool schemas without
+- `@spotterjs/cli` adapts core capabilities into CLI command schemas without
   changing the core API.
 - Plugin packages expose domain APIs only; parsing helpers, path discovery, and
   command escaping helpers are not stable public APIs unless exported.
@@ -64,23 +64,28 @@ optional packages:
 Publishing order: platform packages first, then `@spotterjs/node`, then
 TypeScript packages that depend on it. See [Publishing](../PUBLISHING.md).
 
-## MCP Boundary
+## CLI Boundary
 
-The MCP server exposes:
+The CLI exposes:
 
 - desktop: capture, input, windows, template matching, and optional accessibility.
 - android: companion app tools when `SPOTTERJS_ANDROID=1`.
 - ocr: OCR tools backed by `@spotterjs/plugin-ocr`.
 - host: workspace file tools and optional shell execution.
 
-The MCP security boundary lives in the server layer: file paths must stay inside
-the workspace root, shell execution is disabled by default, and sensitive writes
-are denied by default.
+The CLI validates command arguments and emits structured JSON results. Related
+actions use one in-process sequence queue; separate invocations do not share
+session state or locks. Android connections close when that process exits.
+
+Host file paths must stay inside the workspace root, shell execution is disabled
+by default, and sensitive host writes are denied by default. These host checks
+are not an operating-system sandbox for desktop or Android actions. The bundled
+Skill teaches command discovery and an observe–act–verify workflow.
 
 ## Design Principles
 
 - Prefer high-level APIs for user scripts.
 - Treat `@spotterjs/core/unstable-native` as the unstable escape hatch.
 - Keep package READMEs short; put deep guides in `docs/en` and `docs/zh-CN`.
-- When adding a platform capability, update TypeScript APIs, MCP behavior,
+- When adding a platform capability, update TypeScript APIs, CLI behavior,
   tests, and both language docs together.

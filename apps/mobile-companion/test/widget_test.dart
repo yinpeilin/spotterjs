@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_companion/main.dart';
 
@@ -65,6 +66,11 @@ void main() {
     expect(find.text('Listening'), findsOneWidget);
     expect(find.text('Start listening'), findsOneWidget);
     expect(find.text('Stop listening'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Permissions'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('IME text input'), findsWidgets);
     expect(find.text('Spotter Keyboard'), findsWidgets);
   });

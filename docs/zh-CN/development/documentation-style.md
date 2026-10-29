@@ -29,7 +29,7 @@ spotterjs 文档中文为主，保留包名、API、命令、协议和行业通�
 
 - 包名：`@spotterjs/core`
 - API：`screen.findTemplate`、`windows.findTemplate`、`loadNative()`
-- 协议和格式：HTTP、JSON、MCP、N-API
+- 协议和格式：HTTP、JSON、CLI、N-API
 - 工具名：Node.js、Rust、ADB、ONNX Runtime
 
 可翻译：
@@ -60,7 +60,8 @@ spotterjs 文档中文为主，保留包名、API、命令、协议和行业通�
 
 - [ ] 新增能力是否出现在对应指南或包 README 中。
 - [ ] 公开 API 是否有最小示例。
-- [ ] MCP tool 变化是否同步到 `docs/en/MCP.md` 和 `docs/zh-CN/MCP.md`。
+- [ ] CLI command 变化是否同步到 `docs/en/CLI.md` 和 `docs/zh-CN/CLI.md`。
+- [ ] CLI 工作流变化是否同步到随包的 `packages/cli/skills/spotterjs/SKILL.md`。
 - [ ] 脚本变化是否同步到 [示例地图](../examples.md) 或 [测试指南](./testing.md)。
 - [ ] Markdown 文件是否是有效 UTF-8，且没有替换字符。
 - [ ] 本地相对链接是否通过 `npm run docs:check`。

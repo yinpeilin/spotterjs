@@ -70,4 +70,4 @@ await phone.gesture([
 ```
 
 `captureScreen()` returns PNG bytes plus width, height, and density. Template
-matching stays in the MCP layer so the core plugin can remain transport-only.
+matching stays in the CLI command layer so the core plugin can remain transport-only.

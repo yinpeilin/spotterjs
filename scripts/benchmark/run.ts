@@ -8,7 +8,7 @@ import { loadNative } from "@spotterjs/core/unstable-native";
 import { createOcr, defaultModelDir } from "@spotterjs/plugin-ocr";
 import { cropImage, loadImage, resizeRgba } from "../../packages/plugin-ocr/src/image";
 import { boxesFromBitmap, decodeCtc } from "../../packages/plugin-ocr/src/postprocess";
-import { optimizeCapture, workspaceImageStore } from "../../packages/mcp/src/adapters/artifacts";
+import { optimizeCapture, workspaceImageStore } from "../../packages/cli/src/adapters/artifacts";
 import { writeRgbaPng } from "../lib/png";
 
 type Suite = "synthetic" | "deep" | "ocr" | "all";
@@ -345,7 +345,7 @@ async function syntheticBenchmarks(options: Options): Promise<BenchmarkResult[]>
     decodeCtc(logits, Array.from({ length: 95 }, (_, i) => String.fromCharCode(33 + i))), options));
   await add(results, bench("synthetic", "ocr.findAllText cached fake engine", () =>
     ocr.findAllText(fixture.hay, "send", { caseSensitive: false }), options));
-  await add(results, bench("synthetic", "mcp.optimizeCapture downscale", () =>
+  await add(results, bench("synthetic", "cli.optimizeCapture downscale", () =>
     optimizeCapture(solid(2400, 1350, [30, 40, 50]), 1600), options));
 
   return results;
@@ -374,7 +374,7 @@ async function deepBenchmarks(options: Options): Promise<BenchmarkResult[]> {
       screen.findTemplate(needleBytes, { confidence: 0.7 }), options));
     await add(results, bench("deep", "screen.findTemplate multi-scale buffer", () =>
       screen.findTemplate(needleBytes, { confidence: 0.7, scale: { min: 0.9, max: 1.1, step: 0.05 } }), options));
-    await add(results, bench("deep", "mcp.workspaceImageStore.writeCapture", () =>
+    await add(results, bench("deep", "cli.workspaceImageStore.writeCapture", () =>
       workspaceImageStore.writeCapture(capture!, { prefix: "benchmark-deep" }), options));
   }
 

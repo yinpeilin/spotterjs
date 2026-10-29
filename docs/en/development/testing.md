@@ -11,13 +11,13 @@ areas and should not be treated as interchangeable.
 Default automated tests should avoid real desktop, WeChat, or Android device
 dependencies. Put real environment checks in smoke or integration scripts.
 
-When adding key-path coverage, prefer deterministic fixtures for MCP artifacts
+When adding key-path coverage, prefer deterministic fixtures for CLI artifacts
 and tool schemas, OCR image validation and post-processing, Android
 companion protocol routing and accessibility tree pruning, core match wrapper option
 mapping, and Rust NCC synthetic matching.
 
 Synthetic benchmarks are report-only baselines. Track
-`mcp.optimizeCapture`, `ocr.resizeRgba`, and `ocr.boxesFromBitmap` for trends;
+`cli.optimizeCapture`, `ocr.resizeRgba`, and `ocr.boxesFromBitmap` for trends;
 do not turn them into hard CI gates without a separate decision.
 
 ## Common Commands
@@ -27,9 +27,10 @@ npm run docs:check
 npm run build:ts
 npm run test -w @spotterjs/base
 npm run test -w @spotterjs/core
-npm run test -w @spotterjs/mcp
+npm run test -w @spotterjs/cli
 npm run test -w @spotterjs/plugin-ocr
 npm run test -w @spotterjs/plugin-android
+npm run mobile:check
 cargo test
 ```
 
@@ -38,10 +39,29 @@ cargo test
 - Docs only: run `npm run docs:check`.
 - Public TypeScript API comments or declarations: run `npm run build:ts`.
 - Core desktop API changes: run `npm run test -w @spotterjs/core`.
-- MCP tool schema or behavior changes: run `npm run test -w @spotterjs/mcp`.
+- CLI command schema or behavior changes: run `npm run test -w @spotterjs/cli`.
 - Android companion client behavior: run `npm run test -w @spotterjs/plugin-android`.
+- Mobile companion app behavior: run `npm run mobile:check`.
 - OCR model, image, post-processing, or input-shape behavior: run `npm run test -w @spotterjs/plugin-ocr`.
 - Rust native behavior: run the affected `cargo test` package, then relevant smoke scripts.
+
+## Mobile Companion App
+
+The Flutter app lives under `apps/mobile-companion` and is not part of the npm
+or Rust workspaces. Use the root mobile scripts for checks and APK builds:
+
+```bash
+npm run mobile:doctor
+npm run mobile:check
+npm run mobile:build:debug
+npm run mobile:build:release
+```
+
+The mobile scripts use Flutter from `PATH`, or fall back to the helper SDK at
+`$USERPROFILE\.spotter-tools\flutter` on Windows. Set `SPOTTERJS_FLUTTER_BIN` to
+override the executable path. Use
+`.\scripts\setup-mobile-companion.ps1 -ConfigureOnly -PrintBuildCommands` for
+local environment guidance.
 
 ## Error Assertions
 
@@ -75,9 +95,17 @@ npm run smoke:match-tap
 npm run smoke:a11y
 npm run smoke:desktop
 npm run smoke:android
+npm run smoke:cli
+npm run smoke:cli:a11y
+npm run smoke:writor
 ```
 
 Run them only on a machine where desktop and device automation are safe.
+`smoke:cli` checks Unicode input through separate CLI processes in a temporary test
+window. `smoke:writor` checks discovery and an original window screenshot against
+an already running Writor client; a missing client is reported explicitly.
+`smoke:cli:a11y` verifies independent accessibility inspect, text input and invoke
+commands against a temporary Windows test window.
 
 ## Integration Scripts
 
@@ -110,9 +138,13 @@ and OCR profiling. `benchmark:ncc` and `benchmark:ncc:rust` are NCC-specific.
 npm run sync-license
 npm run verify-pack
 npm run verify:native-install
+npm run verify:cli-install
 ```
 
 Run these before publishing or changing package metadata.
+`verify:cli-install` exercises locally packed CLI/workspace/native packages in a
+clean temporary install. Run `npm run build` first, including the native build.
+See [Publishing](../PUBLISHING.md) for the unpublished CLI verification flow.
 
 ## Documentation Checks
 
