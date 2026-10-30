@@ -37,6 +37,7 @@
     "smoke:a11y": "tsx scripts/smoke/06-accessibility-notepad.ts",
     "smoke:desktop": "tsx scripts/smoke/07-desktop-apps.ts",
     "smoke:android": "tsx scripts/smoke/android-companion.ts",
+    "smoke:scenarios": "node scripts/smoke/scenario-examples.mjs",
     "mobile:check": "node scripts/mobile-companion.mjs check",
     "mobile:analyze": "node scripts/mobile-companion.mjs analyze",
     "mobile:test": "node scripts/mobile-companion.mjs test",

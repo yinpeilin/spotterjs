@@ -1,4 +1,4 @@
-import { scoreOcrText, type OcrTextLine, type OcrTextMatch } from "@spotterjs/plugin-ocr";
+import { createOcr, scoreOcrText, type OcrTextLine, type OcrTextMatch } from "@spotterjs/plugin-ocr";
 import type { Point, TextMatchEvaluation } from "@spotterjs/base";
 import { z } from "zod";
 import type { DebugAnnotation } from "../adapters/debug-draw.js";
@@ -30,7 +30,6 @@ const ocrClients = new Map<string, Promise<import("@spotterjs/plugin-ocr").OcrCl
 let createOcrIdentity: unknown;
 
 export async function getOcr(args: OcrModelOptions) {
-  const { createOcr } = await import("@spotterjs/plugin-ocr");
   if (createOcrIdentity !== createOcr) {
     ocrClients.clear();
     createOcrIdentity = createOcr;
@@ -44,6 +43,9 @@ export async function getOcr(args: OcrModelOptions) {
     client = createOcr({
       modelDir: args.modelDir,
       modelProfile: args.modelProfile,
+    }).catch((error) => {
+      if (ocrClients.get(key) === client) ocrClients.delete(key);
+      throw error;
     });
     ocrClients.set(key, client);
   }

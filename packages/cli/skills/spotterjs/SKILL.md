@@ -147,10 +147,17 @@ Capture `data.imagePath` values are relative to that workspace, under
 Use `detail: "original"` for OCR and exact positioning. Standalone `high`
 captures downscale long edges above 1600 pixels.
 
-Desktop matching/OCR returns screen coordinates; Android uses device pixels.
+Desktop combo matching/OCR returns screen coordinates. Standalone image OCR
+uses image coordinates unless an origin is supplied; Android uses device pixels.
 Check `coordinateSpace`, capture dimensions, and `origin`. Do not click a pixel
 from a downscaled preview without restoring its scale and capture origin.
 Window combo commands already translate results into screen coordinates.
+
+Screen and region capture responses include `origin` in screen coordinates.
+Convert a preview point with `origin.x + x * originalWidth / width` and
+`origin.y + y * originalHeight / height`. Use `detail: "original"` and pass
+the returned origin to standalone OCR. Window captures do not supply this
+origin; use the window combo commands for translated OCR or matching results.
 
 ## Related steps and session lifetime
 
@@ -164,6 +171,10 @@ belong to one process. Separate CLI invocations do not share them. Put Android
 connect and follow-up operations in one sequence, or pass `url` and
 `sessionToken` on every independent action. Use unique device IDs for phones
 within a sequence. Connections close when it finishes; protect returned tokens.
+
+After an Android transport timeout or protocol mismatch, the connection is
+closed and queued commands are rejected. Inspect device state and explicitly
+reconnect before another attempt; an acknowledgement may have arrived late.
 
 Sequences use literal arguments, without returned-value substitution. Use the
 self-contained accessibility commands for CLI work. If a workflow must consume

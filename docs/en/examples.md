@@ -4,6 +4,9 @@
 
 This page maps the runnable examples and scripts in the repository.
 
+Start with [Choose a workflow](./guides/scenarios.md) for desktop observation,
+CLI capture coordinates, offline OCR geometry and Android state inspection.
+
 ## Paint Examples
 
 Paint examples are safe, visible desktop automation exercises for Windows.

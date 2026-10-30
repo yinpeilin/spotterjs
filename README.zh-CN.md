@@ -117,6 +117,8 @@ JSON 参数、多行中文输入和完整流程见 [CLI + Skill](./docs/zh-CN/CL
 
 ## 文档地图
 
+- [按场景选择工作流](./docs/zh-CN/guides/scenarios.md)：桌面、CLI、OCR 和 Android 可运行示例及验证边界。
+
 - [快速开始](./docs/zh-CN/getting-started.md)：安装、第一个脚本和本地验证。
 - [桌面自动化](./docs/zh-CN/guides/desktop-automation.md)：窗口、截图、输入、剪贴板和坐标。
 - [模板匹配](./docs/zh-CN/MATCHING.md)：NCC 参数、编码 Buffer、region 和性能。

@@ -156,11 +156,14 @@ class SocketSession {
     );
   }
 
-  close(): void {
-    this.socket.close();
+  close(error = androidError(
+    "SPOTTER_ANDROID_COMPANION_CONNECTION_CLOSED", "Android companion connection closed"
+  )): void {
+    this.fail(error);
   }
 
   send(message: JsonMessage): Promise<void> {
+    if (this.failure !== undefined) return Promise.reject(this.failure);
     return new Promise((resolve, reject) => {
       this.socket.send(JSON.stringify(message), (error: Error | undefined) => {
         if (error) {
@@ -187,8 +190,9 @@ class SocketSession {
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.removeWaiter(waiter);
-        reject(
+        // Protocol v2 has no request IDs. A late reply cannot be associated with
+        // another command safely, so this session must be explicitly replaced.
+        this.fail(
           androidError(
             "SPOTTER_ANDROID_COMPANION_TIMEOUT",
             "Timed out waiting for Android companion response",
@@ -240,13 +244,7 @@ class SocketSession {
       }
     }
     this.buffer.length = 0;
-  }
-
-  private removeWaiter(waiter: PendingWait): void {
-    const index = this.waiters.indexOf(waiter);
-    if (index >= 0) {
-      this.waiters.splice(index, 1);
-    }
+    this.socket.terminate();
   }
 }
 
@@ -414,11 +412,13 @@ class CompanionDevice implements AndroidCompanionDevice {
         throw errorFromMessage(response);
       }
       if (response.type !== expectedType) {
-        throw androidError(
+        const error = androidError(
           "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
           `Expected ${expectedType} response, got ${String(response.type)}`,
           { context: { responseType: response.type } }
         );
+        this.session.close(error);
+        throw error;
       }
       return response;
     });
@@ -435,30 +435,30 @@ export const android = {
   async pair(options: AndroidPairOptions): Promise<AndroidCompanionDevice> {
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const session = await openSession(options.url, timeoutMs);
-    const hello = await session.nextMessage(timeoutMs);
-    assertMessageType(hello, "hello");
-    assertProtocolVersion(hello);
-    const token = await pairSession(session, options, timeoutMs);
-    return new CompanionDevice({
-      url: options.url,
-      sessionToken: token,
-      session,
-      timeoutMs,
-    });
+    try {
+      const hello = await session.nextMessage(timeoutMs);
+      assertMessageType(hello, "hello");
+      assertProtocolVersion(hello);
+      const token = await pairSession(session, options, timeoutMs);
+      return new CompanionDevice({ url: options.url, sessionToken: token, session, timeoutMs });
+    } catch (error) {
+      session.close();
+      throw error;
+    }
   },
 
   async connect(options: AndroidConnectOptions): Promise<AndroidCompanionDevice> {
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const session = await openSession(options.url, timeoutMs);
-    const hello = await session.nextMessage(timeoutMs);
-    assertMessageType(hello, "hello");
-    assertProtocolVersion(hello);
-    return new CompanionDevice({
-      url: options.url,
-      sessionToken: options.sessionToken,
-      session,
-      timeoutMs,
-    });
+    try {
+      const hello = await session.nextMessage(timeoutMs);
+      assertMessageType(hello, "hello");
+      assertProtocolVersion(hello);
+      return new CompanionDevice({ url: options.url, sessionToken: options.sessionToken, session, timeoutMs });
+    } catch (error) {
+      session.close();
+      throw error;
+    }
   },
 };
 

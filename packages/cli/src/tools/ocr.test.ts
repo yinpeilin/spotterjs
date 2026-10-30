@@ -319,4 +319,25 @@ describe("ocr CLI tools", () => {
       modelProfile: "mobile",
     });
   });
+
+  it("allows an explicit retry after OCR initialization fails", async () => {
+    plugin.createOcr.mockRejectedValueOnce(new Error("temporary model failure")).mockResolvedValue(ocr);
+    ocr.read.mockResolvedValue([]);
+    const read = registerTools().get("ocr_read_image")!;
+    const args = { imagePath: "capture.png", modelDir: "retry-models" };
+    expect((await read(args)).success).toBe(false);
+    expect((await read(args)).success).toBe(true);
+    expect(plugin.createOcr).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares initialization across concurrent OCR calls and reuses a successful client", async () => {
+    plugin.createOcr.mockImplementation(async () => ocr);
+    ocr.read.mockResolvedValue([]);
+    const read = registerTools().get("ocr_read_image")!;
+    const args = { imagePath: "capture.png", modelDir: "shared-models" };
+    const results = await Promise.all([read(args), read(args)]);
+    expect(results.every((result) => result.success)).toBe(true);
+    expect((await read(args)).success).toBe(true);
+    expect(plugin.createOcr).toHaveBeenCalledTimes(1);
+  });
 });

@@ -44,12 +44,26 @@ describe("capture artifact adapters", () => {
 
     expect(captureScreenArtifact(region, { detail: "original" })).toEqual({
       imagePath: ".spotter/artifacts/screen.png",
+      origin: { x: 1, y: 2 },
+      coordinateSpace: "screen",
     });
     expect(mocks.capture).toHaveBeenCalledWith(region);
     expect(writeCapture).toHaveBeenCalledWith(image, {
       prefix: "desktop-screen",
       detail: "original",
     });
+  });
+
+  it("keeps screen origin separate from resized preview dimensions", () => {
+    mocks.capture.mockReturnValue(image);
+    vi.spyOn(workspaceImageStore, "writeCapture").mockReturnValue({
+      imagePath: ".spotter/artifacts/preview.png",
+      width: 1600, height: 800, originalWidth: 3200, originalHeight: 1600,
+      isDownscaled: true,
+    } as never);
+    expect(captureScreenArtifact({ left: -3200, top: 80, width: 3200, height: 1600 }))
+      .toMatchObject({ origin: { x: -3200, y: 80 }, coordinateSpace: "screen", width: 1600, originalWidth: 3200 });
+    expect(captureScreenArtifact()).toMatchObject({ origin: { x: 0, y: 0 } });
   });
 
   it("captures a window and includes the source window id", () => {

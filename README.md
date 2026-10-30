@@ -105,6 +105,8 @@ See [CLI + Skill](./docs/en/CLI.md) for JSON parameters and safe text input.
 
 ## Documentation Map
 
+- [Choose a workflow](./docs/en/guides/scenarios.md): runnable desktop, CLI, OCR and Android scenarios with verification limits.
+
 - [Getting started](./docs/en/getting-started.md): installation, first script, and local verification.
 - [Desktop automation](./docs/en/guides/desktop-automation.md): windows, capture, input, clipboard, and coordinates.
 - [Template matching](./docs/en/MATCHING.md): NCC options, encoded buffers, regions, and performance.

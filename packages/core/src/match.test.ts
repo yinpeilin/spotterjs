@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const findTemplate = vi.fn();
 const findAllTemplates = vi.fn();
@@ -22,8 +22,11 @@ import {
   findNeedle,
   findNeedleInWindow,
   waitForNeedle,
+  waitForNeedleInWindow,
 } from "./match";
 import { SpotterError } from "./errors";
+
+afterEach(() => vi.restoreAllMocks());
 
 beforeEach(() => {
   findTemplate.mockReset();
@@ -268,5 +271,48 @@ describe("findNeedleInWindow", () => {
         matchAlgorithm: "ncc",
       },
     ]);
+  });
+});
+
+describe("window template polling", () => {
+  it("retries a missing template and returns the eventual screen coordinates", () => {
+    findTemplateInWindow.mockImplementationOnce(() => {
+      throw new SpotterError("SPOTTER_NATIVE_MATCH_NOT_FOUND", "not visible yet");
+    });
+    expect(waitForNeedleInWindow("123", "button.png", { timeoutMs: 100, intervalMs: 0 }))
+      .toMatchObject({ center: { x: 16, y: 29 } });
+    expect(findTemplateInWindow).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails immediately when the window disappears instead of retrying a permanent error", () => {
+    const error = new SpotterError("SPOTTER_NATIVE_WINDOW_NOT_FOUND", "window closed");
+    findTemplateInWindow.mockImplementationOnce(() => { throw error; });
+    expect(() => waitForNeedleInWindow("123", "button.png", { timeoutMs: 100, intervalMs: 0 }))
+      .toThrow(error);
+    expect(findTemplateInWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the last missing-template error when the deadline expires", () => {
+    const error = new SpotterError("SPOTTER_NATIVE_MATCH_NOT_FOUND", "still absent");
+    findTemplateInWindow.mockImplementation(() => { throw error; });
+    vi.spyOn(Date, "now").mockReturnValueOnce(0).mockReturnValue(100);
+    expect(() => waitForNeedleInWindow("123", "button.png", { timeoutMs: 100 }))
+      .toThrow(error);
+    expect(findTemplateInWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { timeoutMs: undefined as never }, { timeoutMs: -1 }, { timeoutMs: NaN }, { timeoutMs: Infinity },
+    { timeoutMs: 0, intervalMs: -1 }, { timeoutMs: 0, intervalMs: NaN },
+    { timeoutMs: 0, intervalMs: Infinity },
+  ])("rejects invalid timing before capture: %j", (options) => {
+    expect(() => waitForNeedleInWindow("123", "button.png", options))
+      .toThrow(expect.objectContaining({ code: "SPOTTER_CORE_INVALID_ARGUMENT" }));
+    expect(findTemplateInWindow).not.toHaveBeenCalled();
+  });
+
+  it("allows one immediate observation with a zero timeout", () => {
+    expect(waitForNeedleInWindow("123", "button.png", { timeoutMs: 0 }).score).toBe(0.94);
+    expect(findTemplateInWindow).toHaveBeenCalledTimes(1);
   });
 });

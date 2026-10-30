@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer } from "ws";
 import * as androidPlugin from "./index";
 import { android, isSpotterError, SpotterError } from "./index";
@@ -470,5 +470,59 @@ describe("android companion websocket client", () => {
 
     expect(isSpotterError(error)).toBe(true);
     expect("AndroidCompanionError" in androidPlugin).toBe(false);
+  });
+
+  it.each(["pair", "connect"] as const)("closes a failed %s handshake", async (method) => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 1 }));
+    });
+    const pending = method === "pair"
+      ? android.pair({ url, code: "123456" })
+      : android.connect({ url, sessionToken: "existing" });
+    await expect(pending).rejects.toMatchObject({ code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE" });
+    await vi.waitFor(() => expect(server.clients.size).toBe(0));
+  });
+
+  it("closes a rejected pairing without retaining a live socket", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2 }));
+      socket.on("message", () => socket.send(JSON.stringify({ type: "error", message: "wrong code" })));
+    });
+    await expect(android.pair({ url, code: "wrong" })).rejects.toMatchObject({ code: "SPOTTER_ANDROID_COMPANION_ERROR" });
+    await vi.waitFor(() => expect(server.clients.size).toBe(0));
+  });
+
+  it("does not send queued actions or accept a late acknowledgement after a timeout", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2 }));
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(String(raw)) as Json);
+        if (received.length === 1) {
+          const timer = setTimeout(() => socket.send(JSON.stringify({ type: "ok" })), 80);
+          socket.once("close", () => clearTimeout(timer));
+        }
+      });
+    });
+    const device = await android.connect({ url, sessionToken: "existing", timeoutMs: 50 });
+    const results = await Promise.allSettled([device.tap(1, 1), device.tap(2, 2)]);
+    expect(results.map((result) => result.status)).toEqual(["rejected", "rejected"]);
+    expect(received).toHaveLength(1);
+    await vi.waitFor(() => expect(server.clients.size).toBe(0));
+    device.close();
+  });
+
+  it("requires reconnecting after an unexpected response instead of sending the next action", async () => {
+    server.on("connection", (socket) => {
+      socket.send(JSON.stringify({ type: "hello", protocolVersion: 2 }));
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(String(raw)) as Json);
+        socket.send(JSON.stringify({ type: "status", state: {} }));
+      });
+    });
+    const device = await android.connect({ url, sessionToken: "existing" });
+    await expect(device.heartbeat()).rejects.toMatchObject({ code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE" });
+    await expect(device.status()).rejects.toMatchObject({ code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE" });
+    expect(received).toHaveLength(1);
+    device.close();
   });
 });

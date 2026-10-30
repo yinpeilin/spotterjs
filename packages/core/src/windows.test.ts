@@ -27,6 +27,7 @@ vi.mock("./native", () => ({
 }));
 
 import { windows } from "./windows";
+import { SpotterError } from "./errors";
 
 const nativeWindow = {
   id: "123",
@@ -125,7 +126,7 @@ describe("windows", () => {
   it("retries window template matching until a match appears", () => {
     findTemplateInWindow
       .mockImplementationOnce(() => {
-        throw new Error("no match");
+        throw new SpotterError("SPOTTER_NATIVE_MATCH_NOT_FOUND", "no match");
       })
       .mockReturnValueOnce({
         region: { left: 12, top: 24, width: 8, height: 10 },
@@ -143,7 +144,7 @@ describe("windows", () => {
 
   it("throws the last error when the wait times out", () => {
     findTemplateInWindow.mockImplementation(() => {
-      throw new Error("never matches");
+      throw new SpotterError("SPOTTER_NATIVE_MATCH_NOT_FOUND", "never matches");
     });
 
     expect(() =>

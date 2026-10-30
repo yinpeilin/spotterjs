@@ -7,7 +7,7 @@ import {
   type TemplateImage,
 } from "@spotterjs/base";
 
-import { callNative, type SpotterErrorContext } from "./errors";
+import { callNative, isSpotterError, SpotterError, type SpotterErrorContext } from "./errors";
 import { loadNative } from "./native";
 import { toMatchResult, toNativeOpts } from "./match-shared";
 
@@ -141,6 +141,14 @@ export function waitForNeedleInWindow(
   options: MatchWaitOptions
 ): MatchResult {
   const { timeoutMs, intervalMs, ...matchOptions } = options;
+  for (const [name, value] of Object.entries({ timeoutMs, intervalMs })) {
+    if (name === "intervalMs" && value === undefined) continue;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      throw new SpotterError("SPOTTER_CORE_INVALID_ARGUMENT", `${name} must be a finite non-negative number`, {
+        context: { name, value }, domain: "core",
+      });
+    }
+  }
   const deadline = Date.now() + timeoutMs;
   const poll = intervalMs ?? 200;
   let lastError: unknown;
@@ -148,6 +156,7 @@ export function waitForNeedleInWindow(
     try {
       return findNeedleInWindow(windowId, needle, matchOptions);
     } catch (error) {
+      if (!isSpotterError(error) || error.code !== "SPOTTER_NATIVE_MATCH_NOT_FOUND") throw error;
       lastError = error;
       if (Date.now() >= deadline) break;
       sleepSync(Math.min(poll, Math.max(0, deadline - Date.now())));

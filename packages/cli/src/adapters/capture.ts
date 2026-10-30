@@ -12,10 +12,14 @@ type CaptureOptions = {
 /** Capture the full screen or a region and write a workspace PNG artifact. */
 export function captureScreenArtifact(region?: Region, options: CaptureOptions = {}) {
   const img = screen.capture(region);
-  return workspaceImageStore.writeCapture(img, {
-    prefix: "desktop-screen",
-    detail: options.detail,
-  });
+  return {
+    ...workspaceImageStore.writeCapture(img, {
+      prefix: "desktop-screen",
+      detail: options.detail,
+    }),
+    origin: { x: Math.trunc(region?.left ?? 0), y: Math.trunc(region?.top ?? 0) },
+    coordinateSpace: "screen" as const,
+  };
 }
 
 /** Capture a desktop window and write a workspace PNG artifact. */

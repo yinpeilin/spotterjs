@@ -163,6 +163,8 @@ export const windows = {
    *
    * Returned coordinates are screen coordinates. Polling runs on the calling
    * thread because the native layer has no window-scoped wait.
+   * Only a missing template is retried; closed windows, invalid templates and
+   * capture errors fail immediately. Timing values must be finite and non-negative.
    * @throws When no match appears before the timeout.
    */
   waitForTemplate(

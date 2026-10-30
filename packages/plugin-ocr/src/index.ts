@@ -177,7 +177,10 @@ async function createCachedOnnxEngine(options: CreateOcrOptions): Promise<OcrEng
   });
   let cached = engineCache.get(cacheKey);
   if (!cached) {
-    cached = factory();
+    cached = factory().catch((error) => {
+      if (engineCache.get(cacheKey) === cached) engineCache.delete(cacheKey);
+      throw error;
+    });
     engineCache.set(cacheKey, cached);
   }
   return cached;

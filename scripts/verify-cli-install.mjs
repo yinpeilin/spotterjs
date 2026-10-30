@@ -200,11 +200,13 @@ try {
 
   assert.ok(Array.isArray(run(["run", "desktop_list_windows"]).data));
   const capture = run(["run", "desktop_capture_screen", "--stdin"], {
-    region: { left: 0, top: 0, width: 8, height: 8 },
+    region: { left: 3, top: 5, width: 8, height: 8 },
     detail: "original",
   }).data;
   assert.equal(capture.width, 8);
   assert.equal(capture.height, 8);
+  assert.deepEqual(capture.origin, { x: 3, y: 5 });
+  assert.equal(capture.coordinateSpace, "screen");
   assert.ok(existsSync(path.resolve(workspace, capture.imagePath)));
   checks.push("installed native loader and workspace capture artifacts");
 

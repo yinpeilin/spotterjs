@@ -119,6 +119,14 @@ process's `deviceId` cache no longer exists.
 
 ## Host boundaries
 
+Screen/region capture responses carry screen `origin` plus original and output
+dimensions. Restore preview scale before interpreting a point, or use original
+detail and pass the origin into standalone OCR. Window combo tools perform
+their own coordinate translation.
+
+Android timeouts and protocol mismatches invalidate the connection and reject
+queued actions. Inspect state before reconnecting; do not replay blindly.
+
 Host file operations stay inside the selected workspace; sensitive writes are
 denied by default. The host boundary is not an operating-system sandbox for
 desktop actions. Inspect `host_shell_info` before using `host_exec` so command
