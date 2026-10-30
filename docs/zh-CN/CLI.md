@@ -23,10 +23,14 @@ spotterjs run desktop_list_windows
 
 ```bash
 npm ci
+npm run build:native
 npm run build:ts
 node packages/cli/dist/cli.js list
 node packages/cli/dist/cli.js run desktop_list_windows
 ```
+
+首次源码构建需要 Rust 和平台构建工具。Linux x64 请将 `npm run build:native`
+替换为 `npm run build:linux -w @spotterjs/node`，详见[源码开发](./getting-started.md#源码开发)。
 
 修改 native binary 后需要 `npm run build:native`。桌面自动化要求 Windows 或 Linux
 处于已登录、未锁定的交互桌面中。

@@ -9,7 +9,7 @@
 - Windows native 构建：需要 MSVC 工具链和 `link.exe`。
 - Linux native 构建：需要对应的系统依赖和 X11 环境。
 
-只作为用户安装时，通常不需要本地 Rust 工具链；从源码开发 native 包时才需要 Rust。
+安装已发布的 npm 包不需要 Rust。首次从源码构建时需要 Rust，具体见下方说明。
 
 ## 安装
 
@@ -19,21 +19,35 @@
 npm install @spotterjs/core
 ```
 
-源码开发时：
+## 源码开发
+
+首次从源码构建时，`@spotterjs/node` 链接到本地工作区，所需的 `index.js`、
+`index.d.ts` 和原生二进制由构建生成，不在版本控制中。只安装 optional 平台包
+不会生成这些文件，因此需要先构建 native，再构建 TypeScript。
+
+请安装 `rust-toolchain.toml` 指定的 Rust 工具链。Windows 还需要 MSVC C++
+构建工具和 Windows SDK。Linux x64 需要 C/C++ 工具链和 X11 开发库；
+桌面自动化需要 X11 会话。
+
+Windows x64：
 
 ```bash
 git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
+npm run build:native
 npm run build:ts
 ```
 
-需要编译 native 包时：
+Linux x64 请将 native 构建命令替换为以下命令，以启用 X11：
 
 ```bash
-cargo build -p spotterjs-base -p spotterjs-core -p spotterjs-plugin-match-ncc
-npm run build:native
+npm run build:linux -w @spotterjs/node
 ```
+
+随后运行 `npm run build:ts`。完成首次 native 构建后，只改 TypeScript 时可以直接运行
+`npm run build:ts`；修改 Rust/N-API 时需要重新构建 native。新检出的源码若报
+`TS2307`、找不到 `@spotterjs/node` 类型声明，请先执行对应平台的 native 构建。
 
 ## 第一个脚本
 

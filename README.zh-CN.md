@@ -92,6 +92,7 @@ mouse.tap(match.center.x, match.center.y);
 
 ```bash
 npm ci
+npm run build:native
 npm run build:ts
 node packages/cli/dist/cli.js list
 node packages/cli/dist/cli.js run desktop_list_windows
@@ -141,16 +142,17 @@ JSON 参数、多行中文输入和完整流程见 [CLI + Skill](./docs/zh-CN/CL
 git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
+npm run build:native
 npm run build:ts
 npm test
 ```
 
-修改 Rust 或 N-API 代码时，需要构建 native 包：
-
-```bash
-cargo build -p spotterjs-base -p spotterjs-core -p spotterjs-plugin-match-ncc
-npm run build:native
-```
+首次从源码构建时，需要先构建 native 包，再运行 `build:ts`：工作区的加载器和
+TypeScript 声明由构建生成，不在版本控制中。请先安装 `rust-toolchain.toml`
+指定的 Rust 工具链和平台构建工具。Linux x64 请将上面的
+`npm run build:native` 替换为 `npm run build:linux -w @spotterjs/node`，以启用 X11。
+完成首次 native 构建后，只改 TypeScript 时可以直接运行 `npm run build:ts`。
+前置条件见[源码开发](./docs/zh-CN/getting-started.md#源码开发)。
 
 ## 许可证
 

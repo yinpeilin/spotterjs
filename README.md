@@ -79,6 +79,7 @@ Build the source checkout and discover commands:
 
 ```bash
 npm ci
+npm run build:native
 npm run build:ts
 node packages/cli/dist/cli.js list
 node packages/cli/dist/cli.js run desktop_list_windows
@@ -129,16 +130,18 @@ Maintainer docs:
 git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
+npm run build:native
 npm run build:ts
 npm test
 ```
 
-Build native packages when working on Rust or N-API code:
-
-```bash
-cargo build -p spotterjs-base -p spotterjs-core -p spotterjs-plugin-match-ncc
-npm run build:native
-```
+A fresh source checkout needs a native build before `build:ts`: the workspace
+loader and TypeScript declarations are generated and are not committed. Install
+the Rust toolchain from `rust-toolchain.toml` and the platform build tools first.
+On Linux x64, replace `npm run build:native` above with
+`npm run build:linux -w @spotterjs/node` to enable X11 support.
+After the initial native build, TypeScript-only changes can use `npm run build:ts`.
+See [source setup](./docs/en/getting-started.md#source-checkout) for prerequisites.
 
 ## License
 

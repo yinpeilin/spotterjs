@@ -17,10 +17,16 @@ spotterjs run desktop_capture_screen --json '{"detail":"original"}'
 For a source checkout:
 
 ```bash
+npm ci
+npm run build:native
 npm run build:ts
 node packages/cli/dist/cli.js --help
 node packages/cli/dist/cli.js run desktop_list_windows
 ```
+
+The initial source build requires Rust and platform build tools. On Linux x64,
+use `npm run build:linux -w @spotterjs/node` instead of `npm run build:native`.
+See [source setup](../../docs/en/getting-started.md#source-checkout).
 
 Use `--file args.json` or `--stdin` for Unicode, multiline text, or values that
 are awkward to quote in a shell. Results use `{ "success": true, "data": ... }`

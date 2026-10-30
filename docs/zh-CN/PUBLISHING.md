@@ -7,11 +7,16 @@
 ```bash
 npm ci
 npm run docs:check
+npm run build:native
 npm run build:ts
 npm test
 npm run sync-license
 npm run verify-pack
 ```
+
+首次源码构建需要先构建 native，生成工作区加载器和类型声明。Linux x64 请将
+`npm run build:native` 替换为 `npm run build:linux -w @spotterjs/node`，
+详见[源码开发](./getting-started.md#源码开发)。
 
 如果改动涉及 native 能力，还需要在对应平台运行 native 构建和 Smoke：
 

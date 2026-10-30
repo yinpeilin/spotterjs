@@ -10,11 +10,16 @@ packages, and npm publishing order.
 ```bash
 npm ci
 npm run docs:check
+npm run build:native
 npm run build:ts
 npm test
 npm run sync-license
 npm run verify-pack
 ```
+
+On a fresh checkout, build native code first to generate the workspace loader
+and declarations. Linux x64 uses `npm run build:linux -w @spotterjs/node` instead
+of `npm run build:native`. See [source setup](./getting-started.md#source-checkout).
 
 If the change touches native behavior, also run native build and smoke checks on
 the relevant platform:

@@ -12,8 +12,12 @@ the user's intended target and authorized action explicit.
 ## Locate the executable and discover commands
 
 1. Try `spotterjs --version` and `spotterjs --help`.
-2. In a source checkout, use `node packages/cli/dist/cli.js`; build first with
-   `npm run build:ts` if needed. Native changes require `npm run build:native`.
+2. In a source checkout, use `node packages/cli/dist/cli.js`. On the first build,
+   run `npm ci`, `npm run build:native`, then `npm run build:ts`; native build
+   tools and Rust are required to generate the loader and type declarations.
+   On Linux x64, use `npm run build:linux -w @spotterjs/node` instead of
+   `npm run build:native` to enable X11. Later TypeScript-only changes can use
+   `npm run build:ts` directly.
 3. For an installed npm distribution, `npx @spotterjs/cli` is another entry point.
 4. Run `spotterjs list`, then `spotterjs schema <command>` for exact arguments.
    Use `list --all` to discover optional capabilities. Never invent a command or

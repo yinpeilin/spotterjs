@@ -17,21 +17,38 @@ and points you to the next guide for each capability.
 npm install @spotterjs/core
 ```
 
-From the repository:
+## Source Checkout
+
+Installing the published package does not require Rust. A fresh source checkout
+does: `@spotterjs/node` is linked to the local workspace, whose `index.js`,
+`index.d.ts`, and native binary are generated rather than committed. Installing
+the optional platform package alone does not generate these files.
+
+Install Rust with the version selected by `rust-toolchain.toml`. Windows builds
+also need the MSVC C++ build tools and Windows SDK. Linux x64 builds need a
+C/C++ toolchain and X11 development libraries. Desktop automation requires an
+X11 session.
+
+On Windows x64:
 
 ```bash
 git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
+npm run build:native
 npm run build:ts
 ```
 
-Build native packages only when working on Rust/N-API code:
+On Linux x64, use this native build command instead to enable X11 support:
 
 ```bash
-cargo build -p spotterjs-base -p spotterjs-core -p spotterjs-plugin-match-ncc
-npm run build:native
+npm run build:linux -w @spotterjs/node
 ```
+
+Then run `npm run build:ts`. After the first native build, TypeScript-only
+changes can use `npm run build:ts` directly. Rebuild native code when changing
+Rust/N-API code. `TS2307` for `@spotterjs/node` on a fresh checkout means the
+generated declarations are missing; run the platform's native build first.
 
 ## First Script
 

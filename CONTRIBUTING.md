@@ -8,11 +8,13 @@
 git clone https://github.com/yinpeilin/spotterjs.git
 cd spotterjs
 npm ci
-cargo build -p spotterjs-base -p spotterjs-core -p spotterjs-plugin-match-ncc
-cd crates/spotterjs-node && npm install && npm run build
-cd ../..
+npm run build:native
 npm run build:ts
 ```
+
+首次源码构建需要 Rust 和平台构建工具，native 构建会生成 TypeScript 所需的声明。
+Linux x64 请将 `npm run build:native` 替换为
+`npm run build:linux -w @spotterjs/node`。详见[源码开发](docs/zh-CN/getting-started.md#源码开发)。
 
 ## Tests
 

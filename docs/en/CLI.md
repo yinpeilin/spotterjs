@@ -24,10 +24,15 @@ not wanted. For an unpublished source checkout, build and run the local entry:
 
 ```bash
 npm ci
+npm run build:native
 npm run build:ts
 node packages/cli/dist/cli.js list
 node packages/cli/dist/cli.js run desktop_list_windows
 ```
+
+The first source build requires Rust and platform build tools. On Linux x64,
+replace `npm run build:native` with `npm run build:linux -w @spotterjs/node`.
+See [source setup](./getting-started.md#source-checkout).
 
 Native binary changes require `npm run build:native`. Desktop automation needs
 an unlocked interactive Windows or Linux desktop.
