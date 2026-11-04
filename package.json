@@ -2,6 +2,7 @@
   "name": "spotterjs-workspace",
   "version": "1.0.5",
   "private": true,
+  "license": "Apache-2.0",
   "scripts": {
     "build": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/node && npm run build -w @spotterjs/core && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android && npm run build -w @spotterjs/cli",
     "build:ts": "npm run build -w @spotterjs/base && npm run build -w @spotterjs/core && npm run build -w @spotterjs/plugin-ocr && npm run build -w @spotterjs/plugin-android && npm run build -w @spotterjs/cli",

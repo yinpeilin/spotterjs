@@ -185,7 +185,14 @@ npx @spotterjs/cli list
 npx @spotterjs/cli skill path
 ```
 
-## Commercial License
+## License
 
-For commercial authorization, contact `ypl123698745@qq.com` or use
-[GitHub Issues](https://github.com/yinpeilin/spotterjs/issues).
+spotterjs uses the [Apache License 2.0](../../LICENSE) (Apache-2.0), which
+permits commercial use, modification, redistribution, and integration into
+closed-source products. Distributions must comply with the license, including
+retaining the license and applicable notices and identifying modified files.
+
+Set each published npm package's `license` field to `Apache-2.0`. Before packing
+or publishing, run `npm run sync-license` and confirm that each package includes
+the current root `LICENSE`. Preserve any required third-party license and notice
+files; dependencies and OCR models remain subject to their own terms.

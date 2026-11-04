@@ -142,9 +142,13 @@ npm run build:native
 
 ## License
 
-**spotterjs License 1.0**. See [LICENSE](./LICENSE) and
+**Apache License 2.0 (Apache-2.0)**. See [LICENSE](./LICENSE) and
 [中文说明](./LICENSE.zh-CN).
 
-- Free: personal learning, teaching, non-commercial research, and local evaluation.
-- Commercial: products, SaaS, paid delivery, enterprise production, and similar use
-  require authorization. Contact `ypl123698745@qq.com` or open a GitHub issue.
+Commercial use, modification, redistribution, and integration into closed-source
+products are permitted without a separate commercial license fee. Follow the
+license terms, including retaining the license and applicable notices and
+identifying modified files.
+
+Third-party dependencies and OCR models remain subject to their respective
+licenses and terms.

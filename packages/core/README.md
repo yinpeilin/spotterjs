@@ -97,5 +97,6 @@ text explains parameters, coordinate spaces, errors, and side effects.
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires
-authorization. See [LICENSE](../../LICENSE).
+Licensed under [Apache-2.0](../../LICENSE). Commercial use, modification,
+redistribution, and integration into closed-source products are permitted,
+subject to the license terms and retention of applicable notices.

@@ -66,5 +66,7 @@ and integration tests are documented in the [OCR guide](../../docs/en/guides/ocr
 
 ## License
 
-Learning and non-commercial use are free. Commercial use requires
-authorization. See [LICENSE](../../LICENSE).
+Licensed under [Apache-2.0](../../LICENSE). Commercial use, modification,
+redistribution, and integration into closed-source products are permitted,
+subject to the license terms and retention of applicable notices. Third-party
+dependencies and downloaded OCR models retain their own licenses and terms.

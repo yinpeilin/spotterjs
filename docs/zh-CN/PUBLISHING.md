@@ -171,6 +171,12 @@ npx @spotterjs/cli list
 npx @spotterjs/cli skill path
 ```
 
-## 授权说明
+## 许可证
 
-商用授权请联系 `ypl123698745@qq.com` 或通过 [GitHub Issues](https://github.com/yinpeilin/spotterjs/issues) 处理。
+spotterjs 采用 [Apache License 2.0](../../LICENSE)（Apache-2.0），允许商业使用、
+修改、再分发和集成到闭源产品。分发时须遵守许可证条款，包括保留许可证和适用声明，
+并标明修改过的文件。
+
+每个发布到 npm 的包都应将 `license` 字段设为 `Apache-2.0`。打包或发布前运行
+`npm run sync-license`，确认每个包都包含当前根 `LICENSE`。保留第三方要求的许可证
+和声明文件；依赖和 OCR 模型仍适用各自的条款。
