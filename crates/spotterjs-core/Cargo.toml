@@ -31,6 +31,9 @@ parking_lot = "0.12"
 windows = { workspace = true }
 windows-core = { version = "0.61.2", default-features = false }
 
+[target.'cfg(windows)'.dev-dependencies]
+windows = { workspace = true, features = ["Win32_Security"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 x11rb = { version = "0.13", optional = true, features = ["xtest", "allow-unsafe-code"] }
 atspi = { workspace = true, optional = true }

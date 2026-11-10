@@ -35,6 +35,7 @@ or maintaining the repository.
 
 ## Maintainers
 
+- [2026-11-10 code handoff](./development/handoff-2026-11-10.md): confirmed installation and CLI diagnostic issues, follow-up tasks, and validation results.
 - [Architecture](./development/architecture.md): monorepo layout, TypeScript packages, Rust crates, native packages, and boundaries.
 - [Testing](./development/testing.md): unit tests, Rust tests, smoke tests, integration scripts, benchmarks, and packaging checks.
 - [Documentation style](./development/documentation-style.md): bilingual docs policy, API comments, examples, and links.

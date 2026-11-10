@@ -35,6 +35,9 @@ pub enum SpotterError {
     #[error("platform error: {0}")]
     Platform(String),
 
+    #[error("platform error: {reason}")]
+    PlatformDiagnostics { reason: String, diagnostics: Value },
+
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -73,6 +76,7 @@ impl SpotterError {
             SpotterError::CaptureFailed(_) => "SPOTTER_NATIVE_CAPTURE_FAILED",
             SpotterError::InvalidWindowId(_) => "SPOTTER_NATIVE_INVALID_WINDOW_ID",
             SpotterError::Platform(_) => "SPOTTER_NATIVE_PLATFORM_ERROR",
+            SpotterError::PlatformDiagnostics { .. } => "SPOTTER_NATIVE_PLATFORM_ERROR",
             SpotterError::Io(_) => "SPOTTER_NATIVE_IO_ERROR",
             SpotterError::Image(_) => "SPOTTER_NATIVE_IMAGE_ERROR",
             SpotterError::UnsupportedPlatform => "SPOTTER_NATIVE_UNSUPPORTED_PLATFORM",
@@ -96,6 +100,12 @@ impl SpotterError {
             SpotterError::CaptureFailed(reason) => json!({ "reason": reason }),
             SpotterError::InvalidWindowId(window_id) => json!({ "windowId": window_id }),
             SpotterError::Platform(reason) => json!({ "reason": reason }),
+            SpotterError::PlatformDiagnostics {
+                reason,
+                diagnostics,
+            } => {
+                json!({ "reason": reason, "diagnostics": diagnostics })
+            }
             SpotterError::Io(error) => {
                 json!({ "kind": format!("{:?}", error.kind()), "reason": error.to_string() })
             }

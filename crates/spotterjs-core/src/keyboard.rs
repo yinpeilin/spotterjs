@@ -1,14 +1,14 @@
 use crate::error::{Result, SpotterError};
-use enigo::{Direction, Enigo, Key as EnigoKey, Keyboard, Settings};
-#[cfg(windows)]
-use std::mem::size_of;
+use enigo::Key as EnigoKey;
+#[cfg(not(windows))]
+use enigo::{Direction, Enigo, Keyboard, Settings};
 use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+    MapVirtualKeyW, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
     KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC, VIRTUAL_KEY, VK_0,
     VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B, VK_BACK, VK_C, VK_D,
     VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12, VK_F2, VK_F3,
@@ -286,6 +286,7 @@ pub fn set_keyboard_config(config: KeyboardConfig) {
     *KEYBOARD_CONFIG.lock().unwrap() = config;
 }
 
+#[cfg(not(windows))]
 fn enigo() -> Result<Enigo> {
     // Each API call creates a handle; dropping it must not release keys held by down().
     Enigo::new(&Settings {
@@ -352,10 +353,21 @@ pub fn keyboard_press(keys: &[Key]) -> Result<()> {
 
 pub fn keyboard_press_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
     crate::events::guard::guard_synthetic_input(|| {
-        let mut e = enigo()?;
-        for key in keys {
-            e.key(key.to_enigo(), Direction::Press)
-                .map_err(|err| SpotterError::Platform(format!("keyboard_press: {err}")))?;
+        #[cfg(windows)]
+        {
+            let inputs: Vec<_> = keys
+                .iter()
+                .map(|key| windows_key_input(windows_vk(*key), KEYBD_EVENT_FLAGS::default()))
+                .collect();
+            send_windows_inputs(&inputs)?;
+        }
+        #[cfg(not(windows))]
+        {
+            let mut e = enigo()?;
+            for key in keys {
+                e.key(key.to_enigo(), Direction::Press)
+                    .map_err(|err| SpotterError::Platform(format!("keyboard_press: {err}")))?;
+            }
         }
         auto_delay_for(config.unwrap_or_else(keyboard_config));
         Ok(())
@@ -368,10 +380,22 @@ pub fn keyboard_release(keys: &[Key]) -> Result<()> {
 
 pub fn keyboard_release_with_config(keys: &[Key], config: Option<KeyboardConfig>) -> Result<()> {
     crate::events::guard::guard_synthetic_input(|| {
-        let mut e = enigo()?;
-        for key in keys.iter().rev() {
-            e.key(key.to_enigo(), Direction::Release)
-                .map_err(|err| SpotterError::Platform(format!("keyboard_release: {err}")))?;
+        #[cfg(windows)]
+        {
+            let inputs: Vec<_> = keys
+                .iter()
+                .rev()
+                .map(|key| windows_key_input(windows_vk(*key), KEYEVENTF_KEYUP))
+                .collect();
+            send_windows_inputs(&inputs)?;
+        }
+        #[cfg(not(windows))]
+        {
+            let mut e = enigo()?;
+            for key in keys.iter().rev() {
+                e.key(key.to_enigo(), Direction::Release)
+                    .map_err(|err| SpotterError::Platform(format!("keyboard_release: {err}")))?;
+            }
         }
         auto_delay_for(config.unwrap_or_else(keyboard_config));
         Ok(())
@@ -388,13 +412,6 @@ pub fn keyboard_type_keys_with_config(keys: &[Key], config: Option<KeyboardConfi
             return Ok(());
         }
         let cfg = config.unwrap_or_else(keyboard_config);
-        if keys.len() == 1 {
-            let mut e = enigo()?;
-            e.key(keys[0].to_enigo(), Direction::Click)
-                .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
-            auto_delay_for(cfg);
-            return Ok(());
-        }
         #[cfg(windows)]
         {
             send_windows_shortcut(keys)?;
@@ -403,6 +420,13 @@ pub fn keyboard_type_keys_with_config(keys: &[Key], config: Option<KeyboardConfi
         }
         #[cfg(not(windows))]
         {
+            if keys.len() == 1 {
+                let mut e = enigo()?;
+                e.key(keys[0].to_enigo(), Direction::Click)
+                    .map_err(|err| SpotterError::Platform(format!("keyboard_type_keys: {err}")))?;
+                auto_delay_for(cfg);
+                return Ok(());
+            }
             let modifiers = &keys[..keys.len() - 1];
             keyboard_press_with_config(modifiers, Some(cfg))?;
             let mut e = enigo()?;
@@ -560,16 +584,7 @@ fn windows_text_inputs(c: char) -> Vec<INPUT> {
 
 #[cfg(windows)]
 fn send_windows_inputs(inputs: &[INPUT]) -> Result<()> {
-    let sent = unsafe { SendInput(inputs, size_of::<INPUT>() as i32) };
-    if sent == inputs.len() as u32 {
-        Ok(())
-    } else {
-        Err(SpotterError::Platform(format!(
-            "keyboard: SendInput sent {sent}/{} events: {}",
-            inputs.len(),
-            std::io::Error::last_os_error()
-        )))
-    }
+    crate::platform::windows_input::send_inputs("keyboard", inputs)
 }
 
 #[cfg(windows)]

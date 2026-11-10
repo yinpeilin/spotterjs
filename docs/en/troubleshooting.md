@@ -51,6 +51,42 @@ High-level `screen.findTemplate` and `windows.findTemplate` return coordinates t
 be clicked directly. Use `toMatchBox` and `matchTapScreen` only when you need
 manual conversion.
 
+## Windows Input Fails with SetCursorPos or SendInput
+
+`mouse.tap` moves the cursor before clicking. A `SetCursorPos` failure stops the
+click and any subsequent keyboard input. Windows requires the calling thread to
+use the current input desktop. A stale desktop binding can cause this failure
+after desktop or session changes. The `0x800700CB` (203, environment option not
+found) message can be a leftover Windows error; it does not establish that an
+environment variable is missing.
+
+spotterjs retries failed cursor operations and completely rejected input batches
+on a temporary thread bound to the input desktop. It preserves the host thread's
+desktop. Partially accepted key batches are reported without replaying them, to
+avoid duplicate input.
+
+Input errors preserve the first failure and any failed recovery stage, together
+with desktop diagnostics captured on the original calling thread before retry.
+`error.context.diagnostics` includes `threadDesktop`, `inputDesktop`,
+`threadDesktopMatchesInput`, `sessionId`, `windowStation`, `foregroundWindow`, and
+`errors` for failed diagnostic queries. Unavailable fields remain `null`. The
+message also contains a compact desktop summary, so existing
+`logger.error(error.message)` calls retain this evidence. Collection is automatic;
+no helper script or environment variable is required.
+
+For `threadDesktopMatchesInput`, `false` means the sampled desktop names differ,
+`true` means they match, and `null` means the comparison is unknown; inspect
+`errors` for the missing information. Matching names do not establish sufficient
+input permissions or identify a protected desktop. A mismatch is evidence of the
+thread's binding at that moment, not a complete diagnosis of the incident.
+
+If recovery still fails, run the automation in the target user's unlocked
+interactive session. Check whether Remote Desktop was disconnected, the target
+application runs with higher privileges, or the dialog uses a protected desktop.
+This recovery does not bypass Windows input permissions or protected dialogs.
+After updating from source, rebuild with `npm run build:native`; deployed apps
+also need the rebuilt Windows native binary, not only updated JavaScript.
+
 ## Accessibility Tree Is Empty or Missing Elements
 
 1. Focus the target window and check for permission boundaries.

@@ -45,6 +45,34 @@ npm run smoke:match-tap
 高层 `screen.findTemplate` 和 `windows.findTemplate` 返回的坐标可以直接点击。
 只有在需要手动转换坐标时，才使用 `toMatchBox` 和 `matchTapScreen`。
 
+## Windows 输入报 SetCursorPos 或 SendInput 错误
+
+`mouse.tap` 会先移动光标，再点击。`SetCursorPos` 失败时，点击及后续键盘输入
+都还没有执行。Windows 要求调用线程位于当前接收输入的桌面；桌面或会话变化后，
+线程仍绑定旧桌面就可能导致失败。`0x800700CB`（203，找不到环境选项）可能来自
+此前残留的 Windows 错误码，不能据此认定缺少环境变量。
+
+spotterjs 会在绑定输入桌面的临时线程上，重试失败的光标操作及被整批拒绝的输入。
+调用方线程的桌面保持不变。已经部分成功的按键批次直接报错，不会整批重发，
+避免重复输入。
+
+输入错误会保留首次失败、恢复失败的阶段，以及重试前在原调用线程采集的桌面诊断。
+`error.context.diagnostics` 包含 `threadDesktop`、`inputDesktop`、
+`threadDesktopMatchesInput`、`sessionId`、`windowStation`、`foregroundWindow`，
+以及记录诊断采集失败原因的 `errors`；无法读取的字段为 `null`。错误消息也会带上
+简明桌面摘要，现有 `logger.error(error.message)` 就能留下这些信息。
+诊断自动采集，无需额外脚本或环境变量。
+
+`threadDesktopMatchesInput` 为 `false` 表示采样时桌面名称不一致，`true` 表示名称
+一致，`null` 表示无法判断，需结合 `errors` 查看缺失信息。名称一致不能证明具备
+输入权限，也不能据此判断是否处于受保护桌面；名称不一致只能证明当时的线程绑定状态，
+不能自动确认现场故障的全部原因。
+
+如果恢复仍失败，请在目标用户已解锁的交互会话中运行自动化，检查远程桌面是否已断开、
+目标程序是否使用更高权限，以及弹窗是否位于受保护桌面。恢复逻辑仍受 Windows
+输入权限及受保护弹窗限制。源码更新后需要运行 `npm run build:native`；
+部署应用也需要替换重新构建的 Windows native 二进制，仅更新 JavaScript 不会生效。
+
 ## 无障碍树为空或缺少元素
 
 1. 聚焦目标窗口，并检查是否存在权限边界。

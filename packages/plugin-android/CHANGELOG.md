@@ -1,5 +1,17 @@
 # @spotterjs/plugin-android
 
+## 1.0.6
+
+### Patch Changes
+
+- 7cf0c2f: Adopt the Apache-2.0 license to allow commercial use, modification, redistribution,
+  and integration into proprietary products without separate commercial authorization.
+  Update package license metadata and bundled license texts; third-party dependencies
+  and OCR models remain subject to their own terms.
+- Updated dependencies
+- Updated dependencies [7cf0c2f]
+  - @spotterjs/base@1.1.1
+
 ## 1.0.4
 
 ### Patch Changes

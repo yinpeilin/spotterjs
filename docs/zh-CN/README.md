@@ -45,6 +45,7 @@ spotterjs 是面向桌面和 Android companion 自动化的 TypeScript-first 工
 
 ## 维护者
 
+- [2026-11-10 代码交接与待办](./development/handoff-2026-11-10.md)：已确认的安装与 CLI 诊断问题、后续任务和检查结果。
 - [架构](./development/architecture.md)：monorepo 布局、TypeScript packages、Rust crates、native packages 和边界。
 - [测试](./development/testing.md)：unit tests、Rust tests、smoke tests、integration scripts、benchmarks 和 packaging checks。
 - [文档规范](./development/documentation-style.md)：双语文档策略、API 注释、示例和链接。

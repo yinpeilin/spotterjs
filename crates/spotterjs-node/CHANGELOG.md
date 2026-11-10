@@ -1,5 +1,19 @@
 # @spotterjs/node
 
+## 1.1.1
+
+### Patch Changes
+
+- Recover Windows cursor, mouse button, and keyboard input after the calling thread
+  loses the input desktop. Report failed recovery with the original Win32 error,
+  recovery stage, and a snapshot of the caller's desktop, session, window station,
+  and foreground window in both the error message and `context.diagnostics`.
+  Clear stale Windows error codes and avoid replaying partially accepted input.
+- 7cf0c2f: Adopt the Apache-2.0 license to allow commercial use, modification, redistribution,
+  and integration into proprietary products without separate commercial authorization.
+  Update package license metadata and bundled license texts; third-party dependencies
+  and OCR models remain subject to their own terms.
+
 ## 1.1.0
 
 ### Patch Changes

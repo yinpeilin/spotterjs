@@ -131,6 +131,8 @@ mod bgra;
 pub mod windows;
 #[cfg(windows)]
 pub mod windows_input;
+#[cfg(windows)]
+pub(crate) mod windows_input_diagnostics;
 
 #[cfg(all(target_os = "linux", feature = "linux-x11"))]
 pub mod linux_x11;
