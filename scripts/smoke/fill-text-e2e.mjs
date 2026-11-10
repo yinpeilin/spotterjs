@@ -134,18 +134,27 @@ async function runCase(name, write) {
 }
 
 async function run() {
-  await runCase("paste", async () => {
-    const previous = `previous-${Date.now()}`;
-    clipboard.set(previous);
-    const text = `paste-${Date.now()} \u4e2d\u6587 caf\u00e9 123`;
-    keyboard.write(text, { mode: "paste", restoreClipboard: true });
-    await sleep(500);
-    console.log(`clipboardAfterPaste=${JSON.stringify(clipboard.get())}`);
-    if (clipboard.get() !== previous) {
-      throw new Error("clipboard was not restored after paste-mode write");
-    }
-    return text;
-  });
+  let previousClipboard;
+  try {
+    previousClipboard = clipboard.get();
+  } catch {
+    // There may be no clipboard text to save.
+  }
+  try {
+    await runCase("paste", async () => {
+      clipboard.set(`previous-${Date.now()}`);
+      const text = `paste-${Date.now()} \u4e2d\u6587 caf\u00e9 123`;
+      keyboard.write(text, { mode: "paste", restoreClipboard: true });
+      const clipboardAfterPaste = clipboard.get();
+      console.log(`clipboardAfterPaste=${JSON.stringify(clipboardAfterPaste)}`);
+      if (clipboardAfterPaste !== text) {
+        throw new Error("Windows paste did not retain the clipboard payload");
+      }
+      return text;
+    });
+  } finally {
+    if (previousClipboard !== undefined) clipboard.set(previousClipboard);
+  }
 
   await runCase("native", async () => {
     const text = `native-${Date.now()} Unicode \u03a9 456`;

@@ -25,8 +25,8 @@ spotterjs sequence --file plan.json
 ```
 
 Replace `123456` with the observed ID and ensure the intended editable control
-has focus before typing. Native text input is the default; explicit paste mode
-has a configurable `pasteDelayMs` for slow applications.
+has focus before typing. Native text input is the default and leaves the clipboard
+untouched. See [keyboard input](./desktop-automation.md) for explicit paste behavior.
 
 ## Android session example
 

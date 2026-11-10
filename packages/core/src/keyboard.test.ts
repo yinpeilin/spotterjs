@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const keyboardTypeText = vi.fn();
 const keyboardTypeKey = vi.fn();
@@ -25,6 +25,7 @@ vi.mock("./native", () => ({
 import { keyboard, type KeyName } from "./index";
 
 beforeEach(() => {
+  vi.spyOn(process, "platform", "get").mockReturnValue("win32");
   keyboardTypeText.mockReset();
   keyboardTypeKey.mockReset();
   keyboardPressKeys.mockReset();
@@ -33,6 +34,10 @@ beforeEach(() => {
   setKeyboardConfig.mockReset();
   clipboardGet.mockReset();
   clipboardSet.mockReset();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("keyboard", () => {
@@ -71,6 +76,47 @@ describe("keyboard", () => {
     expect(keyboardTypeText).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, true, false])(
+    "keeps Windows paste text available regardless of restoreClipboard=%s",
+    (restoreClipboard) => {
+      vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
+      clipboardGet.mockImplementation(() => {
+        throw new Error("Windows paste must not read the prior clipboard");
+      });
+
+      keyboard.write("hello", { mode: "paste", restoreClipboard });
+
+      expect(clipboardGet).not.toHaveBeenCalled();
+      expect(clipboardSet).toHaveBeenCalledExactlyOnceWith("hello");
+      expect(keyboardShortcut).toHaveBeenCalledExactlyOnceWith(["Ctrl", "V"]);
+      expect(keyboardTypeText).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps Windows paste text and never replays a failed paste hotkey", () => {
+    keyboardShortcut.mockImplementation(() => {
+      throw new Error("native key failed");
+    });
+
+    expect(() => keyboard.write("hello", { mode: "paste" })).toThrow("native key failed");
+
+    expect(clipboardGet).not.toHaveBeenCalled();
+    expect(clipboardSet).toHaveBeenCalledExactlyOnceWith("hello");
+    expect(keyboardShortcut).toHaveBeenCalledExactlyOnceWith(["Ctrl", "V"]);
+  });
+
+  it("does not overwrite text copied by the user during Windows paste", () => {
+    vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
+    keyboardShortcut.mockImplementation(() => clipboardSet("new user copy"));
+
+    keyboard.write("hello", { mode: "paste" });
+
+    expect(clipboardGet).not.toHaveBeenCalled();
+    expect(clipboardSet).toHaveBeenCalledTimes(2);
+    expect(clipboardSet).toHaveBeenNthCalledWith(1, "hello");
+    expect(clipboardSet).toHaveBeenNthCalledWith(2, "new user copy");
+  });
+
   it("allows extra time for slow paste targets", () => {
     const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
     keyboard.write("hello", { mode: "paste", pasteDelayMs: 800 });
@@ -79,6 +125,7 @@ describe("keyboard", () => {
   });
 
   it("preserves new clipboard contents copied during a paste", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet
       .mockReturnValueOnce("previous")
       .mockReturnValue("new user copy");
@@ -87,6 +134,7 @@ describe("keyboard", () => {
     expect(clipboardSet).toHaveBeenCalledWith("hello");
   });
   it("writes text by pasting through the clipboard and restores the previous clipboard", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
 
     keyboard.write("hello", { mode: "paste" });
@@ -99,6 +147,7 @@ describe("keyboard", () => {
   });
 
   it("waits long enough for paste-mode text to be consumed before restoring the clipboard", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
     clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
 
@@ -114,6 +163,7 @@ describe("keyboard", () => {
   });
 
   it("still writes text when the previous clipboard text is unavailable", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet.mockImplementation(() => {
       throw new Error(
         "[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty"
@@ -128,6 +178,7 @@ describe("keyboard", () => {
   });
 
   it("restores an empty previous clipboard text", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet.mockReturnValueOnce("").mockReturnValue("hello");
 
     keyboard.write("hello", { mode: "paste" });
@@ -137,6 +188,7 @@ describe("keyboard", () => {
   });
 
   it("can skip reading and restoring the clipboard in paste mode", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet.mockImplementation(() => {
       throw new Error("clipboard_get should not be called");
     });
@@ -150,6 +202,7 @@ describe("keyboard", () => {
   });
 
   it("restores the previous clipboard when paste hotkey typing fails", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet.mockReturnValueOnce("previous").mockReturnValue("hello");
     keyboardShortcut.mockImplementation(() => {
       throw new Error("native key failed");
@@ -165,6 +218,7 @@ describe("keyboard", () => {
   });
 
   it("does not restore clipboard text that was unavailable when paste fails", () => {
+    vi.spyOn(process, "platform", "get").mockReturnValue("linux");
     clipboardGet.mockImplementation(() => {
       throw new Error(
         "[PLATFORM_ERROR] platform error: clipboard_get: clipboard is empty"

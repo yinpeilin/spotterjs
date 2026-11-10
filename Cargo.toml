@@ -36,10 +36,12 @@ akaze = "0.7.0"
 bitarray = { version = "0.2.6", features = ["space"] }
 space = "0.10.3"
 windows = { version = "0.61", features = [
+    "Wdk_System_SystemServices",
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",
     "Win32_System_Threading",
+    "Win32_System_SystemInformation",
     "Win32_System_StationsAndDesktops",
     "Win32_System_RemoteDesktop",
     "Win32_System_Com",

@@ -107,7 +107,7 @@ const keyboardOptionsSchema = {
   autoDelayMs: finiteNumber
     .min(0)
     .optional()
-    .describe("Delay in milliseconds between key events."),
+    .describe("Delay in milliseconds between input steps. Windows text input has a minimum 1 ms character interval even when 0 is requested; hotkey timing is unchanged."),
 };
 
 const keyboardTapKeySchema = z.union([
@@ -305,13 +305,13 @@ export function registerDesktopTools(server: CommandRegistry, a11yEnabled: boole
         mode: z
           .enum(["paste", "native"])
           .optional()
-          .describe("Typing mode. Defaults to native Unicode input; paste explicitly uses the clipboard."),
+          .describe("Defaults to clipboard-free native text input. Windows uses ASCII key events verified against the standard US keyboard layout, otherwise Unicode SendInput. Paste explicitly uses the clipboard."),
         restoreClipboard: z
           .boolean()
           .optional()
-          .describe("Restore clipboard content after paste-mode typing."),
+          .describe("Request restoration of unchanged previous clipboard text in paste mode. Windows always retains the paste payload because target consumption is unknown; other platforms retain existing restoration behavior."),
         pasteDelayMs: finiteNumber.min(0).optional()
-          .describe("Wait before restoring the paste clipboard (default 250 ms). Increase for slow apps."),
+          .describe("Settling wait after the paste shortcut (default 250 ms, at least autoDelayMs). Does not confirm consumption or trigger Windows clipboard restoration."),
       }),
     },
     async ({ text, autoDelayMs, mode, restoreClipboard, pasteDelayMs }) => {

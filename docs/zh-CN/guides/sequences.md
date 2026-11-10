@@ -24,7 +24,7 @@ spotterjs sequence --file plan.json
 ```
 
 把 `123456` 替换成实际观察到的窗口 ID，输入前确认目标编辑控件已获得焦点。
-默认使用 native Unicode 输入；显式选择 paste 模式时，可为慢应用设置 `pasteDelayMs`。
+默认使用原生输入，不操作剪贴板。显式粘贴的行为见[桌面自动化指南](./desktop-automation.md)。
 
 ## Android 会话示例
 

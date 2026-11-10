@@ -129,8 +129,9 @@ export type KeyboardTapOptions = {
 
 export type KeyboardWriteOptions = KeyboardTapOptions & {
   mode?: "paste" | "native";
+  /** Best-effort text restore on non-Windows platforms; Windows keeps the paste payload. */
   restoreClipboard?: boolean;
-  /** Wait before restoring a paste-mode clipboard. Increase for slow applications. */
+  /** Wait after the paste hotkey. This is not a clipboard-consumption acknowledgement. */
   pasteDelayMs?: number;
 };
 
@@ -287,8 +288,11 @@ function normalizeTapKey(key: TapKeyInput): string {
 }
 
 function pasteText(text: string, options?: KeyboardWriteOptions) {
-  const shouldRestore = options?.restoreClipboard !== false;
-  const n = loadNative();
+  // Windows accepts the paste shortcut asynchronously. A fixed delay cannot
+  // prove that a busy target has read the clipboard, so keep its payload rather
+  // than restoring old text before the paste is processed.
+  const shouldRestore = process.platform !== "win32" && options?.restoreClipboard !== false;
+  const n = nativeKeyboard();
   let previous: string | undefined;
   if (shouldRestore) {
     try {

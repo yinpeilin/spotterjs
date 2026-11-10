@@ -87,6 +87,31 @@ This recovery does not bypass Windows input permissions or protected dialogs.
 After updating from source, rebuild with `npm run build:native`; deployed apps
 also need the rebuilt Windows native binary, not only updated JavaScript.
 
+## Text Does Not Appear or Paste Uses Old Clipboard Text
+
+`keyboard.write(text)` remains clipboard-free by default. On Windows, ASCII uses physical key
+events only with the standard US keyboard layout when translation produces the exact requested
+character, accounting for Caps Lock and Shift. Other layouts (including US-International), held
+modifiers, and uncertain mappings use Unicode input. Both paths use `SendInput`, preserving
+queued input order. Windows accepting events does not confirm that the target displayed them;
+uncertain input is not replayed.
+
+In explicit paste mode, Windows keeps the paste payload on the clipboard even when
+`restoreClipboard` is requested. The target may read it later, so restoring previous text on
+a timer can paste old content. `pasteDelayMs` controls settling time, not completion or
+restoration. Other platforms retain their existing text-only restoration behavior.
+
+Check that the editable control has focus, physical modifiers are released, and automation
+and target permissions match. Record the Windows version, application/version, loaded native
+binary, and remote-session state when reporting a failure. The compatibility path does not
+bypass protected applications or establish that every older computer or custom control has
+been verified. See [keyboard and clipboard behavior](./guides/desktop-automation.md).
+
+The current Windows keyboard path calls Win32 directly rather than enigo. The historical
+[arboard Windows clipboard-open regression](https://github.com/1Password/arboard/issues/84)
+was fixed in 3.2.0; the locked 3.6.1 opens and closes the clipboard per operation. That issue
+does not establish the cause of a failure in this build.
+
 ## Accessibility Tree Is Empty or Missing Elements
 
 1. Focus the target window and check for permission boundaries.

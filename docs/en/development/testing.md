@@ -107,6 +107,27 @@ an already running Writor client; a missing client is reported explicitly.
 `smoke:cli:a11y` verifies independent accessibility inspect, text input and invoke
 commands against a temporary Windows test window.
 
+Keyboard regression checks read the actual text from a temporary input control,
+covering default `write`, explicit native input, and paste. The paste handler waits
+400 ms before reading the clipboard, without a `pasteDelayMs` override. A busy UI
+thread case queues select-all, delete, and default text input without an intermediate
+readback, checking that text cannot overtake earlier input.
+
+```powershell
+node scripts/smoke/keyboard-text-e2e.mjs
+node scripts/smoke/keyboard-text-e2e.mjs default ASCII --block-unicode-packets
+node scripts/smoke/keyboard-text-e2e.mjs paste ASCII --target-paste-delay-ms=1200
+node scripts/smoke/keyboard-text-e2e.mjs default Unicode --char-delay-ms=15
+node scripts/smoke/keyboard-text-e2e.mjs default ASCII --keyboard-layout=00000409 --check-caps-lock
+```
+
+`--block-unicode-packets` models an application filtering `VK_PACKET` and tests the
+exactly mapped ASCII compatibility path with the standard US layout in that temporary
+window. It does not promise to bypass filters for arbitrary Unicode. `--check-caps-lock`
+toggles Caps Lock while the same Node writer stays alive and restores it afterward.
+Results are stored under `test-output/keyboard-cli/` in separate
+directories for each entry point and fixture configuration.
+
 ## Integration Scripts
 
 Integration scripts can affect real applications or devices:

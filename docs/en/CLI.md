@@ -79,6 +79,11 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 spotterjs run desktop_keyboard_type --file input.json
 ```
 
+`desktop_keyboard_type` defaults to clipboard-free native input. Use `mode: "paste"`
+when the target requires a paste shortcut. On Windows, paste leaves the requested text
+on the clipboard even with `restoreClipboard: true`; `pasteDelayMs` gives the target
+time to settle and does not confirm that it has read the clipboard.
+
 In a UTF-8 shell, stdin is also supported:
 
 ```bash

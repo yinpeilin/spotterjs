@@ -9,13 +9,13 @@ use std::time::Duration;
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     MapVirtualKeyW, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC, VIRTUAL_KEY, VK_0,
-    VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B, VK_BACK, VK_C, VK_D,
-    VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12, VK_F2, VK_F3,
-    VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H, VK_HOME, VK_I, VK_J, VK_K, VK_L,
-    VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M, VK_N, VK_NEXT, VK_O, VK_P, VK_PRIOR,
-    VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S, VK_SPACE,
-    VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC,
+    VIRTUAL_KEY, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6, VK_7, VK_8, VK_9, VK_A, VK_B, VK_BACK,
+    VK_C, VK_D, VK_DELETE, VK_DOWN, VK_E, VK_END, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12,
+    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_H, VK_HOME, VK_I, VK_J, VK_K,
+    VK_L, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_M, VK_N, VK_NEXT, VK_O, VK_P,
+    VK_PRIOR, VK_Q, VK_R, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S,
+    VK_SPACE, VK_T, VK_TAB, VK_U, VK_UP, VK_V, VK_W, VK_X, VK_Y, VK_Z,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -320,6 +320,7 @@ pub fn keyboard_type_with_config(text: &str, config: Option<KeyboardConfig>) -> 
         let cfg = config.unwrap_or_else(keyboard_config);
         #[cfg(windows)]
         {
+            let ascii_layout = crate::platform::windows_text::AsciiLayout::capture(text);
             let mut chars = text.chars().peekable();
             while let Some(c) = chars.next() {
                 // Treat CRLF as one newline. Do not also emit its Unicode code units.
@@ -331,8 +332,39 @@ pub fn keyboard_type_with_config(text: &str, config: Option<KeyboardConfig>) -> 
                 } else {
                     c
                 };
-                send_windows_inputs(&windows_text_inputs(c))?;
-                auto_delay_for(cfg);
+                let inputs = windows_text_inputs_with_layout(c, ascii_layout.as_ref());
+                // The physical ASCII batch owns its character key and any
+                // added Shift. On partial acceptance, release only key-downs
+                // from the accepted prefix, in reverse order; never replay.
+                let physical_ascii = inputs.iter().any(|input| unsafe {
+                    input.Anonymous.ki.dwFlags.0 & KEYEVENTF_SCANCODE.0 != 0
+                });
+                let cleanup = if physical_ascii {
+                    inputs
+                        .iter()
+                        .rev()
+                        .filter_map(|input| unsafe {
+                            let key = input.Anonymous.ki;
+                            if key.dwFlags.0 & KEYEVENTF_KEYUP.0 != 0 {
+                                return None;
+                            }
+                            let mut release = *input;
+                            release.Anonymous.ki.dwFlags |= KEYEVENTF_KEYUP;
+                            Some(release)
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                crate::platform::windows_input::send_inputs_with_partial_cleanup(
+                    "keyboard", &inputs, &cleanup,
+                )?;
+                // Physical ASCII can expand into four events per scalar.
+                // Even a requested zero delay must yield so a slow target can
+                // drain long mixed-text input instead of losing queue events.
+                auto_delay_for(KeyboardConfig {
+                    auto_delay_ms: cfg.auto_delay_ms.max(1),
+                });
             }
             Ok(())
         }
@@ -554,12 +586,24 @@ fn windows_key_input(vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
 }
 
 #[cfg(windows)]
+#[cfg(test)]
 fn windows_text_inputs(c: char) -> Vec<INPUT> {
+    windows_text_inputs_with_layout(c, None)
+}
+
+#[cfg(windows)]
+fn windows_text_inputs_with_layout(
+    c: char,
+    ascii_layout: Option<&crate::platform::windows_text::AsciiLayout>,
+) -> Vec<INPUT> {
     if c == '\n' {
         return vec![
             windows_key_input(VK_RETURN, KEYBD_EVENT_FLAGS::default()),
             windows_key_input(VK_RETURN, KEYEVENTF_KEYUP),
         ];
+    }
+    if let Some(key) = ascii_layout.and_then(|layout| layout.key(c)) {
+        return windows_ascii_inputs(key);
     }
     let mut buffer = [0; 2];
     let mut inputs = Vec::with_capacity(4);
@@ -578,6 +622,37 @@ fn windows_text_inputs(c: char) -> Vec<INPUT> {
                 },
             });
         }
+    }
+    inputs
+}
+
+#[cfg(windows)]
+fn windows_ascii_inputs(key: crate::platform::windows_text::AsciiKey) -> Vec<INPUT> {
+    let mut inputs = Vec::with_capacity(if key.shift { 4 } else { 2 });
+    if key.shift {
+        inputs.push(windows_key_input(VK_LSHIFT, KEYBD_EVENT_FLAGS::default()));
+    }
+    let flags = if key.extended {
+        KEYEVENTF_SCANCODE | KEYEVENTF_EXTENDEDKEY
+    } else {
+        KEYEVENTF_SCANCODE
+    };
+    for flags in [flags, flags | KEYEVENTF_KEYUP] {
+        inputs.push(INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: key.virtual_key,
+                    wScan: key.scan,
+                    dwFlags: flags,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        });
+    }
+    if key.shift {
+        inputs.push(windows_key_input(VK_LSHIFT, KEYEVENTF_KEYUP));
     }
     inputs
 }
@@ -647,6 +722,46 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn physical_ascii_batches_balance_shift_and_preserve_scan_code_flags() {
+        use crate::platform::windows_text::AsciiKey;
+        for shift in [false, true] {
+            let inputs = windows_ascii_inputs(AsciiKey {
+                virtual_key: VK_A,
+                scan: 0x1e,
+                extended: false,
+                shift,
+            });
+            assert_eq!(inputs.len(), if shift { 4 } else { 2 });
+            let offset = usize::from(shift);
+            let down = unsafe { inputs[offset].Anonymous.ki };
+            let up = unsafe { inputs[offset + 1].Anonymous.ki };
+            assert_eq!(down.wScan, 0x1e);
+            assert_eq!(up.wScan, 0x1e);
+            assert_eq!(down.dwFlags, KEYEVENTF_SCANCODE);
+            assert_eq!(up.dwFlags, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP);
+            if shift {
+                let shift_down = unsafe { inputs[0].Anonymous.ki };
+                let shift_up = unsafe { inputs[3].Anonymous.ki };
+                assert_eq!(shift_down.wVk, VK_LSHIFT);
+                assert_eq!(shift_up.wVk, VK_LSHIFT);
+                assert_eq!(shift_down.dwFlags, KEYBD_EVENT_FLAGS::default());
+                assert_eq!(shift_up.dwFlags, KEYEVENTF_KEYUP);
+            }
+        }
+        let inputs = windows_ascii_inputs(AsciiKey {
+            virtual_key: VK_A,
+            scan: 0x1e,
+            extended: true,
+            shift: false,
+        });
+        assert_eq!(
+            unsafe { inputs[0].Anonymous.ki.dwFlags },
+            KEYEVENTF_SCANCODE | KEYEVENTF_EXTENDEDKEY
+        );
     }
 
     #[test]

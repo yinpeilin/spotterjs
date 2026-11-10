@@ -120,9 +120,11 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 spotterjs run desktop_keyboard_type --file input.json
 ```
 
-Native Unicode input is the default. Use explicit `mode: "paste"` when the
-application requires paste; `pasteDelayMs` can accommodate slow paste handling.
-Typing requires the intended editable control to have focus.
+Native input is the default and leaves the clipboard untouched. Use explicit
+`mode: "paste"` when the application requires paste. On Windows, paste leaves
+the requested text on the clipboard even with `restoreClipboard: true`.
+`pasteDelayMs` controls the wait after the shortcut; verify the target text to
+confirm it was received. Typing requires the intended editable control to have focus.
 
 ## JSON output and failures
 

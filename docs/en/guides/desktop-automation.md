@@ -80,18 +80,28 @@ const text = clipboard.get();
 Use raw key APIs only when you understand the current desktop state.
 
 `keyboard.type`, `keyboard.write` and `keyboard.writeText` input literal Unicode text.
-They now default to native input without using the clipboard. Use `tap`/`hotkey` for key names.
-On Windows, `autoDelayMs` is the interval between characters; CRLF emits one newline and Tab
-is inserted as text.
+They default to native input without using the clipboard. Use `tap`/`hotkey` for key names.
+On Windows, text stays in the `SendInput` queue. ASCII uses physical key events only with
+the standard US keyboard layout when translation exactly matches the requested character,
+accounting for Caps Lock and Shift. Other layouts (including US-International), held modifiers,
+and uncertain mappings retain Unicode input. `autoDelayMs` is the interval between characters;
+Windows text input uses at least 1 ms even when 0 is requested to limit input bursts. The
+default remains 10 ms, and hotkey timing is unchanged. CRLF emits one newline and Tab is
+inserted as text. Focus the intended editable control before writing.
 
 ```typescript
 keyboard.type('中文 😀 !@#$\nnext line\ttext', { autoDelayMs: 10 });
 keyboard.write('bulk paste', { mode: 'paste', pasteDelayMs: 600 });
 ```
 
-To retain the old paste behavior, explicitly pass `mode: 'paste'`. This mode saves/restores
-clipboard text only, waiting 250 ms by default. Increase `pasteDelayMs` for slow applications.
-New clipboard contents copied during a paste are preserved. See [CLI sequences](./sequences.md)
+Use `mode: 'paste'` to paste through the clipboard. `pasteDelayMs` is a settling interval
+(250 ms by default, at least `autoDelayMs`), not confirmation that the target consumed it.
+On Windows, spotterjs leaves the paste payload on the clipboard even when `restoreClipboard`
+is requested: restoring it on a timer can make a slow target read the old text. Content copied
+by another program during the operation is preserved. Other platforms retain their existing
+text-only clipboard restoration behavior when `restoreClipboard` is enabled.
+
+Input is not automatically replayed after an uncertain result. See [CLI sequences](./sequences.md)
 for related focus/input/capture steps and process-local session lifetime.
 
 ## Template Matching

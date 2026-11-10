@@ -75,6 +75,10 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 spotterjs run desktop_keyboard_type --file input.json
 ```
 
+`desktop_keyboard_type` 默认使用原生输入，无需剪贴板。目标应用需要粘贴快捷键时，使用
+`mode: "paste"`。Windows 上即使设置 `restoreClipboard: true`，剪贴板也会保留本次粘贴文本；
+`pasteDelayMs` 只控制等待时间，无法确认目标已读取剪贴板。
+
 UTF-8 shell 也可以通过 stdin 传参：
 
 ```bash

@@ -133,6 +133,8 @@ pub mod windows;
 pub mod windows_input;
 #[cfg(windows)]
 pub(crate) mod windows_input_diagnostics;
+#[cfg(windows)]
+pub(crate) mod windows_text;
 
 #[cfg(all(target_os = "linux", feature = "linux-x11"))]
 pub mod linux_x11;

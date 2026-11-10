@@ -14,9 +14,9 @@ use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-    MOUSEEVENTF_WHEEL, MOUSEINPUT,
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, SetCursorPos};
 #[cfg(test)]
@@ -162,21 +162,73 @@ fn input_error(
 }
 
 pub(crate) fn send_inputs(label: &str, inputs: &[INPUT]) -> Result<()> {
+    send_inputs_with_partial_cleanup(label, inputs, &[])
+}
+
+fn same_key(left: &INPUT, right: &INPUT) -> bool {
+    if left.r#type != INPUT_KEYBOARD || right.r#type != INPUT_KEYBOARD {
+        return false;
+    }
+    let left = unsafe { left.Anonymous.ki };
+    let right = unsafe { right.Anonymous.ki };
+    left.wVk == right.wVk
+        && left.wScan == right.wScan
+        && left.dwFlags.0 & !KEYEVENTF_KEYUP.0 == right.dwFlags.0 & !KEYEVENTF_KEYUP.0
+}
+
+fn pending_key_releases(inputs: &[INPUT], sent: u32, candidates: &[INPUT]) -> Vec<INPUT> {
+    let accepted = &inputs[..(sent as usize).min(inputs.len())];
+    candidates
+        .iter()
+        .filter(|release| {
+            accepted
+                .iter()
+                .rev()
+                .find(|event| same_key(release, event))
+                .is_some_and(|last| unsafe { last.Anonymous.ki.dwFlags.0 & KEYEVENTF_KEYUP.0 == 0 })
+        })
+        .copied()
+        .collect()
+}
+
+fn send_batch_with(
+    label: &str,
+    inputs: &[INPUT],
+    cleanup: &[INPUT],
+    mut emit: impl FnMut(&[INPUT]) -> (u32, std::io::Error),
+) -> (u32, Result<()>) {
+    let (sent, error) = emit(inputs);
+    if sent == inputs.len() as u32 {
+        return (sent, Ok(()));
+    }
+    let mut reason = format!(
+        "{label}: SendInput sent {sent}/{} events: {error}",
+        inputs.len()
+    );
+    let pending = pending_key_releases(inputs, sent, cleanup);
+    if !pending.is_empty() {
+        let (released, cleanup_error) = emit(&pending);
+        if released != pending.len() as u32 {
+            reason.push_str(&format!(
+                "; owned key cleanup sent {released}/{} events: {cleanup_error}",
+                pending.len()
+            ));
+        }
+    }
+    (sent, Err(SpotterError::Platform(reason)))
+}
+
+pub(crate) fn send_inputs_with_partial_cleanup(
+    label: &str,
+    inputs: &[INPUT],
+    cleanup: &[INPUT],
+) -> Result<()> {
     let send = || {
-        let sent = unsafe {
+        send_batch_with(label, inputs, cleanup, |batch| unsafe {
             SetLastError(ERROR_SUCCESS);
-            SendInput(inputs, size_of::<INPUT>() as i32)
-        };
-        let result = if sent == inputs.len() as u32 {
-            Ok(())
-        } else {
-            Err(SpotterError::Platform(format!(
-                "{label}: SendInput sent {sent}/{} events: {}",
-                inputs.len(),
-                std::io::Error::last_os_error()
-            )))
-        };
-        (sent, result)
+            let sent = SendInput(batch, size_of::<INPUT>() as i32);
+            (sent, std::io::Error::last_os_error())
+        })
     };
     let (sent, result) = send();
     match result {
@@ -316,6 +368,110 @@ pub fn mouse_scroll(length: i32, vertical: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_SCANCODE, VIRTUAL_KEY, VK_A, VK_LSHIFT,
+    };
+
+    fn key(vk: VIRTUAL_KEY, scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: scan,
+                    dwFlags: flags,
+                    ..Default::default()
+                },
+            },
+        }
+    }
+
+    fn shifted_batch() -> ([INPUT; 4], [INPUT; 2]) {
+        let shift_down = key(VK_LSHIFT, 0x2a, KEYBD_EVENT_FLAGS::default());
+        let down = key(VK_A, 0x1e, KEYEVENTF_SCANCODE);
+        let up = key(VK_A, 0x1e, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP);
+        let shift_up = key(VK_LSHIFT, 0x2a, KEYEVENTF_KEYUP);
+        ([shift_down, down, up, shift_up], [up, shift_up])
+    }
+
+    #[test]
+    fn partial_batches_release_only_accepted_unmatched_keys_without_replaying_input() {
+        let (inputs, cleanup) = shifted_batch();
+        for accepted in [0, 1, 2, 3, 4] {
+            let mut calls = Vec::new();
+            let (sent, result) = send_batch_with("keyboard", &inputs, &cleanup, |batch| {
+                calls.push(
+                    batch
+                        .iter()
+                        .map(|input| unsafe { input.Anonymous.ki.wVk })
+                        .collect::<Vec<_>>(),
+                );
+                let sent = if calls.len() == 1 {
+                    accepted
+                } else {
+                    batch.len() as u32
+                };
+                (sent, std::io::Error::from_raw_os_error(5))
+            });
+            assert_eq!(sent, accepted);
+            assert_eq!(result.is_ok(), accepted == 4);
+            let expected_cleanup = match accepted {
+                1 | 3 => vec![VK_LSHIFT],
+                2 => vec![VK_A, VK_LSHIFT],
+                _ => Vec::new(),
+            };
+            assert_eq!(calls[0], vec![VK_LSHIFT, VK_A, VK_A, VK_LSHIFT]);
+            assert_eq!(calls.len(), if expected_cleanup.is_empty() { 1 } else { 2 });
+            if !expected_cleanup.is_empty() {
+                assert_eq!(calls[1], expected_cleanup);
+            }
+        }
+    }
+
+    #[test]
+    fn an_unshifted_partial_character_is_released_only_with_explicit_ownership() {
+        let (shifted, candidates) = shifted_batch();
+        let inputs = &shifted[1..3];
+        for owned in [false, true] {
+            let mut calls = Vec::new();
+            let (_, result) = send_batch_with(
+                "keyboard",
+                inputs,
+                if owned { &candidates[..1] } else { &[] },
+                |batch| {
+                    calls.push(batch.len());
+                    assert_eq!(unsafe { batch[0].Anonymous.ki.wVk }, VK_A);
+                    if calls.len() == 2 {
+                        assert_eq!(
+                            unsafe { batch[0].Anonymous.ki.dwFlags },
+                            KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
+                        );
+                    }
+                    (1, std::io::Error::from_raw_os_error(5))
+                },
+            );
+            assert!(result.is_err());
+            assert_eq!(calls, if owned { vec![2, 1] } else { vec![2] });
+        }
+    }
+
+    #[test]
+    fn cleanup_failure_preserves_the_original_send_error() {
+        let (inputs, cleanup) = shifted_batch();
+        let mut calls = 0;
+        let (_, result) = send_batch_with("keyboard", &inputs, &cleanup, |_| {
+            calls += 1;
+            (
+                if calls == 1 { 2 } else { 0 },
+                std::io::Error::from_raw_os_error(if calls == 1 { 5 } else { 87 }),
+            )
+        });
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("SendInput sent 2/4 events"));
+        assert!(message.contains("os error 5"));
+        assert!(message.contains("owned key cleanup sent 0/2 events"));
+        assert!(message.contains("os error 87"));
+    }
 
     #[test]
     fn normalized_origin_on_virtual_desk_is_zero() {

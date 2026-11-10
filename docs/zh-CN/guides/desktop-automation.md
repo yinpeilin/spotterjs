@@ -65,18 +65,28 @@ const text = clipboard.get();
 
 `keyboard.up()` 只释放由 `keyboard.down()` 记录的按键。需要强制释放底层按键时，使用 raw API 前先确认当前键盘状态，避免影响用户正在使用的桌面。
 
-`keyboard.type`、`keyboard.write`、`keyboard.writeText` 输入文字，默认使用原生 Unicode 输入，
+`keyboard.type`、`keyboard.write`、`keyboard.writeText` 输入文字，默认使用原生输入，
 不操作剪贴板。特殊符号按字面输入；按键名称和组合键使用 `tap`、`hotkey`。
-Windows 上 `autoDelayMs` 是字符间隔，CRLF 只发送一次换行，Tab 按文字输入。
+Windows 上文字始终进入 `SendInput` 输入队列。只有标准美式键盘布局能准确生成所需
+ASCII 字符时才使用实体按键事件，并计入 Caps Lock 和 Shift 状态；其他布局（含美式
+国际键盘）、已有修饰键按下或映射不确定时继续使用 Unicode 输入。`autoDelayMs` 控制
+字符间隔；Windows 文字输入即使请求 0，也至少间隔 1 ms，限制瞬时输入量。默认仍为
+10 ms，组合键时序不变。CRLF 只发送一次换行，Tab 按文字输入。调用前需让目标编辑
+控件获得焦点。
 
 ```typescript
 keyboard.type('中文 😀 !@#$\n第二行\t文字', { autoDelayMs: 10 });
 keyboard.write('批量粘贴', { mode: 'paste', pasteDelayMs: 600 });
 ```
 
-旧版默认粘贴的调用可显式指定 `mode: 'paste'`。粘贴模式只能保存并恢复剪贴板中的文字，
-默认等待 250 ms 后恢复；慢应用可增大 `pasteDelayMs`。期间剪贴板被其他程序修改时，不覆盖新内容。
-有关联的聚焦、输入和截图动作见 [CLI 序列编排](./sequences.md)。
+使用 `mode: 'paste'` 可通过剪贴板粘贴。`pasteDelayMs` 是粘贴快捷键后的等待时间
+（默认 250 ms，至少为 `autoDelayMs`），不代表目标已经读取文字。
+Windows 上即使请求 `restoreClipboard`，也会保留待粘贴文字：按定时器恢复剪贴板可能
+让慢应用读到旧内容。期间其他程序复制的新内容会保留。其他平台在启用
+`restoreClipboard` 时，沿用只能恢复文字的原有行为。
+
+处理结果不确定时不会自动重发输入。有关联的聚焦、输入和截图动作见
+[CLI 序列编排](./sequences.md)。
 
 ## 模板匹配
 

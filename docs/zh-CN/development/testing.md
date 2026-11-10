@@ -93,6 +93,24 @@ npm run smoke:writor
 对已运行的 Writor 客户端验证窗口发现和原尺寸截图，未找到客户端时会明确报告。
 `smoke:cli:a11y` 在临时 Windows 测试窗口中验证独立调用的无障碍查询、输入和控件调用。
 
+键盘回归在临时输入框中回读实际文字，覆盖默认 `write`、显式 native 和 paste。
+粘贴控件默认延迟 400 ms 读取，测试不传 `pasteDelayMs`；另有 UI 线程忙碌时连续
+全选、删除、默认输入的检查，确保文字不会越过先前排队的按键。
+
+```powershell
+node scripts/smoke/keyboard-text-e2e.mjs
+node scripts/smoke/keyboard-text-e2e.mjs default ASCII --block-unicode-packets
+node scripts/smoke/keyboard-text-e2e.mjs paste ASCII --target-paste-delay-ms=1200
+node scripts/smoke/keyboard-text-e2e.mjs default Unicode --char-delay-ms=15
+node scripts/smoke/keyboard-text-e2e.mjs default ASCII --keyboard-layout=00000409 --check-caps-lock
+```
+
+`--block-unicode-packets` 模拟目标软件过滤 `VK_PACKET`，用于可精确映射的 ASCII
+兼容路径测试，并为该临时窗口选择标准美式布局；它不表示任意 Unicode 都可绕过过滤。
+`--check-caps-lock` 会在同一 Node 进程存活期间切换 Caps Lock 验证大小写，并在结束时恢复。
+结果写入
+`test-output/keyboard-cli/` 下按调用入口及控件配置区分的目录。
+
 ## 集成脚本
 
 微信脚本会操作真实应用：
