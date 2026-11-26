@@ -175,7 +175,26 @@ export function resolveOcrModelProfile(
   }
   throw ocrError("SPOTTER_OCR_MODEL_PROFILE_UNKNOWN", `unknown OCR model profile: ${profile}`, {
     context: { profile },
+    hint: 'Valid OCR model profiles are "server", "mobile", "large", "ppocrv5-server", "ppocrv5-mobile", and "ppocrv4-server".',
   });
+}
+
+function runModelCacheFs<T>(rootDir: string, target: string, fn: () => T): T {
+  try {
+    return fn();
+  } catch (error) {
+    if (isSpotterError(error)) throw error;
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    throw ocrError(
+      "SPOTTER_OCR_MODEL_CACHE_ERROR",
+      `Failed to access OCR model cache (${target}): ${rawMessage}`,
+      {
+        cause: error,
+        hint: "Check write permissions and free disk space for the model cache directory, or set SPOTTERJS_OCR_MODEL_DIR / options.modelDir.",
+        context: { rootDir, target },
+      }
+    );
+  }
 }
 
 /** Return the default model cache directory for the current platform. */
@@ -205,14 +224,17 @@ export async function ensureOcrModels(
   const fetchFile = options.fetchFile ?? defaultFetchFile;
   const files: Record<string, string> = {};
 
-  fs.mkdirSync(rootDir, { recursive: true });
+  runModelCacheFs(rootDir, rootDir, () => {
+    fs.mkdirSync(rootDir, { recursive: true });
+  });
 
   for (const file of profile.files) {
     const target = path.join(rootDir, file.name);
     files[file.name] = target;
 
     if (fs.existsSync(target)) {
-      verifySha256(fs.readFileSync(target), file.sha256, target);
+      const existingBytes = runModelCacheFs(rootDir, target, () => fs.readFileSync(target));
+      verifySha256(existingBytes, file.sha256, target);
       continue;
     }
 
@@ -222,8 +244,10 @@ export async function ensureOcrModels(
       fetchFile,
       options.modelSource ?? envModelSource()
     );
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    writeFileAtomic(target, bytes);
+    runModelCacheFs(rootDir, target, () => {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      writeFileAtomic(target, bytes);
+    });
   }
 
   return { profile, rootDir, files };
@@ -284,7 +308,10 @@ export function resolveLocalOcrModels(
       throw ocrError(
         "SPOTTER_OCR_MODEL_FILE_MISSING",
         `OCR local model file does not exist: ${file}`,
-        { context: { file } }
+        {
+          context: { file, rootDir },
+          hint: `Ensure ${detName}, ${recName}, and ${dictName} exist inside "${rootDir}".`,
+        }
       );
     }
   }
@@ -330,6 +357,21 @@ async function defaultFetchFile(url: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
+function formatDownloadFailure(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = (error as { cause?: unknown }).cause;
+  if (error.message === "fetch failed" && cause !== undefined) {
+    const causeCode =
+      typeof cause === "object" && cause !== null && "code" in cause
+        ? String((cause as { code?: unknown }).code)
+        : undefined;
+    const causeMessage = cause instanceof Error ? cause.message : String(cause);
+    const detail = [causeCode, causeMessage].filter(Boolean).join(": ");
+    if (detail) return `${error.message} (${detail})`;
+  }
+  return error.message;
+}
+
 async function downloadModelFile(
   file: { url: string; mirrorUrl?: string },
   sha256: string,
@@ -346,7 +388,7 @@ async function downloadModelFile(
       verifySha256(bytes, sha256, url);
       return { bytes, url };
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = formatDownloadFailure(e);
       errors.push(`${url}: ${msg}`);
       attempts.push({
         url,
@@ -371,14 +413,20 @@ async function downloadModelFile(
         | "SPOTTER_OCR_MODEL_SHA256_MISMATCH"
         | "SPOTTER_OCR_MODEL_MANIFEST_INVALID",
       shaError.error,
-      { context: { source, attempts } }
+      {
+        context: { source, attempts },
+        hint: "Delete any partially downloaded or corrupted model file in the cache directory and retry, or pass local models via resolveLocalOcrModels().",
+      }
     );
   }
 
   throw ocrError(
     "SPOTTER_OCR_MODEL_DOWNLOAD_FAILED",
     `failed to download OCR model from ${source} source(s): ${errors.join("; ")}`,
-    { context: { source, attempts } }
+    {
+      context: { source, attempts },
+      hint: "Try setting SPOTTERJS_OCR_MODEL_SOURCE=mirror, check network/proxy settings, or pre-download det.onnx, rec.onnx, and dict.txt and pass resolveLocalOcrModels({ modelDir }).",
+    }
   );
 }
 
@@ -417,7 +465,10 @@ function verifySha256(bytes: Buffer, expected: string, label: string): void {
     throw ocrError(
       "SPOTTER_OCR_MODEL_SHA256_MISMATCH",
       `OCR model sha256 mismatch for ${label}: expected ${expected}`,
-      { context: { label, expected } }
+      {
+        context: { label, expected },
+        hint: "Delete the corrupted cached model file and retry the download.",
+      }
     );
   }
 
@@ -426,7 +477,10 @@ function verifySha256(bytes: Buffer, expected: string, label: string): void {
     throw ocrError(
       "SPOTTER_OCR_MODEL_SHA256_MISMATCH",
       `OCR model sha256 mismatch for ${label}: expected ${expected}, got ${actual}`,
-      { context: { label, expected, actual } }
+      {
+        context: { label, expected, actual },
+        hint: "Delete the corrupted cached model file and retry the download.",
+      }
     );
   }
 }

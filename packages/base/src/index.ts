@@ -22,6 +22,7 @@ export type SpotterErrorOptions = {
   context?: SpotterErrorContext;
   cause?: unknown;
   domain?: string;
+  hint?: string;
 };
 
 export type ToSpotterErrorOptions = SpotterErrorOptions & {
@@ -34,6 +35,7 @@ export class SpotterError extends Error {
   readonly context?: SpotterErrorContext;
   readonly cause?: unknown;
   readonly domain?: string;
+  readonly hint?: string;
 
   constructor(
     code: SpotterErrorCode,
@@ -46,6 +48,7 @@ export class SpotterError extends Error {
     this.context = options.context;
     this.cause = options.cause;
     this.domain = options.domain;
+    this.hint = options.hint;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
@@ -79,6 +82,9 @@ export function toSpotterError(
       domain:
         options.domain ??
         (typeof error.domain === "string" ? error.domain : undefined),
+      hint:
+        options.hint ??
+        (typeof error.hint === "string" ? error.hint : undefined),
     });
   }
 
@@ -88,8 +94,32 @@ export function toSpotterError(
     cause: options.cause ?? error,
     context: options.context,
     domain: options.domain,
+    hint: options.hint,
   });
 }
+
+/**
+ * Format an error into a concise human-readable string including code and hint
+ * when available.
+ */
+export function formatSpotterError(error: unknown): string {
+  if (isSpotterError(error)) {
+    const header = `[${error.code}] ${error.message}`;
+    if (error.hint && !error.message.includes(error.hint)) {
+      return `${header}\nHint: ${error.hint}`;
+    }
+    return header;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+export {
+  diagnoseNativeAddonError,
+  type DiagnoseNativeAddonOptions,
+  type NativeAddonDiagnosticEnv,
+  type NativeAddonDiagnosis,
+  type NativeAddonFailureKind,
+} from "./native-diagnostics";
 
 /**
  * Point in a two-dimensional coordinate space, measured in pixels.

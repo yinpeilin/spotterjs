@@ -52,7 +52,11 @@ function assertPngFormat(format: string | undefined): void {
     throw new SpotterError(
       "SPOTTER_CORE_IMAGE_FORMAT_UNSUPPORTED",
       "image.encode only supports png output",
-      { context: { format }, domain: "core" }
+      {
+        context: { format },
+        domain: "core",
+        hint: 'Omit options.format or pass format: "png".',
+      }
     );
   }
 }
@@ -119,7 +123,11 @@ function save(
     throw new SpotterError(
       "SPOTTER_CORE_IMAGE_ALREADY_EXISTS",
       `image already exists: ${targetPath}`,
-      { context: { path: targetPath }, domain: "core" }
+      {
+        context: { path: targetPath },
+        domain: "core",
+        hint: "Pass { overwrite: true } or choose a different output path.",
+      }
     );
   }
 

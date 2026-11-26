@@ -145,6 +145,20 @@ describe("CLI input and lifecycle", () => {
       expect(call.result.success).toBe(false);
       expect(call.closed).toBe(true);
     }
+
+    const invalidArgs = await invoke(["run", "echo", "--json", '{"text":4}']);
+    expect(invalidArgs.result.error).toMatchObject({
+      code: "SPOTTER_CLI_INVALID_ARGUMENTS",
+      domain: "cli",
+      hint: 'Run "spotterjs schema echo" to inspect the expected JSON input schema.',
+    });
+
+    const badJson = await invoke(["run", "echo", "--json", "{"]);
+    expect(badJson.result.error).toMatchObject({
+      code: "SPOTTER_CLI_INVALID_JSON",
+      domain: "cli",
+      hint: expect.stringContaining("--file"),
+    });
   });
 
   it("validates the complete sequence before effects, then fails fast at runtime", async () => {

@@ -1,4 +1,4 @@
-import type { CaptureImage } from "@spotterjs/base";
+import { SpotterError, type CaptureImage } from "@spotterjs/base";
 import { image } from "@spotterjs/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -97,7 +97,15 @@ function writeArtifactFile(relativePath: string, content: string | Buffer): void
   const resolved = path.resolve(root, relativePath);
   const rel = path.relative(root, resolved);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error(`artifact path escapes workspace: ${relativePath}`);
+    throw new SpotterError(
+      "SPOTTER_CLI_ARTIFACT_PATH_ESCAPE",
+      `artifact path escapes workspace: ${relativePath}`,
+      {
+        domain: "cli",
+        context: { relativePath, workspaceRoot: root },
+        hint: "Use a relative artifact path inside SPOTTERJS_WORKSPACE_ROOT.",
+      }
+    );
   }
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   fs.writeFileSync(resolved, content);

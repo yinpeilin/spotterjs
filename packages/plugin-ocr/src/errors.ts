@@ -1,4 +1,5 @@
 import {
+  formatSpotterError,
   isSpotterError,
   SpotterError,
   toSpotterError,
@@ -10,6 +11,7 @@ import {
 type SpotterOcrErrorCode = `SPOTTER_OCR_${string}`;
 
 export {
+  formatSpotterError,
   isSpotterError,
   SpotterError,
   toSpotterError,

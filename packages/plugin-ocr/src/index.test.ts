@@ -112,6 +112,7 @@ describe("model cache", () => {
         code: "SPOTTER_OCR_MODEL_PROFILE_UNKNOWN",
         context: { profile: "unknown" },
         domain: "ocr",
+        hint: expect.stringContaining("ppocrv5-server"),
       });
     }
   });
@@ -239,6 +240,33 @@ describe("model cache", () => {
     expect(fetchFile.mock.calls[0][0]).toContain("hf-mirror.com");
   });
 
+  it("surfaces underlying network cause for fetch failed errors and includes an actionable hint", async () => {
+    const modelDir = tmpDir();
+    const profile = testProfile({ "det.onnx": "skip" });
+    const fetchErr = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+
+    await expect(
+      ensureOcrModels({
+        modelDir,
+        profile,
+        modelSource: "origin",
+        fetchFile: async () => {
+          throw fetchErr;
+        },
+      })
+    ).rejects.toMatchObject({
+      name: "SpotterError",
+      code: "SPOTTER_OCR_MODEL_DOWNLOAD_FAILED",
+      domain: "ocr",
+      message: expect.stringContaining("ECONNREFUSED"),
+      hint: expect.stringContaining("SPOTTERJS_OCR_MODEL_SOURCE=mirror"),
+    });
+  });
+
   it("resolves local model files without downloading or sha checks", () => {
     const modelDir = tmpDir();
     fs.writeFileSync(path.join(modelDir, "det.onnx"), "det");
@@ -346,9 +374,34 @@ describe("OCR engine", () => {
     await expect(ocr.findText(image, "missing")).rejects.toMatchObject({
       name: "SpotterError",
       code: "SPOTTER_OCR_TEXT_NOT_FOUND",
-      context: { text: "missing" },
+      context: {
+        text: "missing",
+        recognizedCount: 1,
+        recognizedSample: ["发送消息"],
+      },
       domain: "ocr",
+      hint: expect.stringContaining("minSimilarity"),
     });
+  });
+
+  it("does not cache a failed createOcr engine promise", async () => {
+    const modelDir = tmpDir();
+    let shouldFail = true;
+    const profile = testProfile({ "det.onnx": "skip" });
+    const fetchFile = vi.fn(async () => {
+      if (shouldFail) throw new Error("transient network error");
+      return Buffer.from("bad-onnx");
+    });
+
+    await expect(
+      createOcr({ modelDir, profile, fetchFile, modelSource: "origin" })
+    ).rejects.toMatchObject({ code: "SPOTTER_OCR_MODEL_DOWNLOAD_FAILED" });
+
+    shouldFail = false;
+    await expect(
+      createOcr({ modelDir, profile, fetchFile, modelSource: "origin" })
+    ).rejects.toMatchObject({ code: "SPOTTER_OCR_ONNX_SESSION_FAILED" });
+    expect(fetchFile).toHaveBeenCalledTimes(2);
   });
 
   it("findAllText supports exact and case sensitive matching", async () => {

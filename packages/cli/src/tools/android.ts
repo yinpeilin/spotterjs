@@ -2,7 +2,7 @@ import type { CommandRegistry } from "../registry.js";
 import { resolveImagePath } from "../paths.js";
 import { waitForDelay } from "../execution.js";
 import { z } from "zod";
-import type { CaptureImage } from "@spotterjs/base";
+import { SpotterError, type CaptureImage } from "@spotterjs/base";
 import { image as coreImage } from "@spotterjs/core";
 import { android } from "@spotterjs/plugin-android";
 import type {
@@ -314,7 +314,15 @@ async function waitForElement(
     if (first) return first;
     if (pollMs > 0) await waitForDelay(pollMs, signal);
   }
-  throw new Error(`Android element not found before timeout; matches=${lastCount}`);
+  throw new SpotterError(
+    "SPOTTER_ANDROID_ELEMENT_NOT_FOUND",
+    `Android element not found before timeout; matches=${lastCount}`,
+    {
+      domain: "android",
+      context: { query, matches: lastCount, timeoutMs: args.waitTimeoutMs },
+      hint: "Use android_dump_tree to inspect available UI elements, adjust query fields, or increase waitTimeoutMs.",
+    }
+  );
 }
 
 export function registerAndroidTools(server: CommandRegistry): void {
@@ -374,8 +382,14 @@ export function registerAndroidTools(server: CommandRegistry): void {
       };
     }
 
-    throw new Error(
-      `Android device session not found: ${deviceId}; call android_connect first or pass url/sessionToken`
+    throw new SpotterError(
+      "SPOTTER_ANDROID_SESSION_NOT_FOUND",
+      `Android device session not found: ${deviceId}; call android_connect first or pass url/sessionToken`,
+      {
+        domain: "android",
+        context: { deviceId },
+        hint: "Call android_connect first (or pass url and sessionToken directly).",
+      }
     );
   }
 
@@ -724,8 +738,19 @@ export function registerAndroidTools(server: CommandRegistry): void {
       const tree = await withDevice(args, (device) => device.dumpTree({
         maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
       }));
-      const element = findElements(tree, elementQuery(args))[0];
-      if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
+      const query = elementQuery(args);
+      const element = findElements(tree, query)[0];
+      if (!element) {
+        throw new SpotterError(
+          "SPOTTER_ANDROID_ELEMENT_NOT_FOUND",
+          `Android element not found: ${JSON.stringify(query)}`,
+          {
+            domain: "android",
+            context: { query },
+            hint: "Use android_dump_tree to inspect visible text, resourceId, and contentDescription.",
+          }
+        );
+      }
       return json(withAndroidCoordinateSpace({ element }));
     }
   );
@@ -780,8 +805,19 @@ export function registerAndroidTools(server: CommandRegistry): void {
         const tree = await device.dumpTree({
           maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
         });
-        const element = findElements(tree, elementQuery(args))[0];
-        if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
+        const query = elementQuery(args);
+        const element = findElements(tree, query)[0];
+        if (!element) {
+          throw new SpotterError(
+            "SPOTTER_ANDROID_ELEMENT_NOT_FOUND",
+            `Android element not found: ${JSON.stringify(query)}`,
+            {
+              domain: "android",
+              context: { query },
+              hint: "Use android_dump_tree to inspect visible text, resourceId, and contentDescription.",
+            }
+          );
+        }
         await device.tap(element.center.x, element.center.y);
         return json(withAndroidCoordinateSpace({ element }));
       });
@@ -814,8 +850,19 @@ export function registerAndroidTools(server: CommandRegistry): void {
         const tree = await device.dumpTree({
         maxDepth: typeof args.maxDepth === "number" ? args.maxDepth : undefined,
       });
-        const element = findElements(tree, elementQuery(args))[0];
-        if (!element) throw new Error(`Android element not found: ${JSON.stringify(elementQuery(args))}`);
+        const query = elementQuery(args);
+        const element = findElements(tree, query)[0];
+        if (!element) {
+          throw new SpotterError(
+            "SPOTTER_ANDROID_ELEMENT_NOT_FOUND",
+            `Android element not found: ${JSON.stringify(query)}`,
+            {
+              domain: "android",
+              context: { query },
+              hint: "Use android_dump_tree to inspect visible text, resourceId, and contentDescription.",
+            }
+          );
+        }
         await device.tap(element.center.x, element.center.y);
         await device.text(args.textToType);
         return json(withAndroidCoordinateSpace({ element }));

@@ -4,6 +4,7 @@ import { getHostConfig } from "./config";
 import {
   assertWithinSize,
   assertWriteAllowed,
+  hostError,
   resolveWorkspacePath,
   statSafe,
 } from "./paths";
@@ -23,7 +24,13 @@ export function readFile(filePath: string, opts?: ReadFileOptions): string | Buf
   const resolved = resolveWorkspacePath(filePath);
   const st = statSafe(resolved);
   if (!st.isFile()) {
-    throw new Error(`not a file: ${filePath}`);
+    throw hostError(
+      `not a file: ${filePath}`,
+      "SPOTTER_HOST_NOT_A_FILE",
+      { userPath: filePath },
+      undefined,
+      "Pass a regular file path; use host.listDir() to inspect directories."
+    );
   }
   assertWithinSize(st.size);
   if (opts?.encoding === null) {
@@ -67,7 +74,13 @@ export function listDir(dirPath = "."): DirEntry[] {
   const resolved = resolveWorkspacePath(dirPath);
   const st = statSafe(resolved);
   if (!st.isDirectory()) {
-    throw new Error(`not a directory: ${dirPath}`);
+    throw hostError(
+      `not a directory: ${dirPath}`,
+      "SPOTTER_HOST_NOT_A_DIRECTORY",
+      { userPath: dirPath },
+      undefined,
+      "Pass a directory path; use host.readFile() to read files."
+    );
   }
   return fs.readdirSync(resolved).map((name) => {
     const full = path.join(resolved, name);

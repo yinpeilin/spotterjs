@@ -365,6 +365,7 @@ describe("android companion websocket client", () => {
       message: "pairing code is invalid",
       context: { remoteCode: "PAIRING_CODE_INVALID" },
       domain: "android",
+      hint: expect.stringContaining("pairing code"),
     });
   });
 
@@ -401,6 +402,7 @@ describe("android companion websocket client", () => {
       name: "SpotterError",
       code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       domain: "android",
+      hint: expect.stringContaining("WebSocket URL"),
     });
   });
 
@@ -448,6 +450,7 @@ describe("android companion websocket client", () => {
       name: "SpotterError",
       code: "SPOTTER_ANDROID_COMPANION_TIMEOUT",
       domain: "android",
+      hint: expect.stringContaining("timeoutMs"),
     });
   });
 
@@ -460,6 +463,7 @@ describe("android companion websocket client", () => {
       name: "SpotterError",
       code: "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       domain: "android",
+      hint: expect.stringContaining("protocol version 2"),
     });
   });
 

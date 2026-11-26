@@ -258,7 +258,11 @@ function parseColor(color: ColorInput): Rgb {
     throw new SpotterError(
       "SPOTTER_CORE_INVALID_COLOR",
       `invalid RGB hex color: ${color}`,
-      { context: { color }, domain: "core" }
+      {
+        context: { color },
+        domain: "core",
+        hint: 'Pass a 6-digit hex color string like "#00cc66" or an { r, g, b } object.',
+      }
     );
   }
   const hex = match[1]!;
@@ -356,7 +360,11 @@ function writeArtifactFile(relativePath: string, content: Buffer): void {
     throw new SpotterError(
       "SPOTTER_CORE_ARTIFACT_PATH_ESCAPE",
       `artifact path escapes workspace: ${relativePath}`,
-      { context: { path: relativePath }, domain: "core" }
+      {
+        context: { path: relativePath },
+        domain: "core",
+        hint: "Use a relative prefix that resolves inside SPOTTERJS_WORKSPACE_ROOT.",
+      }
     );
   }
   fs.mkdirSync(path.dirname(resolved), { recursive: true });

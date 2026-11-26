@@ -41,9 +41,13 @@ export async function getOcr(args: OcrModelOptions) {
   });
   let client = ocrClients.get(key);
   if (!client) {
-    client = createOcr({
+    const pending = createOcr({
       modelDir: args.modelDir,
       modelProfile: args.modelProfile,
+    });
+    client = pending.catch((error) => {
+      if (ocrClients.get(key) === client) ocrClients.delete(key);
+      throw error;
     });
     ocrClients.set(key, client);
   }

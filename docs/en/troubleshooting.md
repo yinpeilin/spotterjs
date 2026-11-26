@@ -10,7 +10,10 @@ Common symptoms:
 
 - `Cannot find module @spotterjs/node-*`
 - `Failed to load native binding`
+- `The specified module could not be found` pointing to `onnxruntime_binding.node` on Windows when using `@spotterjs/plugin-ocr` (Win32 error 126)
 - Missing MSVC runtime or linker tooling on Windows
+
+Note: When the `.node` file exists at the reported path on Windows, `The specified module could not be found` means Windows failed to load a dependent DLL (typically missing or outdated Microsoft Visual C++ 2015–2022 Redistributable (x64), or a missing sibling `onnxruntime.dll` when bundling/unpacking with Electron `asarUnpack`). `@spotterjs/core` and `@spotterjs/plugin-ocr` inspect these conditions automatically and report them in `error.message`, `error.hint`, and `error.context`.
 
 Checklist:
 
@@ -18,6 +21,7 @@ Checklist:
 2. Reinstall dependencies with `npm ci`.
 3. From source, run `npm run build:native`.
 4. Before publishing, confirm optional native packages were built and published in order.
+5. For `@spotterjs/plugin-ocr` on Windows, install the latest Microsoft Visual C++ 2015–2022 Redistributable (x64) and ensure deployment/Electron `asarUnpack` keeps both `.node` and `.dll` files under `onnxruntime-node/bin/**`.
 
 ## Template Matching Cannot Find the Target
 
@@ -155,13 +159,16 @@ See [CLI](./CLI.md).
 ## Structured Error Codes
 
 First-party libraries throw `SpotterError` with
-`SPOTTER_<DOMAIN>_<REASON>` codes. Use `isSpotterError(error)` and inspect
-`error.domain` plus `error.context` for diagnostics.
+`SPOTTER_<DOMAIN>_<REASON>` codes. Use `isSpotterError(error)`, inspect
+`error.domain`, `error.hint`, and `error.context`, or call
+`formatSpotterError(error)` for a human-readable summary.
 
-Common setup codes include `SPOTTER_NATIVE_PACKAGE_MISSING`,
-`SPOTTER_NATIVE_LOAD_FAILED`, `SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`, and
-`SPOTTER_ANDROID_COMPANION_TIMEOUT`. CLI command failures include the same
-`code`, summarized `context`, and `domain` in the JSON `error` object.
+Common setup and runtime codes include `SPOTTER_NATIVE_PACKAGE_MISSING`,
+`SPOTTER_NATIVE_LOAD_FAILED`, `SPOTTER_OCR_RUNTIME_LOAD_FAILED`,
+`SPOTTER_OCR_ONNX_SESSION_FAILED`, `SPOTTER_OCR_SHARP_LOAD_FAILED`,
+`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`, `SPOTTER_ANDROID_COMPANION_TIMEOUT`, and
+`SPOTTER_CLI_INVALID_ARGUMENTS`. CLI command failures include the same
+`code`, `hint`, summarized `context`, and `domain` in the JSON `error` object.
 
 ## Markdown Check Fails
 

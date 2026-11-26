@@ -6,12 +6,13 @@ import {
   screen,
   windows,
 } from "@spotterjs/core";
-import type {
-  CaptureImage,
-  MatchResult,
-  Point,
-  Region,
-  Rgb,
+import {
+  SpotterError,
+  type CaptureImage,
+  type MatchResult,
+  type Point,
+  type Region,
+  type Rgb,
 } from "@spotterjs/base";
 import { z } from "zod";
 import {
@@ -479,7 +480,15 @@ export function registerVisualTools(server: CommandRegistry): void {
 function captureDesktopSource(args: CaptureArgs, prefix: string): CaptureContext {
   const source = args.source ?? "screen";
   if (source === "window" && !args.windowId) {
-    throw new Error('source "window" requires windowId');
+    throw new SpotterError(
+      "SPOTTER_CLI_INVALID_ARGUMENTS",
+      'source "window" requires windowId',
+      {
+        domain: "cli",
+        context: { source },
+        hint: 'Pass windowId from desktop_list_windows, or use source: "active" / "screen".',
+      }
+    );
   }
 
   if (source === "screen") {
@@ -611,7 +620,15 @@ function stableRegion(args: CaptureArgs): Region | undefined {
   if (source === "screen") return args.region;
   if (source === "active") return windows.getActive().region;
   if (!args.windowId) {
-    throw new Error('source "window" requires windowId');
+    throw new SpotterError(
+      "SPOTTER_CLI_INVALID_ARGUMENTS",
+      'source "window" requires windowId',
+      {
+        domain: "cli",
+        context: { source },
+        hint: 'Pass windowId from desktop_list_windows, or use source: "active" / "screen".',
+      }
+    );
   }
   return windows.getRegion(args.windowId);
 }

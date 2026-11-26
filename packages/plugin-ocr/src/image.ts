@@ -1,7 +1,31 @@
-import type { CaptureImage, Region } from "@spotterjs/base";
+import { diagnoseNativeAddonError, type CaptureImage, type Region } from "@spotterjs/base";
 import { image as coreImage } from "@spotterjs/core";
-import { ocrError } from "./errors";
+import { isSpotterError, ocrError } from "./errors";
 import type { OcrImage, OcrPreprocessOptions } from "./types";
+
+async function loadSharp() {
+  try {
+    return await import("sharp");
+  } catch (error) {
+    if (isSpotterError(error)) throw error;
+    const diagnosis = diagnoseNativeAddonError(error, {
+      component: "sharp image processor",
+      packageName: "sharp",
+      installCommand: "npm install @spotterjs/plugin-ocr sharp --include=optional",
+    });
+    throw ocrError(
+      diagnosis.kind === "module-missing"
+        ? "SPOTTER_OCR_SHARP_MISSING"
+        : "SPOTTER_OCR_SHARP_LOAD_FAILED",
+      diagnosis.message,
+      {
+        cause: error,
+        hint: diagnosis.hint,
+        context: diagnosis.context,
+      }
+    );
+  }
+}
 
 export async function loadImage(image: OcrImage): Promise<CaptureImage> {
   if (typeof image === "string" || Buffer.isBuffer(image)) {
@@ -116,7 +140,7 @@ export async function resizeRgba(
   height: number
 ): Promise<CaptureImage> {
   validateCaptureImage(image, "image");
-  const sharp = await import("sharp");
+  const sharp = await loadSharp();
   const { data, info } = await sharp
     .default(image.data, {
       raw: {
@@ -153,7 +177,7 @@ export async function preprocessImage(
     scale !== 1;
   if (!needsSharp) return image;
 
-  const sharp = await import("sharp");
+  const sharp = await loadSharp();
   let pipeline = sharp.default(image.data, {
     raw: {
       width: image.width,

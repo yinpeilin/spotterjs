@@ -120,4 +120,29 @@ describe("host", () => {
       expect(info.shell).toBe("bash");
     }
   });
+
+  it("throws structured SpotterError with hints for non-file and non-directory targets", () => {
+    host.writeFile("folder/note.txt", "hi");
+
+    expect(() => host.readFile("folder")).toThrowError(SpotterError);
+    try {
+      host.readFile("folder");
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "SPOTTER_HOST_NOT_A_FILE",
+        domain: "host",
+        hint: expect.stringContaining("listDir"),
+      });
+    }
+
+    try {
+      host.listDir("folder/note.txt");
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: "SPOTTER_HOST_NOT_A_DIRECTORY",
+        domain: "host",
+        hint: expect.stringContaining("readFile"),
+      });
+    }
+  });
 });

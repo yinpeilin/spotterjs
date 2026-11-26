@@ -56,7 +56,7 @@ export {
   resolveOcrModelProfile,
   resolveLocalOcrModels,
 };
-export { isSpotterError, toSpotterError } from "./errors";
+export { formatSpotterError, isSpotterError, toSpotterError } from "./errors";
 
 export type {
   CreateOcrOptions,
@@ -100,7 +100,13 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
     },
 
     async findText(image, text, findOptions) {
-      const matches = await this.findAllText(image, text, findOptions);
+      const lines = await client.read(image, findOptions);
+      const matches = lines
+        .map((line: OcrTextLine) => ({
+          ...line,
+          ...scoreOcrText(line.text, text, findOptions),
+        }))
+        .filter((line): line is OcrTextMatch => line.matched);
       if (!matches.length) {
         throw ocrError("SPOTTER_OCR_TEXT_NOT_FOUND", `OCR text not found: ${text}`, {
           context: {
@@ -108,7 +114,10 @@ export async function createOcr(options: CreateOcrOptions = {}): Promise<OcrClie
             exact: findOptions?.exact,
             caseSensitive: findOptions?.caseSensitive,
             minSimilarity: findOptions?.minSimilarity,
+            recognizedCount: lines.length,
+            recognizedSample: lines.slice(0, 5).map((line) => line.text),
           },
+          hint: "Inspect recognized lines with ocr.read(), try loosening exact/caseSensitive, pass minSimilarity, or enable preprocess: true for small or low-contrast text.",
         });
       }
       return matches[0];
@@ -177,7 +186,11 @@ async function createCachedOnnxEngine(options: CreateOcrOptions): Promise<OcrEng
   });
   let cached = engineCache.get(cacheKey);
   if (!cached) {
-    cached = factory();
+    const pending = factory();
+    cached = pending.catch((error) => {
+      if (engineCache.get(cacheKey) === cached) engineCache.delete(cacheKey);
+      throw error;
+    });
     engineCache.set(cacheKey, cached);
   }
   return cached;

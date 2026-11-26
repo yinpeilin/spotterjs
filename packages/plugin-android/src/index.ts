@@ -1,5 +1,6 @@
 import WebSocket = require("ws");
 import {
+  formatSpotterError,
   isSpotterError,
   SpotterError,
   toSpotterError,
@@ -17,6 +18,7 @@ export type AndroidErrorCode = `SPOTTER_ANDROID_${string}`;
 export type AndroidErrorContext = SpotterErrorContext;
 
 export {
+  formatSpotterError,
   isSpotterError,
   SpotterError,
   toSpotterError,
@@ -33,6 +35,25 @@ function androidError(
     ...options,
     domain: "android",
   });
+}
+
+function remoteErrorHint(remoteCode?: string): string {
+  if (!remoteCode) {
+    return "Inspect error.context.response from the Android companion app.";
+  }
+  if (/PAIR/i.test(remoteCode)) {
+    return "Refresh the pairing code in the Spotter companion app and retry android.pair().";
+  }
+  if (/UNAUTHORIZED|SESSION|TOKEN/i.test(remoteCode)) {
+    return "Re-pair with android.pair() and reuse the new sessionToken.";
+  }
+  if (/ACCESSIBILITY/i.test(remoteCode)) {
+    return "Enable the Spotter accessibility service in Android Settings -> Accessibility.";
+  }
+  if (/KEYBOARD|IME/i.test(remoteCode)) {
+    return "Enable and select Spotter Keyboard in Android input method settings for reliable text input.";
+  }
+  return "Inspect error.context.remoteCode and error.context.response from the Android companion app.";
 }
 
 export interface AndroidPairOptions {
@@ -142,16 +163,24 @@ class SocketSession {
       this.fail(
         androidError(
           "SPOTTER_ANDROID_COMPANION_CONNECTION_CLOSED",
-          "Android companion connection closed"
+          "Android companion connection closed",
+          {
+            hint: "Reconnect with android.connect() or re-pair with android.pair() if the session expired.",
+          }
         )
       )
     );
     socket.on("error", (error) =>
       this.fail(
-        androidError("SPOTTER_ANDROID_COMPANION_CONNECTION_FAILED", "Android companion socket error", {
-          context: { message: error.message },
-          cause: error,
-        })
+        androidError(
+          "SPOTTER_ANDROID_COMPANION_CONNECTION_FAILED",
+          `Android companion socket error: ${error.message}`,
+          {
+            context: { message: error.message },
+            cause: error,
+            hint: "Verify the Android companion app is running and reachable over Wi-Fi or adb forward.",
+          }
+        )
       )
     );
   }
@@ -165,13 +194,17 @@ class SocketSession {
       this.socket.send(JSON.stringify(message), (error: Error | undefined) => {
         if (error) {
           reject(
-            androidError("SPOTTER_ANDROID_COMPANION_SEND_FAILED", "Failed to send Android companion message", {
-              context: { messageType: message.type },
-              cause: error,
-            })
+            androidError(
+              "SPOTTER_ANDROID_COMPANION_SEND_FAILED",
+              `Failed to send Android companion message (${String(message.type ?? "unknown")}): ${error.message}`,
+              {
+                context: { messageType: message.type },
+                cause: error,
+                hint: "Check that the WebSocket connection is still open and reconnect if needed.",
+              }
+            )
           );
-        }
-        else resolve();
+        } else resolve();
       });
     });
   }
@@ -191,8 +224,11 @@ class SocketSession {
         reject(
           androidError(
             "SPOTTER_ANDROID_COMPANION_TIMEOUT",
-            "Timed out waiting for Android companion response",
-            { context: { timeoutMs } }
+            `Timed out waiting for Android companion response after ${timeoutMs}ms`,
+            {
+              context: { timeoutMs },
+              hint: "Ensure the device screen is awake and the Spotter companion service is running, or increase timeoutMs.",
+            }
           )
         );
       }, timeoutMs);
@@ -393,7 +429,10 @@ class CompanionDevice implements AndroidCompanionDevice {
       throw androidError(
         "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
         "screen capture mimeType must be image/png",
-        { context: { mimeType } }
+        {
+          context: { mimeType },
+          hint: "Update the Spotter Android companion app to a compatible version.",
+        }
       );
     }
     return {
@@ -417,7 +456,10 @@ class CompanionDevice implements AndroidCompanionDevice {
         throw androidError(
           "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
           `Expected ${expectedType} response, got ${String(response.type)}`,
-          { context: { responseType: response.type } }
+          {
+            context: { responseType: response.type },
+            hint: "Confirm the companion app protocol matches v2 and no stale frames are buffered.",
+          }
         );
       }
       return response;
@@ -470,8 +512,11 @@ function openSession(url: string, timeoutMs: number): Promise<SocketSession> {
       reject(
         androidError(
           "SPOTTER_ANDROID_COMPANION_TIMEOUT",
-          "Timed out opening Android companion connection",
-          { context: { timeoutMs, url } }
+          `Timed out opening Android companion connection to ${url} after ${timeoutMs}ms`,
+          {
+            context: { timeoutMs, url },
+            hint: "Confirm the companion app is listening at the target URL/port, check Wi-Fi or adb forward, or increase timeoutMs.",
+          }
         )
       );
     }, timeoutMs);
@@ -482,10 +527,15 @@ function openSession(url: string, timeoutMs: number): Promise<SocketSession> {
     socket.once("error", (error: Error) => {
       clearTimeout(timer);
       reject(
-        androidError("SPOTTER_ANDROID_COMPANION_CONNECTION_FAILED", "Failed to open Android companion connection", {
-          context: { url, message: error.message },
-          cause: error,
-        })
+        androidError(
+          "SPOTTER_ANDROID_COMPANION_CONNECTION_FAILED",
+          `Failed to open Android companion connection to ${url}: ${error.message}`,
+          {
+            context: { url, message: error.message },
+            cause: error,
+            hint: "Confirm the Android companion app is listening at the URL/port and reachable from this machine (or run adb forward).",
+          }
+        )
       );
     });
   });
@@ -522,7 +572,10 @@ function assertMessageType(message: JsonMessage, expectedType: string): void {
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `Expected ${expectedType} response, got ${String(message.type)}`,
-      { context: { responseType: message.type } }
+      {
+        context: { responseType: message.type },
+        hint: "Verify the Android companion app protocol matches v2.",
+      }
     );
   }
 }
@@ -532,7 +585,10 @@ function assertProtocolVersion(message: JsonMessage): void {
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `Expected protocolVersion ${PROTOCOL_VERSION}, got ${String(message.protocolVersion)}`,
-      { context: { protocolVersion: message.protocolVersion } }
+      {
+        context: { protocolVersion: message.protocolVersion },
+        hint: `Update the Android companion app or @spotterjs/plugin-android to protocol version ${PROTOCOL_VERSION}.`,
+      }
     );
   }
 }
@@ -542,15 +598,23 @@ function parseMessage(raw: RawData): JsonMessage {
   try {
     parsed = JSON.parse(String(raw)) as unknown;
   } catch (error) {
-    throw androidError("SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE", "Android companion message must be valid JSON", {
-      context: { raw: String(raw).slice(0, 200) },
-      cause: error,
-    });
+    throw androidError(
+      "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
+      "Android companion message must be valid JSON",
+      {
+        context: { raw: String(raw).slice(0, 200) },
+        cause: error,
+        hint: "Verify the WebSocket URL points to the Spotter Android companion server.",
+      }
+    );
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
-      "Android companion message must be a JSON object"
+      "Android companion message must be a JSON object",
+      {
+        hint: "Verify the WebSocket URL points to the Spotter Android companion server.",
+      }
     );
   }
   return parsed as JsonMessage;
@@ -561,7 +625,10 @@ function errorFromMessage(message: JsonMessage): SpotterError {
   return androidError(
     "SPOTTER_ANDROID_COMPANION_ERROR",
     readOptionalString(message, "message") ?? "Android companion returned an error",
-    { context: { response: message, ...defined({ remoteCode }) } }
+    {
+      context: { response: message, ...defined({ remoteCode }) },
+      hint: remoteErrorHint(remoteCode),
+    }
   );
 }
 
@@ -571,7 +638,10 @@ function readString(message: JsonMessage, key: string): string {
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a string`,
-      { context: { key, value } }
+      {
+        context: { key, value },
+        hint: "Verify the Android companion app version matches protocol v2.",
+      }
     );
   }
   return value;
@@ -584,7 +654,10 @@ function readOptionalString(message: JsonMessage, key: string): string | undefin
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a string`,
-      { context: { key, value } }
+      {
+        context: { key, value },
+        hint: "Verify the Android companion app version matches protocol v2.",
+      }
     );
   }
   return value;
@@ -596,7 +669,10 @@ function readNumber(message: JsonMessage, key: string): number {
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a finite number`,
-      { context: { key, value } }
+      {
+        context: { key, value },
+        hint: "Verify the Android companion app version matches protocol v2.",
+      }
     );
   }
   return value;
@@ -613,7 +689,10 @@ function readBase64(message: JsonMessage, key: string): Buffer {
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be a base64 string`,
-      { context: { key } }
+      {
+        context: { key },
+        hint: "Verify the Android companion app version matches protocol v2.",
+      }
     );
   }
   return Buffer.from(normalized, "base64");
@@ -625,7 +704,10 @@ function readObject(message: JsonMessage, key: string): Record<string, unknown> 
     throw androidError(
       "SPOTTER_ANDROID_COMPANION_INVALID_MESSAGE",
       `${key} must be an object`,
-      { context: { key, value } }
+      {
+        context: { key, value },
+        hint: "Verify the Android companion app version matches protocol v2.",
+      }
     );
   }
   return value as Record<string, unknown>;

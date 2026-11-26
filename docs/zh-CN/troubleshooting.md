@@ -10,9 +10,17 @@
 
 - `Cannot find module @spotterjs/node-*`
 - `Failed to load native binding`
+- Windows 上加载 `@spotterjs/plugin-ocr` 时出现 `The specified module could not be found` 并指向 `onnxruntime_binding.node`（Win32 error 126）
+
+说明：当报错路径下的 `.node` 文件实际存在但报 `The specified module could not be found` 时，通常是它依赖的 DLL 缺失（例如目标机器缺少或版本过旧的 Microsoft Visual C++ 2015–2022 Redistributable (x64)，或打包/Electron `asarUnpack` 漏掉了同目录下的 `onnxruntime.dll`）。`@spotterjs/plugin-ocr`、`@spotterjs/core` 会自动探测这些常见问题并在 `SpotterError` 的 `message`、`hint` 与 `context` 中给出定位结果。
+
+检查清单：
+
+1. 确认平台是 Windows x64 (MSVC) 或 Linux x64 (glibc)。
 2. 使用 `npm ci` 重新安装依赖。
 3. 源码开发时运行 `npm run build:native`。
 4. 发布前确认 optional native packages 已按顺序构建并发布。
+5. 使用 OCR 时确保目标 Windows 机器已安装最新版 Microsoft Visual C++ 2015–2022 Redistributable (x64)，且部署/Electron `asarUnpack` 保留了 `onnxruntime-node/bin/**` 下的 `.node` 与 `.dll` 文件。
 
 ## 模板匹配找不到目标
 
@@ -138,12 +146,15 @@ arboard 历史上的 [Windows 剪贴板未关闭问题](https://github.com/1Pass
 
 first-party 库统一抛出 `SpotterError`，code 形如
 `SPOTTER_<DOMAIN>_<REASON>`。应用代码可以用 `isSpotterError(error)` 判断，
-并读取 `error.domain` 和 `error.context` 做诊断。
+并读取 `error.domain`、`error.hint` 和 `error.context` 做诊断，也可以直接调用
+`formatSpotterError(error)` 输出包含 code 和排查建议的友好文案。
 
-常见安装和环境 code 包括 `SPOTTER_NATIVE_PACKAGE_MISSING`、
-`SPOTTER_NATIVE_LOAD_FAILED`、`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED` 和
-`SPOTTER_ANDROID_COMPANION_TIMEOUT`。CLI 命令失败时会在 JSON `error` 对象中带上同一套
-`code`、摘要后的 `context` 和 `domain`。
+常见安装、运行时和校验 code 包括 `SPOTTER_NATIVE_PACKAGE_MISSING`、
+`SPOTTER_NATIVE_LOAD_FAILED`、`SPOTTER_OCR_RUNTIME_LOAD_FAILED`、
+`SPOTTER_OCR_ONNX_SESSION_FAILED`、`SPOTTER_OCR_SHARP_LOAD_FAILED`、
+`SPOTTER_OCR_MODEL_DOWNLOAD_FAILED`、`SPOTTER_ANDROID_COMPANION_TIMEOUT` 和
+`SPOTTER_CLI_INVALID_ARGUMENTS`。CLI 命令失败时会在 JSON `error` 对象中带上同一套
+`code`、`hint`、摘要后的 `context` 和 `domain`。
 
 ## Markdown 检查失败
 

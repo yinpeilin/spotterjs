@@ -30,9 +30,11 @@ npm install @spotterjs/base
 | `WindowInfo` | Top-level desktop window metadata |
 | `DesktopApp` | Process-grouped desktop app and window metadata |
 | `MatchProvider` | `findTemplate` / `findAllTemplates` / `waitForTemplate` provider interface |
-| `SpotterError` | Structured error with stable `code`, optional `domain`, and `context` |
+| `SpotterError` | Structured error with stable `code`, optional `domain`, `hint`, and `context` |
 | `isSpotterError(error)` | Type guard for spotterjs structured errors |
 | `toSpotterError(error)` | Convert unknown errors into `SpotterError` |
+| `formatSpotterError(error)` | Format an error with `[code]`, message, and actionable `Hint:` |
+| `diagnoseNativeAddonError(error, opts)` | Diagnose `.node` native addon load failures (Win32 error 126/VC++ runtime, `.asar`, sibling DLLs, glibc/`.so`) |
 | `centerOf(region)` | Return the integer center point of a region |
 
 ## Coordinate Conventions
@@ -51,16 +53,17 @@ plugin APIs use Android device screenshot coordinates.
 
 spotterjs packages throw `SpotterError` for structured failures. Application
 code should branch on `isSpotterError(error)` and then use stable
-`SPOTTER_<DOMAIN>_<REASON>` codes.
+`SPOTTER_<DOMAIN>_<REASON>` codes, optional `error.hint`, or `formatSpotterError(error)`.
 
 ```typescript
-import { isSpotterError } from "@spotterjs/base";
+import { formatSpotterError, isSpotterError } from "@spotterjs/base";
 
 try {
   // call a spotterjs API
 } catch (error) {
   if (isSpotterError(error)) {
-    console.log(error.code, error.domain, error.context);
+    console.log(error.code, error.domain, error.hint, error.context);
+    console.error(formatSpotterError(error));
   }
 }
 ```

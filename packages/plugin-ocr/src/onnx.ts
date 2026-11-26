@@ -1,6 +1,10 @@
 import * as fs from "fs";
-import type { CaptureImage } from "@spotterjs/base";
-import { ocrError } from "./errors";
+import {
+  diagnoseNativeAddonError,
+  type CaptureImage,
+  type DiagnoseNativeAddonOptions,
+} from "@spotterjs/base";
+import { isSpotterError, ocrError, type SpotterError } from "./errors";
 import { cropImage, resizeRgba } from "./image";
 import { centerOf, boxesFromBitmap, type DetectedBox } from "./postprocess";
 import type {
@@ -24,6 +28,116 @@ type OrtModule = {
 
 const DB_UNCLIP_RATIO = 1.5;
 
+export const ONNXRUNTIME_WINDOWS_RUNTIME_DLLS = [
+  "vcruntime140.dll",
+  "vcruntime140_1.dll",
+  "msvcp140.dll",
+  "msvcp140_1.dll",
+  "msvcp140_atomic_wait.dll",
+] as const;
+
+/**
+ * Wrap failures loading `onnxruntime-node` or its native `.node`/`.dll` binaries
+ * into an actionable `SpotterError`.
+ */
+export function wrapOnnxRuntimeLoadError(
+  error: unknown,
+  env?: DiagnoseNativeAddonOptions["env"]
+): SpotterError {
+  if (isSpotterError(error)) return error;
+  const diagnosis = diagnoseNativeAddonError(error, {
+    component: "ONNX Runtime",
+    packageName: "onnxruntime-node",
+    siblingFiles: ["onnxruntime.dll"],
+    windowsRuntimeDlls: ONNXRUNTIME_WINDOWS_RUNTIME_DLLS,
+    installCommand: "npm install @spotterjs/plugin-ocr onnxruntime-node --include=optional",
+    env,
+  });
+  return ocrError(
+    diagnosis.kind === "module-missing"
+      ? "SPOTTER_OCR_RUNTIME_MISSING"
+      : "SPOTTER_OCR_RUNTIME_LOAD_FAILED",
+    diagnosis.message,
+    {
+      cause: error,
+      hint: diagnosis.hint,
+      context: diagnosis.context,
+    }
+  );
+}
+
+async function loadOnnxRuntime(): Promise<OrtModule> {
+  try {
+    return (await import("onnxruntime-node")) as OrtModule;
+  } catch (error) {
+    throw wrapOnnxRuntimeLoadError(error);
+  }
+}
+
+async function createInferenceSession(
+  ort: OrtModule,
+  label: "detection" | "recognition",
+  modelPath: string,
+  executionProviders?: readonly OcrExecutionProvider[]
+): Promise<OcrSession> {
+  const sessionOptions = executionProviders ? { executionProviders } : undefined;
+  try {
+    return await ort.InferenceSession.create(modelPath, sessionOptions);
+  } catch (error) {
+    if (isSpotterError(error)) throw error;
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const lower = rawMessage.toLowerCase();
+    let hint = "Verify the ONNX model file path, executionProviders, and error.cause.";
+    if (/dml|cuda|directml|d3d12|provider/i.test(lower)) {
+      hint =
+        'GPU execution provider initialization failed; try falling back to executionProviders: ["cpu"] or ["dml", "cpu"] and verify GPU drivers.';
+    } else if (/enoent|no such file|protobuf|invalid|load model|empty/i.test(lower)) {
+      hint =
+        "Verify that the ONNX model file exists and is not corrupted, or delete the cached model directory and retry downloading.";
+    }
+    throw ocrError(
+      "SPOTTER_OCR_ONNX_SESSION_FAILED",
+      `Failed to initialize ONNX ${label} session (${modelPath}): ${rawMessage}`,
+      {
+        cause: error,
+        hint,
+        context: {
+          label,
+          modelPath,
+          ...(executionProviders ? { executionProviders } : {}),
+        },
+      }
+    );
+  }
+}
+
+function readDictionaryFile(dictionaryPath: string): string[] {
+  try {
+    return fs
+      .readFileSync(dictionaryPath, "utf8")
+      .split(/\r?\n/)
+      .filter(Boolean);
+  } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const errCode =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : undefined;
+    const missing = errCode === "ENOENT";
+    throw ocrError(
+      missing ? "SPOTTER_OCR_MODEL_FILE_MISSING" : "SPOTTER_OCR_MODEL_READ_FAILED",
+      `Failed to read OCR dictionary file (${dictionaryPath}): ${rawMessage}`,
+      {
+        cause: error,
+        hint: missing
+          ? "Ensure dict.txt exists in the model directory or clear the model cache to re-download it."
+          : "Verify read permissions and UTF-8 encoding for dict.txt.",
+        context: { file: dictionaryPath },
+      }
+    );
+  }
+}
+
 export async function createOnnxOcrEngine(
   models: ResolvedOcrModels,
   options: {
@@ -31,22 +145,22 @@ export async function createOnnxOcrEngine(
     executionProviders?: readonly OcrExecutionProvider[];
   } = {}
 ): Promise<OcrEngine> {
-  const ort = (await import("onnxruntime-node")) as OrtModule;
-  const sessionOptions = options.executionProviders
-    ? { executionProviders: options.executionProviders }
-    : undefined;
-  const det = await ort.InferenceSession.create(
+  const ort = await loadOnnxRuntime();
+  const det = await createInferenceSession(
+    ort,
+    "detection",
     models.files[models.profile.detection.modelFile],
-    sessionOptions
+    options.executionProviders
   );
-  const rec = await ort.InferenceSession.create(
+  const rec = await createInferenceSession(
+    ort,
+    "recognition",
     models.files[models.profile.recognition.modelFile],
-    sessionOptions
+    options.executionProviders
   );
-  const dictionary = fs
-    .readFileSync(models.files[models.profile.recognition.dictionaryFile], "utf8")
-    .split(/\r?\n/)
-    .filter(Boolean);
+  const dictionary = readDictionaryFile(
+    models.files[models.profile.recognition.dictionaryFile]
+  );
 
   return new OnnxOcrEngine(
     ort,
@@ -100,7 +214,7 @@ class OnnxOcrEngine implements OcrEngine {
     const input = rgbaToNchw({ data: padded, width: cfg.inputWidth, height: cfg.inputHeight }, cfg.mean, cfg.std);
     const inputName = cfg.inputName ?? this.detector.inputNames?.[0] ?? "x";
     const feeds = { [inputName]: new this.ort.Tensor("float32", input, [1, 3, cfg.inputHeight, cfg.inputWidth]) };
-    const output = firstTensor(await this.detector.run(feeds));
+    const output = firstTensor(await runSession(this.detector, feeds, "detection"));
     const bitmap = tensorData(output, "detection");
     const dims = output.dims;
     if (dims.length < 2 || dims.slice(0, -2).some((dim) => dim !== 1) ||
@@ -128,7 +242,7 @@ class OnnxOcrEngine implements OcrEngine {
     const input = rgbaToNchw(resized, cfg.mean, cfg.std, cfg.inputWidth);
     const inputName = cfg.inputName ?? this.recognizer.inputNames?.[0] ?? "x";
     const feeds = { [inputName]: new this.ort.Tensor("float32", input, [1, 3, cfg.inputHeight, cfg.inputWidth]) };
-    const output = firstTensor(await this.recognizer.run(feeds));
+    const output = firstTensor(await runSession(this.recognizer, feeds, "recognition"));
     const data = tensorData(output, "recognition");
     const dims = output.dims as number[];
     const classes = dims[dims.length - 1];
@@ -175,6 +289,28 @@ function firstTensor(outputs: Record<string, unknown>): { data: unknown; dims: n
     });
   }
   return first as { data: unknown; dims: number[] };
+}
+
+async function runSession(
+  session: OcrSession,
+  feeds: Record<string, unknown>,
+  label: "detection" | "recognition"
+): Promise<Record<string, unknown>> {
+  try {
+    return await session.run(feeds);
+  } catch (error) {
+    if (isSpotterError(error)) throw error;
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    throw ocrError(
+      "SPOTTER_OCR_ONNX_INFERENCE_FAILED",
+      `ONNX ${label} inference failed: ${rawMessage}`,
+      {
+        cause: error,
+        hint: "Verify the input image dimensions, model profile, and ONNX execution provider.",
+        context: { label },
+      }
+    );
+  }
 }
 
 function tensorData(output: { data: unknown; dims: number[] }, label: string): Float32Array {

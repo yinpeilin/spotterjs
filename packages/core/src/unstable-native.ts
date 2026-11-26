@@ -6,7 +6,11 @@
  * `accessibility` for normal scripts. This entrypoint is for low-level
  * integrations or unwrapped native capabilities.
  */
-import { SpotterError } from "@spotterjs/base";
+import {
+  diagnoseNativeAddonError,
+  SpotterError,
+  type DiagnoseNativeAddonOptions,
+} from "@spotterjs/base";
 import type * as Node from "@spotterjs/node";
 
 /** Full generated N-API module type. */
@@ -59,36 +63,42 @@ function platformLabel(): string {
   return `${process.platform}/${process.arch}`;
 }
 
-function nativeLoadError(error: unknown): SpotterError {
+export function nativeLoadError(
+  error: unknown,
+  env?: DiagnoseNativeAddonOptions["env"]
+): SpotterError {
   const missing = missingModuleName(error);
   const nodeVersion = packageVersion("@spotterjs/node");
 
   if (missing === "@spotterjs/node") {
+    const hint = "Run `npm install @spotterjs/core --include=optional` or reinstall dependencies.";
     return new SpotterError(
       "SPOTTER_NATIVE_PACKAGE_MISSING",
       [
         "spotterjs could not load @spotterjs/node.",
         "@spotterjs/core depends on @spotterjs/node, so the installation is incomplete.",
-        "Run `npm install @spotterjs/core --include=optional` or reinstall dependencies.",
+        hint,
         `Original error: ${errorMessage(error)}`,
       ].join("\n"),
       {
         cause: error,
         context: { missingPackage: missing },
         domain: "native",
+        hint,
       }
     );
   }
 
   if (missing?.startsWith("@spotterjs/node-")) {
     const expected = nodeVersion ? `${missing}@${nodeVersion}` : missing;
+    const hint = `Reinstall with optional dependencies enabled: npm install ${expected} --include=optional`;
     return new SpotterError(
       "SPOTTER_NATIVE_PACKAGE_MISSING",
       [
         `spotterjs native package is missing for ${platformLabel()}.`,
         `Expected optional package: ${expected}.`,
         "This usually means optional dependencies were omitted, or the matching native package was not published for the installed @spotterjs/node version.",
-        `Try reinstalling with optional dependencies enabled: npm install ${expected} --include=optional`,
+        hint,
         nodeVersion
           ? `Maintainers: publish ${expected} before publishing @spotterjs/node@${nodeVersion}.`
           : "Maintainers: publish the matching native optional package before publishing @spotterjs/node.",
@@ -104,18 +114,26 @@ function nativeLoadError(error: unknown): SpotterError {
           nodeVersion,
         },
         domain: "native",
+        hint,
       }
     );
   }
 
-  return new SpotterError("SPOTTER_NATIVE_LOAD_FAILED", errorMessage(error), {
+  const diagnosis = diagnoseNativeAddonError(error, {
+    component: "spotterjs native module",
+    packageName: "@spotterjs/node",
+    installCommand: "npm install @spotterjs/core --include=optional",
+    env,
+  });
+
+  return new SpotterError("SPOTTER_NATIVE_LOAD_FAILED", diagnosis.message, {
     cause: error,
     context: {
-      platform: process.platform,
-      arch: process.arch,
-      nodeVersion,
+      ...diagnosis.context,
+      ...(nodeVersion ? { nodeVersion } : {}),
     },
     domain: "native",
+    hint: diagnosis.hint,
   });
 }
 

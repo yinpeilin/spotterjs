@@ -279,7 +279,11 @@ function normalizeTapKey(key: TapKeyInput): string {
       throw new SpotterError(
         "SPOTTER_CORE_INVALID_ARGUMENT",
         `keyboard.tap number key must be an integer from 0 to 9: ${key}`,
-        { context: { key }, domain: "core" }
+        {
+          context: { key },
+          domain: "core",
+          hint: "Pass a single digit 0-9 or a named KeyName string such as 'Enter' or 'A'.",
+        }
       );
     }
     return String(key);
@@ -455,7 +459,10 @@ export const keyboard = {
       throw new SpotterError(
         "SPOTTER_CORE_INVALID_ARGUMENT",
         "Text must be valid Unicode without null characters",
-        { domain: "core" }
+        {
+          domain: "core",
+          hint: "Remove NUL (\\0) characters and unpaired UTF-16 surrogates from the text.",
+        }
       );
     }
     for (const delay of [options?.autoDelayMs, options?.pasteDelayMs]) {
@@ -463,7 +470,10 @@ export const keyboard = {
         throw new SpotterError(
           "SPOTTER_CORE_INVALID_ARGUMENT",
           "Keyboard delays must be finite non-negative numbers",
-          { domain: "core" }
+          {
+            domain: "core",
+            hint: "Pass a finite number >= 0 for autoDelayMs and pasteDelayMs.",
+          }
         );
       }
     }
@@ -475,7 +485,10 @@ export const keyboard = {
       throw new SpotterError(
         "SPOTTER_CORE_INVALID_ARGUMENT",
         "Unknown text input mode",
-        { domain: "core" }
+        {
+          domain: "core",
+          hint: 'Valid keyboard.write modes are "native" and "paste".',
+        }
       );
     }
     if (text.length === 0) return;
@@ -596,7 +609,12 @@ export type {
 export { desktop } from "./desktop";
 export { host, configureHost } from "./host";
 export type { ShellInfo, ExecResult, DirEntry } from "./host";
-export { SpotterError, isSpotterError, toSpotterError } from "./errors";
+export {
+  SpotterError,
+  formatSpotterError,
+  isSpotterError,
+  toSpotterError,
+} from "./errors";
 export type { SpotterErrorCode, SpotterErrorContext } from "./errors";
 export {
   image,

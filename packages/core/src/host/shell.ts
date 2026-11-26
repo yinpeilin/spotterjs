@@ -79,7 +79,10 @@ export function execCommand(
     return Promise.reject(
       hostError(
         "shell execution disabled; set SPOTTERJS_ALLOW_SHELL=1 to enable host.exec",
-        "SPOTTER_HOST_SHELL_DISABLED"
+        "SPOTTER_HOST_SHELL_DISABLED",
+        undefined,
+        undefined,
+        "Set environment variable SPOTTERJS_ALLOW_SHELL=1 or call configureHost({ allowShell: true })."
       )
     );
   }
@@ -114,10 +117,15 @@ export function execCommand(
       const text = chunk?.toString() ?? "";
       const nextBytes = Buffer.byteLength(stream === "stdout" ? stdout + text : stderr + text);
       if (nextBytes > maxBytes) {
-        fail(hostError(`command ${stream} output exceeds limit ${maxBytes}`, "SPOTTER_HOST_SHELL_OUTPUT_LIMIT", {
-          stream,
-          maxBytes,
-        }));
+        fail(
+          hostError(
+            `command ${stream} output exceeds limit ${maxBytes}`,
+            "SPOTTER_HOST_SHELL_OUTPUT_LIMIT",
+            { stream, maxBytes },
+            undefined,
+            `Filter or truncate command output below ${maxBytes} bytes, or raise maxBytes via configureHost().`
+          )
+        );
         return;
       }
       if (stream === "stdout") stdout += text;
@@ -130,12 +138,26 @@ export function execCommand(
       append("stderr", d);
     });
     const timer = setTimeout(() => {
-      fail(hostError(`command timed out after ${timeout}ms`, "SPOTTER_HOST_SHELL_TIMEOUT", {
-        timeoutMs: timeout,
-      }));
+      fail(
+        hostError(
+          `command timed out after ${timeout}ms`,
+          "SPOTTER_HOST_SHELL_TIMEOUT",
+          { timeoutMs: timeout },
+          undefined,
+          `Increase timeoutMs (current: ${timeout}ms) or ensure the command exits cleanly without waiting for interactive input.`
+        )
+      );
     }, timeout);
     child.on("error", (err) => {
-      fail(err);
+      fail(
+        hostError(
+          `failed to start shell executable ${executable}: ${err.message}`,
+          "SPOTTER_HOST_SHELL_SPAWN_FAILED",
+          { executable },
+          err,
+          `Verify that "${executable}" is installed and on PATH, or override via SPOTTERJS_SHELL.`
+        )
+      );
     });
     child.on("close", (code) => {
       if (settled) return;

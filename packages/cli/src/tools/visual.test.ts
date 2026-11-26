@@ -443,7 +443,10 @@ describe("visual combo tool schemas", () => {
       { name: "desktop_find_template_and_tap", arguments: { source: "window", image: { path: "button.png" } } },
     ] });
     expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('source \\"window\\" requires windowId');
+    expect(result.error?.code).toBe("SPOTTER_CLI_INVALID_ARGUMENTS");
+    expect(result.error?.domain).toBe("cli");
+    expect(result.error?.hint).toContain("spotterjs schema");
+    expect(result.error?.message).toContain('source "window" requires windowId');
     expect(acted).toBe(false);
     expect(screen.capture).not.toHaveBeenCalled();
     expect(screen.captureWindow).not.toHaveBeenCalled();

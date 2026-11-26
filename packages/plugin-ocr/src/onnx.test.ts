@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createOnnxOcrEngine } from "./onnx";
+import { createOnnxOcrEngine, wrapOnnxRuntimeLoadError } from "./onnx";
 import type { ResolvedOcrModels } from "./types";
 
 const mocks = vi.hoisted(() => ({
@@ -96,6 +96,114 @@ describe("ONNX OCR output validation", () => {
     await expect(engine.read(capture())).rejects.toMatchObject({
       code: "SPOTTER_OCR_ONNX_INVALID_OUTPUT",
       context: { label: "detection", dims, dataLength: data.length },
+    });
+  });
+
+  it("wraps ONNX session creation failures for execution providers and corrupt model files", async () => {
+    mocks.create.mockRejectedValueOnce(new Error("DML execution provider failed to initialize"));
+    await expect(
+      createOnnxOcrEngine(models(), { executionProviders: ["dml"] })
+    ).rejects.toMatchObject({
+      name: "SpotterError",
+      code: "SPOTTER_OCR_ONNX_SESSION_FAILED",
+      domain: "ocr",
+      hint: expect.stringContaining("cpu"),
+      context: { label: "detection", executionProviders: ["dml"] },
+    });
+
+    mocks.create.mockRejectedValueOnce(new Error("Protobuf parsing failed: invalid model"));
+    await expect(createOnnxOcrEngine(models())).rejects.toMatchObject({
+      name: "SpotterError",
+      code: "SPOTTER_OCR_ONNX_SESSION_FAILED",
+      domain: "ocr",
+      hint: expect.stringContaining("corrupted"),
+      context: { label: "detection" },
+    });
+  });
+
+  it("wraps ONNX inference runtime failures with SPOTTER_OCR_ONNX_INFERENCE_FAILED", async () => {
+    const detector = {
+      inputNames: ["x"],
+      run: vi.fn(async () => {
+        throw new Error("tensor shape mismatch");
+      }),
+    };
+    mocks.create.mockResolvedValueOnce(detector).mockResolvedValueOnce(session({}));
+    const engine = await createOnnxOcrEngine(models());
+
+    await expect(engine.read(capture())).rejects.toMatchObject({
+      name: "SpotterError",
+      code: "SPOTTER_OCR_ONNX_INFERENCE_FAILED",
+      domain: "ocr",
+      context: { label: "detection" },
+      hint: expect.stringContaining("input image dimensions"),
+    });
+  });
+});
+
+describe("ONNX Runtime load error diagnostics", () => {
+  const nodePath =
+    "C:\\app\\node_modules\\onnxruntime-node\\bin\\napi-v6\\win32\\x64\\onnxruntime_binding.node";
+  const win126Error = Object.assign(
+    new Error(`The specified module could not be found.\r\n\\\\?\\${nodePath}`),
+    { code: "ERR_DLOPEN_FAILED" }
+  );
+
+  it("diagnoses missing VC++ runtime DLLs when onnxruntime_binding.node and onnxruntime.dll exist", () => {
+    const wrapped = wrapOnnxRuntimeLoadError(win126Error, {
+      platform: "win32",
+      arch: "x64",
+      systemRoot: "C:\\Windows",
+      existsSync: (target) =>
+        target === nodePath ||
+        target.endsWith("\\onnxruntime.dll") ||
+        target.endsWith("\\vcruntime140.dll"),
+    });
+
+    expect(wrapped).toMatchObject({
+      name: "SpotterError",
+      code: "SPOTTER_OCR_RUNTIME_LOAD_FAILED",
+      domain: "ocr",
+      context: {
+        failureKind: "missing-windows-vc-runtime",
+        nodeFileExists: true,
+        missingSystemDlls: expect.arrayContaining([
+          "vcruntime140_1.dll",
+          "msvcp140_atomic_wait.dll",
+        ]),
+      },
+    });
+    expect(wrapped.hint).toContain("Visual C++ 2015-2022 Redistributable");
+  });
+
+  it("diagnoses missing sibling onnxruntime.dll", () => {
+    const wrapped = wrapOnnxRuntimeLoadError(win126Error, {
+      platform: "win32",
+      arch: "x64",
+      existsSync: (target) => target === nodePath || target.includes("\\System32\\"),
+    });
+
+    expect(wrapped).toMatchObject({
+      code: "SPOTTER_OCR_RUNTIME_LOAD_FAILED",
+      context: {
+        failureKind: "missing-sibling-dll",
+        missingSiblingDlls: ["onnxruntime.dll"],
+      },
+    });
+  });
+
+  it("diagnoses missing onnxruntime-node package as SPOTTER_OCR_RUNTIME_MISSING", () => {
+    const wrapped = wrapOnnxRuntimeLoadError(
+      Object.assign(new Error("Cannot find module 'onnxruntime-node'"), {
+        code: "MODULE_NOT_FOUND",
+      }),
+      { platform: "linux", arch: "x64" }
+    );
+
+    expect(wrapped).toMatchObject({
+      code: "SPOTTER_OCR_RUNTIME_MISSING",
+      domain: "ocr",
+      context: { failureKind: "module-missing", missingModule: "onnxruntime-node" },
     });
   });
 });
