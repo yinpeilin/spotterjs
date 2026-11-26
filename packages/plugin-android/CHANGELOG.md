@@ -1,5 +1,19 @@
 # @spotterjs/plugin-android
 
+## 1.0.7
+
+### Patch Changes
+
+- Improve structured error diagnostics and human-friendly hints across all packages:
+
+  - Add optional `hint`, `formatSpotterError()`, and `diagnoseNativeAddonError()` in `@spotterjs/base` to pinpoint Windows Win32 error 126 missing VC++ runtime or sibling DLL issues, `.asar` packaging issues, architecture mismatches, and Linux shared library / glibc failures.
+  - Wrap `onnxruntime-node`, ONNX session/inference, and `sharp` loading in `@spotterjs/plugin-ocr` with actionable `SpotterError` codes (`SPOTTER_OCR_RUNTIME_LOAD_FAILED`, `SPOTTER_OCR_ONNX_SESSION_FAILED`, `SPOTTER_OCR_SHARP_LOAD_FAILED`), surface underlying `fetch failed` causes, add recognized-line samples to `SPOTTER_OCR_TEXT_NOT_FOUND`, and evict failed OCR engine promises from cache.
+  - Attach actionable hints for all `SPOTTER_NATIVE_*` errors, native addon load failures, and host sandbox errors in `@spotterjs/core`, and companion connection/protocol/remote errors in `@spotterjs/plugin-android`.
+  - Format Zod validation errors cleanly with `SPOTTER_CLI_INVALID_ARGUMENTS` and schema hints, preserve `hint`/`code`/`context` in top-level CLI errors, and evict failed CLI OCR client promises from cache.
+
+- Updated dependencies
+  - @spotterjs/base@1.1.2
+
 ## 1.0.6
 
 ### Patch Changes
